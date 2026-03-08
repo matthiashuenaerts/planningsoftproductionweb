@@ -1,5 +1,7 @@
 import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
+import { CheckCircle2 } from "lucide-react";
+import featuresImg from "@/assets/marketing/features-abstract.jpg";
 
 interface FeatureBlock {
   titleKey: string;
@@ -25,47 +27,58 @@ const MarketingFeatures: React.FC = () => {
 
   return (
     <>
-      {/* Header */}
-      <section className="pt-20 pb-12">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4">{t("features_title")}</h1>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto">{t("features_subtitle")}</p>
+      {/* Hero header */}
+      <section className="relative pt-28 pb-16 overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-[#195F85]/15 rounded-full blur-[150px]" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-6 text-center">
+          <span className="inline-block text-xs font-semibold uppercase tracking-[0.2em] text-blue-400/80 mb-4">Product</span>
+          <h1 className="text-4xl md:text-6xl font-extrabold mb-5 leading-tight">{t("features_title")}</h1>
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-12">{t("features_subtitle")}</p>
+          <div className="max-w-4xl mx-auto rounded-2xl border border-white/10 overflow-hidden shadow-2xl shadow-blue-500/5">
+            <img src={featuresImg} alt="Features overview" className="w-full" loading="eager" />
+          </div>
         </div>
       </section>
 
       {/* Feature blocks */}
-      <section className="pb-24">
-        <div className="max-w-7xl mx-auto px-6 space-y-24">
+      <section className="pb-28">
+        <div className="max-w-7xl mx-auto px-6 space-y-32">
           {features.map((f, i) => {
             const bullets = t(f.bulletsKey).split("|");
             const reversed = i % 2 === 1;
             return (
               <div
                 key={f.titleKey}
-                className={`flex flex-col ${reversed ? "lg:flex-row-reverse" : "lg:flex-row"} gap-12 items-center`}
+                className={`flex flex-col ${reversed ? "lg:flex-row-reverse" : "lg:flex-row"} gap-16 items-center`}
               >
                 {/* Image */}
                 <div className="lg:w-1/2">
-                  <div className="rounded-xl border border-white/10 overflow-hidden shadow-xl shadow-blue-500/5">
-                    <img
-                      src={f.image}
-                      alt={t(f.titleKey)}
-                      className="w-full"
-                      loading="lazy"
-                    />
+                  <div className="relative group">
+                    <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-xl bg-white/[0.02]">
+                      <img
+                        src={f.image}
+                        alt={t(f.titleKey)}
+                        className="w-full transition-transform duration-700 group-hover:scale-[1.02]"
+                        loading="lazy"
+                      />
+                    </div>
                   </div>
                 </div>
                 {/* Text */}
                 <div className="lg:w-1/2">
-                  <h2 className="text-2xl md:text-3xl font-bold mb-4">{t(f.titleKey)}</h2>
-                  <p className="text-slate-400 mb-6 leading-relaxed">{t(f.descKey)}</p>
-                  <ul className="space-y-3">
+                  <span className="inline-block text-xs font-semibold uppercase tracking-[0.15em] text-blue-400/60 mb-3">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <h2 className="text-3xl md:text-4xl font-extrabold mb-5 leading-tight">{t(f.titleKey)}</h2>
+                  <p className="text-slate-400 mb-8 leading-relaxed text-base">{t(f.descKey)}</p>
+                  <ul className="space-y-4">
                     {bullets.map((b, bi) => (
                       <li key={bi} className="flex items-start gap-3">
-                        <span className="h-6 w-6 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="h-2 w-2 rounded-full bg-blue-400" />
-                        </span>
-                        <span className="text-slate-300 text-sm">{b.trim()}</span>
+                        <CheckCircle2 className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-slate-300 text-sm leading-relaxed">{b.trim()}</span>
                       </li>
                     ))}
                   </ul>
