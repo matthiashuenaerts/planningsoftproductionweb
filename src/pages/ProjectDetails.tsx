@@ -1118,17 +1118,17 @@ const ProjectDetails = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <Button variant="outline" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-4">
-              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
+          <div className="mb-4 sm:mb-6">
+            <Button variant="outline" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm">
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> {t('back_to_projects')}
             </Button>
             
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:gap-4">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
-                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
+                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-3xl'}`}>{project?.name}</h1>
+                <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
               </div>
               
               <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent md:overflow-visible md:flex-wrap">
