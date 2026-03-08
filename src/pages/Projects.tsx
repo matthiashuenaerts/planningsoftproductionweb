@@ -430,7 +430,7 @@ const Projects = () => {
           {isLoading ? <div className="flex justify-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div> : filteredProjects.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-              {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]" onClick={() => handleProjectClick(project.id)}>
+              {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
                   <div>
                     <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
                         <div className="flex justify-between items-start gap-2">
