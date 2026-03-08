@@ -417,7 +417,7 @@ const ServiceTeamCalendar: React.FC = () => {
         : ` ${t('svc_return_by', { time: returnTimeStr })}`;
 
       const warningMsg = unrecognizedAddresses.length > 0 
-        ? ` (${t('svc_addresses_not_recognized', { count: unrecognizedAddresses.length })})` 
+        ? ` (${t('svc_addresses_not_recognized', { count: String(unrecognizedAddresses.length) })})` 
         : '';
       toast({ 
         title: t('svc_route_optimized'), 
