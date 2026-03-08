@@ -229,16 +229,39 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     };
   }, [isOpen, listening, processCode, maxKeyInterval, minCodeLength, terminator, acceptAllInput]);
 
-  // Connect source COM port
-  const connectSerialPort = async () => {
+  // Check if serial is truly available (not just present but also allowed by permissions policy)
+  const checkSerialAccess = useCallback(async (): Promise<boolean> => {
     if (!('serial' in navigator)) {
       toast({
         title: 'WebSerial niet ondersteund',
         description: 'Gebruik Chrome of Edge voor seriële poort verbinding.',
         variant: 'destructive',
       });
-      return;
+      return false;
     }
+    // Test if permissions policy allows serial access
+    try {
+      // getPorts() will throw if permissions policy blocks serial
+      await (navigator as any).serial.getPorts();
+      return true;
+    } catch (e: any) {
+      if (e.message?.includes('permissions policy') || e.message?.includes('disallowed')) {
+        toast({
+          title: 'COM poort geblokkeerd',
+          description: 'WebSerial is geblokkeerd in een iframe. Open de app in een apart tabblad (niet in preview) of gebruik de HID keyboard modus.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      // Other errors during getPorts are ok, requestPort may still work
+      return true;
+    }
+  }, [toast]);
+
+  // Connect source COM port
+  const connectSerialPort = async () => {
+    const allowed = await checkSerialAccess();
+    if (!allowed) return;
 
     try {
       const port = await (navigator as any).serial.requestPort({ filters: [] });
