@@ -449,9 +449,9 @@ function extractAllDatesWithContext(text: string): Array<{ date: string; context
 
 function extractSupplier(text: string): string | undefined {
   const patterns = [
-    /(?:supplier|leverancier|vendor|geleverd\s*door)[:\s]*([^\n]+)/gi,
-    /(?:from|van|afzender|verzender)[:\s]*([^\n]+)/gi,
-    /(?:company|bedrijf|firma)[:\s]*([^\n]+)/gi,
+    /(?:supplier|leverancier|vendor|geleverd\s*door|fournisseur|vendeur)[:\s]*([^\n]+)/gi,
+    /(?:from|van|afzender|verzender|de\s*la\s*part\s*de|expéditeur)[:\s]*([^\n]+)/gi,
+    /(?:company|bedrijf|firma|société|entreprise)[:\s]*([^\n]+)/gi,
     /(?:verkoper|seller)[:\s]*([^\n]+)/gi,
   ];
   for (const p of patterns) {
@@ -462,7 +462,7 @@ function extractSupplier(text: string): string | undefined {
   // Try company name in first lines
   const lines = text.split('\n').slice(0, 10);
   for (const line of lines) {
-    const cm = line.match(/^([A-Z][A-Za-z\s&]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC|S\.?A\.?|BVBA)?)\s*$/);
+    const cm = line.match(/^([A-Z][A-Za-z\s&àâéèêëïîôùûüçÀÂÉÈÊËÏÎÔÙÛÜÇ]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC|S\.?A\.?|BVBA|SAS|SARL|SPRL)?)\s*$/);
     if (cm && cm[1].trim().length > 3 && cm[1].trim().length < 60) return cm[1].trim();
   }
   return undefined;
