@@ -150,7 +150,20 @@ const NotesAndTasks = () => {
       const isOwner = item.user_id === currentEmployee?.id;
       
       if (isOwner) {
-        // If owner, delete the entire item (this will cascade delete shares and attachments)
+        // Delete storage attachments first
+        const { data: attachments } = await supabase
+          .from('personal_item_attachments')
+          .select('file_path')
+          .eq('personal_item_id', item.id);
+
+        if (attachments?.length) {
+          const paths = attachments.map((a) => a.file_path).filter(Boolean);
+          if (paths.length) {
+            await supabase.storage.from('personal-attachments').remove(paths);
+          }
+        }
+
+        // Delete the item (cascades shares & attachment rows)
         const { error } = await supabase
           .from('personal_items')
           .delete()
