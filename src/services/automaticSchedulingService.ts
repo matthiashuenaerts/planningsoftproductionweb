@@ -341,7 +341,7 @@ class AutomaticSchedulingService {
             project_id,
             projects!inner (id, name, installation_date)
           ),
-          standard_tasks (task_number),
+          standard_tasks (task_number, multi_user_task),
           task_workstation_links (workstation_id)
         `)
         .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
@@ -363,7 +363,8 @@ class AutomaticSchedulingService {
         project_name: t.phases?.projects?.name || '',
         installation_date: t.phases?.projects?.installation_date || '',
         task_number: t.standard_tasks?.task_number || '999',
-        workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean)
+        workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean),
+        is_multi_user: t.standard_tasks?.multi_user_task || false
       }));
       
       allTasks.push(...mapped);
