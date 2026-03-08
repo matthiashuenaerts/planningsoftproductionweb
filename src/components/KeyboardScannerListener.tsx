@@ -18,23 +18,11 @@ export interface ScannerConfig {
   stripPrefix: boolean;
   stripSuffix: boolean;
   selectedBaudRate: number;
-  relayBaudRate: number;
   terminator: 'enter' | 'tab' | 'both';
   acceptAllInput: boolean;
-  relayEnabled: boolean;
+  bypassEnabled: boolean;
+  bypassMode: 'send' | 'receive';
 }
-
-const DEFAULT_CONFIG: ScannerConfig = {
-  maxKeyInterval: 150,
-  minCodeLength: 1,
-  stripPrefix: true,
-  stripSuffix: false,
-  selectedBaudRate: 9600,
-  relayBaudRate: 9600,
-  terminator: 'both',
-  acceptAllInput: true,
-  relayEnabled: false,
-};
 
 interface KeyboardScannerListenerProps {
   isOpen: boolean;
@@ -42,7 +30,6 @@ interface KeyboardScannerListenerProps {
   onCodeDetected: (code: string) => void;
   workstationName: string;
   workstationId?: string;
-  /** When true, renders as a full page instead of a dialog */
   standalone?: boolean;
 }
 
@@ -57,6 +44,7 @@ interface ScanResult {
 
 const MAX_HISTORY = 50;
 const BAUD_RATES = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
+const BROADCAST_CHANNEL_NAME = 'scanner-bypass';
 
 export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = ({
   isOpen,
@@ -78,10 +66,11 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Bypass state (BroadcastChannel-based in-app relay)
-  const [relayEnabled, setRelayEnabled] = useState(false);
-  const [relayListening, setRelayListening] = useState(false);
-  const [relayReceiveCount, setRelayReceiveCount] = useState(0);
+  // Bypass state (in-app BroadcastChannel relay)
+  const [bypassEnabled, setBypassEnabled] = useState(false);
+  const [bypassMode, setBypassMode] = useState<'send' | 'receive'>('send');
+  const [bypassActive, setBypassActive] = useState(false);
+  const [bypassReceiveCount, setBypassReceiveCount] = useState(0);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
 
   // Configurable settings
@@ -90,7 +79,6 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const [stripPrefix, setStripPrefix] = useState(true);
   const [stripSuffix, setStripSuffix] = useState(false);
   const [selectedBaudRate, setSelectedBaudRate] = useState(9600);
-  const [relayBaudRate, setRelayBaudRate] = useState(9600);
   const [terminator, setTerminator] = useState<'enter' | 'tab' | 'both'>('both');
   const [acceptAllInput, setAcceptAllInput] = useState(true);
   const [manualInput, setManualInput] = useState('');
@@ -119,10 +107,10 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
           if (cfg.stripPrefix != null) setStripPrefix(cfg.stripPrefix);
           if (cfg.stripSuffix != null) setStripSuffix(cfg.stripSuffix);
           if (cfg.selectedBaudRate != null) setSelectedBaudRate(cfg.selectedBaudRate);
-          if (cfg.relayBaudRate != null) setRelayBaudRate(cfg.relayBaudRate);
           if (cfg.terminator != null) setTerminator(cfg.terminator);
           if (cfg.acceptAllInput != null) setAcceptAllInput(cfg.acceptAllInput);
-          if (cfg.relayEnabled != null) setRelayEnabled(cfg.relayEnabled);
+          if (cfg.bypassEnabled != null) setBypassEnabled(cfg.bypassEnabled);
+          if (cfg.bypassMode != null) setBypassMode(cfg.bypassMode);
         }
         setConfigLoaded(true);
       } catch (err) {
@@ -140,7 +128,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     try {
       const config: ScannerConfig = {
         maxKeyInterval, minCodeLength, stripPrefix, stripSuffix,
-        selectedBaudRate, relayBaudRate, terminator, acceptAllInput, relayEnabled,
+        selectedBaudRate, terminator, acceptAllInput, bypassEnabled, bypassMode,
       };
       await supabase
         .from('workstations')
@@ -153,7 +141,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     } finally {
       setSaving(false);
     }
-  }, [workstationId, workstationName, maxKeyInterval, minCodeLength, stripPrefix, stripSuffix, selectedBaudRate, relayBaudRate, terminator, acceptAllInput, relayEnabled, toast]);
+  }, [workstationId, workstationName, maxKeyInterval, minCodeLength, stripPrefix, stripSuffix, selectedBaudRate, terminator, acceptAllInput, bypassEnabled, bypassMode, toast]);
 
   // Open scanner in a new tab
   const openInNewTab = useCallback(() => {
@@ -164,16 +152,70 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     window.open(url, `scanner-${workstationId}`, 'noopener');
   }, [workstationId, tenantContext, languageContext]);
 
-  // Write data to relay port
-  const relayData = useCallback(async (data: string) => {
-    if (!relayEnabled || !relayWriterRef.current) return;
-    try {
-      const encoder = new TextEncoder();
-      await relayWriterRef.current.write(encoder.encode(data + '\r\n'));
-    } catch (err) {
-      console.error('Relay write error:', err);
+  // BroadcastChannel bypass management
+  useEffect(() => {
+    if (!bypassEnabled) {
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.close();
+        broadcastChannelRef.current = null;
+      }
+      setBypassActive(false);
+      return;
     }
-  }, [relayEnabled]);
+
+    const channelName = workstationId
+      ? `${BROADCAST_CHANNEL_NAME}-${workstationId}`
+      : BROADCAST_CHANNEL_NAME;
+
+    const channel = new BroadcastChannel(channelName);
+    broadcastChannelRef.current = channel;
+    setBypassActive(true);
+
+    if (bypassMode === 'receive') {
+      channel.onmessage = (event) => {
+        const { code, workstation } = event.data;
+        if (code) {
+          setBypassReceiveCount(prev => prev + 1);
+          // Process the received code as if it was scanned locally
+          processCodeDirect(code);
+        }
+      };
+    }
+
+    return () => {
+      channel.close();
+      broadcastChannelRef.current = null;
+      setBypassActive(false);
+    };
+  }, [bypassEnabled, bypassMode, workstationId]);
+
+  // Broadcast a scan to other tabs
+  const broadcastScan = useCallback((code: string) => {
+    if (!bypassEnabled || bypassMode !== 'send' || !broadcastChannelRef.current) return;
+    try {
+      broadcastChannelRef.current.postMessage({
+        code,
+        workstation: workstationName,
+        workstationId,
+        timestamp: Date.now(),
+      });
+    } catch (err) {
+      console.error('Broadcast error:', err);
+    }
+  }, [bypassEnabled, bypassMode, workstationName, workstationId]);
+
+  // Process code without relay (used by receiver)
+  const processCodeDirect = useCallback(async (rawCode: string) => {
+    let code = rawCode.trim();
+    if (code.length < 1) return;
+
+    const result: ScanResult = {
+      code, rawCode, status: 'success',
+      message: `⇐ ${code} (bypass ontvangen)`, timestamp: Date.now(),
+    };
+    setScanHistory(prev => [result, ...prev].slice(0, MAX_HISTORY));
+    onCodeDetected(code);
+  }, [onCodeDetected]);
 
   // Process a scanned code
   const processCode = useCallback(async (rawCode: string) => {
@@ -182,7 +224,9 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     if (processing) return;
 
     const originalCode = code;
-    relayData(rawCode);
+
+    // Bypass: broadcast raw scan to other tabs
+    broadcastScan(rawCode);
 
     if (stripPrefix && code.length > 1) code = code.substring(1);
     if (stripSuffix && code.length > 1) code = code.substring(0, code.length - 1);
@@ -255,7 +299,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     } finally {
       setProcessing(false);
     }
-  }, [workstationName, workstationId, onCodeDetected, processing, minCodeLength, stripPrefix, stripSuffix, relayData]);
+  }, [workstationName, workstationId, onCodeDetected, processing, minCodeLength, stripPrefix, stripSuffix, broadcastScan]);
 
   // Keyboard listener for HID scanners
   useEffect(() => {
@@ -345,42 +389,16 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
       setSerialConnected(true);
       abortControllerRef.current = new AbortController();
       readSerialPort(port);
-      toast({ title: 'Bron COM poort verbonden', description: `Scanner verbonden (${selectedBaudRate} baud).` });
+      toast({ title: 'COM poort verbonden', description: `Scanner verbonden (${selectedBaudRate} baud).` });
     } catch (error: any) {
       if (error.message?.includes('permissions policy') || error.message?.includes('disallowed')) {
         toast({ title: 'COM poort geblokkeerd', description: 'Open de scanner in een apart tabblad.', variant: 'destructive' });
       } else if (error.name === 'InvalidStateError' || error.message?.includes('already open') || error.message?.includes('access') || error.message?.includes('denied') || error.message?.includes('busy')) {
-        toast({ title: 'COM poort bezet', description: 'Gebruik Relay/Bypass of HID keyboard modus.', variant: 'destructive' });
+        toast({ title: 'COM poort bezet', description: 'Gebruik de in-app bypass of HID keyboard modus.', variant: 'destructive' });
       } else if (error.name !== 'NotFoundError') {
         toast({ title: 'Verbindingsfout', description: error.message || 'Kon geen verbinding maken.', variant: 'destructive' });
       }
     }
-  };
-
-  const connectRelayPort = async () => {
-    const allowed = await checkSerialAccess();
-    if (!allowed) return;
-    try {
-      const port = await (navigator as any).serial.requestPort({ filters: [] });
-      await port.open({ baudRate: relayBaudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
-      relayPortRef.current = port;
-      const writer = port.writable.getWriter();
-      relayWriterRef.current = writer;
-      setRelayConnected(true);
-      toast({ title: 'Bypass poort verbonden', description: `Data wordt doorgestuurd (${relayBaudRate} baud).` });
-    } catch (error: any) {
-      if (error.name !== 'NotFoundError') {
-        toast({ title: 'Bypass verbindingsfout', description: error.message || 'Kon bypass poort niet openen.', variant: 'destructive' });
-      }
-    }
-  };
-
-  const disconnectRelayPort = async () => {
-    try {
-      if (relayWriterRef.current) { try { relayWriterRef.current.releaseLock(); } catch {} relayWriterRef.current = null; }
-      if (relayPortRef.current) { try { await relayPortRef.current.close(); } catch {} relayPortRef.current = null; }
-      setRelayConnected(false);
-    } catch (error) { console.error('Relay disconnect error:', error); }
   };
 
   const readSerialPort = async (port: any) => {
@@ -438,7 +456,10 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const handleClose = async () => {
     stopListening();
     await disconnectSerialPort();
-    await disconnectRelayPort();
+    if (broadcastChannelRef.current) {
+      broadcastChannelRef.current.close();
+      broadcastChannelRef.current = null;
+    }
     setScanHistory([]);
     onClose();
   };
@@ -461,7 +482,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
           </Button>
         )}
 
-        {supportsSerial && !relayEnabled && (
+        {supportsSerial && (
           !serialConnected ? (
             <Button onClick={connectSerialPort} variant="outline" className="gap-2">
               <Usb className="h-4 w-4" />
@@ -486,86 +507,63 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
         )}
       </div>
 
-      {/* Relay/Bypass controls */}
-      {supportsSerial && (
-        <div className="p-3 rounded-lg border bg-muted/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Relay / Bypass Modus</Label>
-            </div>
-            <Switch checked={relayEnabled} onCheckedChange={setRelayEnabled} />
+      {/* In-App Bypass */}
+      <div className="p-3 rounded-lg border bg-muted/10 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wifi className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">In-App Bypass</Label>
           </div>
-          {relayEnabled && (
-            <div className="space-y-3 pt-1">
-              <p className="text-xs text-muted-foreground">
-                Selecteer de bron poort (scanner) en de bypass poort (doorsturen naar ander programma).
-              </p>
+          <Switch checked={bypassEnabled} onCheckedChange={setBypassEnabled} />
+        </div>
+        {bypassEnabled && (
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Deel scans tussen tabbladen zonder externe software. Eén tabblad scant (Zender), andere tabbladen ontvangen automatisch (Ontvanger).
+            </p>
 
-              <div className="p-2 rounded border bg-background space-y-2">
-                <Label className="text-xs font-semibold flex items-center gap-1">
-                  <Usb className="h-3 w-3" /> Lees Poort (bron / scanner)
-                </Label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Baud rate" /></SelectTrigger>
-                      <SelectContent>
-                        {BAUD_RATES.map(rate => (<SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {!serialConnected ? (
-                    <Button onClick={connectSerialPort} variant="outline" size="sm" className="gap-1">
-                      <Usb className="h-3 w-3" /> Selecteer Poort
-                    </Button>
-                  ) : (
-                    <Button onClick={disconnectSerialPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
-                      <CheckCircle2 className="h-3 w-3" /> Verbonden
-                    </Button>
-                  )}
-                </div>
-              </div>
+            <div className="flex gap-2">
+              <Button
+                variant={bypassMode === 'send' ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1 gap-1"
+                onClick={() => setBypassMode('send')}
+              >
+                <ArrowRight className="h-3 w-3" />
+                Zender
+              </Button>
+              <Button
+                variant={bypassMode === 'receive' ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1 gap-1"
+                onClick={() => setBypassMode('receive')}
+              >
+                <Wifi className="h-3 w-3" />
+                Ontvanger
+              </Button>
+            </div>
 
-              <div className="flex items-center justify-center">
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-
-              <div className="p-2 rounded border bg-background space-y-2">
-                <Label className="text-xs font-semibold flex items-center gap-1">
-                  <ArrowRight className="h-3 w-3" /> Bypass Poort (doorsturen)
-                </Label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Select value={String(relayBaudRate)} onValueChange={v => setRelayBaudRate(parseInt(v))}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Baud rate" /></SelectTrigger>
-                      <SelectContent>
-                        {BAUD_RATES.map(rate => (<SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {!relayConnected ? (
-                    <Button onClick={connectRelayPort} variant="outline" size="sm" className="gap-1">
-                      <Usb className="h-3 w-3" /> Selecteer Poort
-                    </Button>
-                  ) : (
-                    <Button onClick={disconnectRelayPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
-                      <CheckCircle2 className="h-3 w-3" /> Verbonden
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {serialConnected && relayConnected && (
-                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 justify-center">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Lees Poort → App → Bypass Poort actief
-                </div>
+            <div className={`flex items-center gap-2 p-2 rounded text-xs ${
+              bypassActive
+                ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400'
+                : 'bg-muted text-muted-foreground'
+            }`}>
+              <div className={`h-2 w-2 rounded-full flex-shrink-0 ${bypassActive ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'}`} />
+              {bypassMode === 'send' ? (
+                <span>Zender actief — scans worden doorgestuurd naar alle open ontvangers</span>
+              ) : (
+                <span>Ontvanger actief — wacht op scans van een zender tabblad {bypassReceiveCount > 0 && `(${bypassReceiveCount} ontvangen)`}</span>
               )}
             </div>
-          )}
-        </div>
-      )}
+
+            {bypassMode === 'receive' && (
+              <p className="text-[11px] text-muted-foreground">
+                💡 Open een ander tabblad met dezelfde werkstation scanner als <strong>Zender</strong> om scans te ontvangen.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Settings panel */}
       {showSettings && (
@@ -600,7 +598,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Bron baud rate (COM)</Label>
+              <Label className="text-xs">Baud rate (COM)</Label>
               <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -657,8 +655,10 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
           {serialConnected && (
             <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">COM</span>
           )}
-          {relayConnected && (
-            <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 px-1.5 py-0.5 rounded">RELAY</span>
+          {bypassEnabled && bypassActive && (
+            <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 px-1.5 py-0.5 rounded">
+              {bypassMode === 'send' ? 'SEND' : 'RECV'}
+            </span>
           )}
         </div>
       </div>
@@ -700,7 +700,6 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     </div>
   );
 
-  // Standalone mode: full page
   if (standalone) {
     return (
       <div className="min-h-screen bg-background p-4 max-w-lg mx-auto flex flex-col">
@@ -710,7 +709,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
             Scanner - {workstationName}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Luister naar USB scanner, COM poort, relay/bypass, of handmatige invoer
+            Luister naar USB scanner, COM poort, of ontvang via bypass
           </p>
         </div>
         {scannerContent}
@@ -718,7 +717,6 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     );
   }
 
-  // Dialog mode
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
@@ -728,7 +726,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
             Scanner Listener - {workstationName}
           </DialogTitle>
           <DialogDescription>
-            Luister naar USB scanner, COM poort, relay/bypass, of handmatige invoer
+            Luister naar USB scanner, COM poort, of ontvang via bypass
           </DialogDescription>
         </DialogHeader>
         {scannerContent}
