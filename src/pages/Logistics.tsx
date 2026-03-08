@@ -12,6 +12,7 @@ import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries'
 import { Truck, Calendar, AlertTriangle, Search, Scan, Clock, PackageCheck } from 'lucide-react';
 import { EanBarcodeScanner } from '@/components/logistics/EanBarcodeScanner';
 import { Button } from '@/components/ui/button';
+import { BatchReceiptsScanner } from '@/components/logistics/BatchReceiptsScanner';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
