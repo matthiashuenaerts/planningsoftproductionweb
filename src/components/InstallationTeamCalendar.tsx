@@ -326,6 +326,7 @@ const DayCell = ({
   onRefreshData
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [{
     isOver
   }, drop] = useDrop(() => ({
