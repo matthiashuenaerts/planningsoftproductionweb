@@ -70,7 +70,7 @@ export const planningService = {
         .select(`
           *,
           employee:employees(id, name, role, workstation),
-          task:tasks(id, title, description, priority, status),
+          task:tasks(id, title, description, priority, status, phases(name, projects(name))),
           phase:phases(id, name, project_id, progress)
         `)
         .gte('start_time', startOfDay)
