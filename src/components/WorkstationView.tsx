@@ -1200,7 +1200,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       }}
                     >
                       {/* Task Info Section */}
-                      <div className="space-y-2 mb-4">
+                      <div className={`${isMobile ? 'space-y-1 mb-2' : 'space-y-2 mb-4'}`}>
                         <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
                         <p className="text-sm text-muted-foreground">{task.title}</p>
                         
