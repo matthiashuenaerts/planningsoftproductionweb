@@ -469,6 +469,9 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="space-y-6">
+          {/* OneDrive Configuration */}
+          <OneDriveSettingsCard tenantId={tenant.id} />
+
           {/* Name Edit */}
           <Card className="bg-white/5 border-white/10">
             <CardHeader><CardTitle className="text-white text-sm"><Building2 className="h-4 w-4 inline mr-2" />Display Name</CardTitle></CardHeader>
