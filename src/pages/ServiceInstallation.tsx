@@ -453,7 +453,7 @@ const ServiceInstallation: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 {routeData.departureTime && (
                   <Badge variant="default" className="gap-1 font-semibold">
-                    🚗 Depart: {routeData.departureTime}
+                    🚗 {t('si_depart')}: {routeData.departureTime}
                   </Badge>
                 )}
                 {routeData.workStartTime && (
