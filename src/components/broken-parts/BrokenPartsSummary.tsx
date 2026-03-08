@@ -114,16 +114,16 @@ const BrokenPartsSummary: React.FC = () => {
   const uniqueProjects = new Set(filteredData.map(part => part.project_id)).size;
   const uniqueWorkstations = new Set(filteredData.map(part => part.workstation_id)).size;
   const uniqueEmployees = new Set(filteredData.map(part => part.reported_by)).size;
-  return <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-1 justify-between mt-10">
-        <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
+  return <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-4 sm:mt-10">
+        <h1 className="text-xl sm:text-2xl font-bold">Broken Parts Summary</h1>
         
-        <div className="flex flex-wrap gap-2 py-[10px]">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 py-1 sm:py-[10px]">
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <Label>Time Period:</Label>
+            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label className="text-xs sm:text-sm shrink-0">Time Period:</Label>
             <Select value={timeFilter} onValueChange={value => setTimeFilter(value as TimeFilter)}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[120px] sm:w-[150px] h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select time period" />
               </SelectTrigger>
               <SelectContent>
@@ -137,10 +137,10 @@ const BrokenPartsSummary: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <ListFilter className="h-4 w-4 text-muted-foreground" />
-            <Label>Group By:</Label>
+            <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label className="text-xs sm:text-sm shrink-0">Group By:</Label>
             <Select value={groupBy} onValueChange={value => setGroupBy(value as GroupBy)}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[120px] sm:w-[150px] h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select grouping" />
               </SelectTrigger>
               <SelectContent>
@@ -151,56 +151,54 @@ const BrokenPartsSummary: React.FC = () => {
             </Select>
           </div>
           
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/broken-parts">
-                <List className="h-4 w-4 mr-2" />
-                List View
-              </Link>
-            </Button>
-          </div>
+          <Button variant="outline" asChild size="sm" className="text-xs sm:text-sm w-fit">
+            <Link to="/broken-parts">
+              <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+              List View
+            </Link>
+          </Button>
         </div>
       </div>
       
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Reports</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalReports}</div>
-            <p className="text-xs text-muted-foreground">in selected time period</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{totalReports}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">in selected time period</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unique Projects</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Unique Projects</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueProjects}</div>
-            <p className="text-xs text-muted-foreground">with broken parts reported</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueProjects}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">with broken parts reported</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Workstations Affected</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Workstations Affected</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueWorkstations}</div>
-            <p className="text-xs text-muted-foreground">with issues reported</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueWorkstations}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">with issues reported</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reporters</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Reporters</CardTitle>
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueEmployees}</div>
-            <p className="text-xs text-muted-foreground">employees reported issues</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueEmployees}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">employees reported issues</p>
           </CardContent>
         </Card>
       </div>
