@@ -1471,14 +1471,14 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Additional Costs Input */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_additional_costs')}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground" />
