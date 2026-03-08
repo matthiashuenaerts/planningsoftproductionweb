@@ -41,11 +41,21 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
   const { t } = useLanguage();
   const isMobile = useIsMobile();
 
-  const getImageUrl = (path: string) => {
-    if (!path) return null;
-    const { data } = supabase.storage.from('broken_parts').getPublicUrl(path);
-    return data.publicUrl;
-  };
+  // Use signed URLs for private bucket access
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadImageUrl = async () => {
+      if (brokenPart?.image_path) {
+        const { createSignedUrl } = await import('@/lib/storageUtils');
+        const url = await createSignedUrl('broken_parts', brokenPart.image_path);
+        setImageUrl(url);
+      } else {
+        setImageUrl(null);
+      }
+    };
+    loadImageUrl();
+  }, [brokenPart?.image_path]);
 
   const handleOpenRushOrderForm = async () => {
     setShowRushOrderForm(true);

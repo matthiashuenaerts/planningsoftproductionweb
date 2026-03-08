@@ -83,9 +83,10 @@ const BrokenPartsList: React.FC = () => {
     return await createSignedUrl('broken_parts', path);
   };
 
-  const openImageDialog = (imagePath: string) => {
+  const openImageDialog = async (imagePath: string) => {
     if (!imagePath) return;
-    setSelectedImage(getImageUrl(imagePath));
+    const signedUrl = await getSignedImageUrl(imagePath);
+    setSelectedImage(signedUrl);
   };
 
   const handleImageError = (id: string) => {
