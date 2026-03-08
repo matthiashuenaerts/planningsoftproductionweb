@@ -516,30 +516,51 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     };
 
     projects.forEach((project) => {
-      // Only include projects that are visible in current date range
-      if (!isProjectVisible(project)) {
-        return;
-      }
-
       const teamAssignments = project.project_team_assignments;
-      let targetTeamId = 'unnamed';
       
       if (teamAssignments && teamAssignments.length > 0) {
-        const assignment = teamAssignments[0];
-        // Use team_id directly if available, otherwise fall back to team name matching
-        if (assignment.team_id) {
-          // Verify this team_id exists in our teams list
-          const teamExists = teams.find(t => t.id === assignment.team_id);
-          targetTeamId = teamExists ? assignment.team_id : 'unnamed';
-        } else if (assignment.team) {
-          // Fallback to old team name matching
-          const targetCategory = getTeamCategory(assignment.team, teams);
-          const matchedTeam = teams.find(t => t.name === targetCategory);
-          targetTeamId = matchedTeam?.id || 'unnamed';
+        // Place the project in EACH team it has an assignment for
+        const placedTeamIds = new Set<string>();
+        
+        teamAssignments.forEach((assignment) => {
+          let targetTeamId = 'unnamed';
+          
+          if (assignment.team_id) {
+            const teamExists = teams.find(t => t.id === assignment.team_id);
+            targetTeamId = teamExists ? assignment.team_id : 'unnamed';
+          } else if (assignment.team) {
+            const targetCategory = getTeamCategory(assignment.team, teams);
+            const matchedTeam = teams.find(t => t.name === targetCategory);
+            targetTeamId = matchedTeam?.id || 'unnamed';
+          }
+          
+          // Check visibility for this specific assignment
+          if (assignment.start_date && assignment.duration) {
+            const startDate = parseYMD(assignment.start_date);
+            const endDate = addDays(startDate, assignment.duration - 1);
+            const firstDay = dateRange[0];
+            const lastDay = dateRange[dateRange.length - 1];
+            if (endDate < firstDay || startDate > lastDay) return;
+          }
+          
+          if (!placedTeamIds.has(targetTeamId)) {
+            placedTeamIds.add(targetTeamId);
+            (grouped[targetTeamId] = grouped[targetTeamId] || []).push(project);
+          }
+        });
+        
+        // If no assignments matched any team, place in unnamed
+        if (placedTeamIds.size === 0) {
+          if (isProjectVisible(project)) {
+            (grouped['unnamed'] = grouped['unnamed'] || []).push(project);
+          }
+        }
+      } else {
+        // No assignments at all — place in unnamed if visible
+        if (isProjectVisible(project)) {
+          (grouped['unnamed'] = grouped['unnamed'] || []).push(project);
         }
       }
-      
-      (grouped[targetTeamId] = grouped[targetTeamId] || []).push(project);
     });
 
     // Sort projects within each team by installation date (oldest to newest)
@@ -571,10 +592,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   }, [teams, projects, loading]);
 
   // Calculate project bar position and width to match calendar grid exactly
-  const getProjectPosition = (project: Project, teamName: string) => {
+  const getProjectPosition = (project: Project, teamName: string, teamId?: string) => {
     const teamAssignments = project.project_team_assignments || [];
-    // Prefer assignment that matches the team row
-    const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team, teams) === teamName) || teamAssignments[0];
+    // Prefer assignment that matches the team row by team_id, then by name
+    const matchedAssignment = 
+      (teamId ? teamAssignments.find((a) => a.team_id === teamId) : null) ||
+      teamAssignments.find((a) => mapTeamToCategory(a.team, teams) === teamName) || 
+      teamAssignments[0];
     if (!matchedAssignment?.start_date || !matchedAssignment?.duration) return null;
 
     const startDate = parseYMD(matchedAssignment.start_date);
@@ -943,7 +967,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       {/* Project bars - positioned in calendar grid only */}
                       <div className="absolute left-64 right-0 top-0 z-10 py-2 pointer-events-none">
                           {teamProjects.map((project, idx) => {
-                            const position = getProjectPosition(project, team.name);
+                            const position = getProjectPosition(project, team.name, team.id);
                             
                             // For unassigned projects, show a placeholder indicator
                             if (!position) {
