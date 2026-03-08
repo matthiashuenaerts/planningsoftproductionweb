@@ -564,7 +564,7 @@ const ServiceTeamCalendar: React.FC = () => {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>
-            <Calendar className="h-4 w-4 mr-1" /> Today
+            <Calendar className="h-4 w-4 mr-1" /> {t('svc_today')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}>
             <ChevronRight className="h-4 w-4" />
