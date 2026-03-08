@@ -159,7 +159,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const openInNewTab = useCallback(() => {
     if (!workstationId) return;
     const tenantSlug = tenantContext?.tenantSlug || '';
-    const lang = languageContext?.language || 'nl';
+    const lang = languageContext?.lang || 'nl';
     const url = `/${tenantSlug}/${lang}/scanner/${workstationId}`;
     window.open(url, `scanner-${workstationId}`, 'noopener');
   }, [workstationId, tenantContext, languageContext]);
