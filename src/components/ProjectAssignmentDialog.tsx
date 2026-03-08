@@ -349,16 +349,26 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         }
       }
 
-      console.log('Updating project installation date...');
-      // Update installation date in projects table with start date
-      const { error: projectError } = await supabase
-        .from('projects')
-        .update({ installation_date: startDate })
-        .eq('id', projectId);
+      // Only update project installation_date for non-service teams
+      const { data: teamTypeData } = await (supabase
+        .from('placement_teams')
+        .select('team_type') as any)
+        .eq('id', selectedTeamId)
+        .maybeSingle();
 
-      if (projectError) {
-        console.error('Project error:', projectError);
-        throw projectError;
+      if (!teamTypeData || teamTypeData.team_type !== 'service') {
+        console.log('Updating project installation date...');
+        const { error: projectError } = await supabase
+          .from('projects')
+          .update({ installation_date: startDate })
+          .eq('id', projectId);
+
+        if (projectError) {
+          console.error('Project error:', projectError);
+          throw projectError;
+        }
+      } else {
+        console.log('Skipping installation_date update for service team assignment.');
       }
 
       // Handle daily team assignments synchronization
