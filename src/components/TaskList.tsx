@@ -365,8 +365,8 @@ const TaskList: React.FC<TaskListProps> = ({
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-8">
-        No tasks found
+      <div className="text-center text-muted-foreground py-8">
+        {t('tl_no_tasks_found')}
       </div>
     );
   }
