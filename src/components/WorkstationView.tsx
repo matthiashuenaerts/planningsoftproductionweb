@@ -986,13 +986,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const inProgressTasks = sortTasks(tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task));
   const todoTasks = sortTasks(tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task));
   
+  const isMobile = useIsMobile();
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{t('workstation_view_title', { name: actualWorkstationName })}</h1>
-        <div className="flex gap-2">
+    <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
+      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
+        <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('workstation_view_title', { name: actualWorkstationName })}</h1>
+        <div className={`flex gap-2 ${isMobile ? 'flex-wrap' : ''}`}>
           {onBack && (
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" size={isMobile ? 'sm' : 'default'} onClick={onBack}>
               {t('back')}
             </Button>
           )}
@@ -1002,7 +1004,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
               if (!wsId) return null;
               return <PartsCountBadge workstationId={wsId} />;
             })()}
-            <Badge variant="outline" className="text-lg px-3 py-1">
+            <Badge variant="outline" className={isMobile ? 'text-sm px-2 py-0.5' : 'text-lg px-3 py-1'}>
               {t('active_tasks', { count: tasks.length.toString() })}
             </Badge>
           </div>
