@@ -197,6 +197,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const refetchEmployee = async () => {
+    if (user) {
+      await fetchEmployeeData(user.id);
+    }
+  };
+
   const logout = async () => {
     // Clear developer active tenant if applicable
     if (isDeveloper) {
