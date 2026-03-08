@@ -25,6 +25,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
 
   const [formData, setFormData] = useState({
     employee_id: '',
