@@ -1,11 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Activity, AlertTriangle, Users, Building2, FolderOpen, 
-  Clock, Server, Wifi, WifiOff, BarChart3,
+  Clock, Server, Wifi, WifiOff, BarChart3, RefreshCw, ChevronDown, ChevronUp,
+  CheckCircle2, XCircle, ArrowRightLeft,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
