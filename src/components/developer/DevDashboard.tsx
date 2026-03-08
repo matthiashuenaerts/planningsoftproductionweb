@@ -1,11 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Activity, AlertTriangle, Users, Building2, FolderOpen, 
-  Clock, Server, Wifi, WifiOff, BarChart3,
+  Clock, Server, Wifi, WifiOff, BarChart3, RefreshCw, ChevronDown, ChevronUp,
+  CheckCircle2, XCircle, ArrowRightLeft,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -236,7 +239,124 @@ const DevDashboard: React.FC = () => {
             <TenantStatsTable />
           </CardContent>
         </Card>
+        {/* Sync Logs */}
+        <Card className="bg-white/5 border-white/10 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2 text-sm">
+              <ArrowRightLeft className="h-4 w-4" /> Project Sync Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SyncLogsPanel tenantMap={tenantMap} />
+          </CardContent>
+        </Card>
       </div>
+    </div>
+  );
+};
+
+const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug: string }> }> = ({ tenantMap }) => {
+  const [expandedLog, setExpandedLog] = useState<string | null>(null);
+
+  const { data: syncLogs, refetch, isLoading } = useQuery({
+    queryKey: ["dev", "dashboard", "sync-logs"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("project_sync_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return data ?? [];
+    },
+    refetchInterval: 30000,
+  });
+
+  const getTenantName = (id: string) => tenantMap?.[id]?.name ?? id?.slice(0, 8) ?? "Unknown";
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-end mb-2">
+        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading} className="text-slate-400 hover:text-white text-xs">
+          <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+      </div>
+      <ScrollArea className="h-[400px]">
+        <div className="space-y-2">
+          {(syncLogs ?? []).map((log: any) => {
+            const details = log.details as any;
+            const isExpanded = expandedLog === log.id;
+            const syncDetails: any[] = details?.sync_details ?? [];
+            const errorDetails: string[] = details?.error_details ?? [];
+            const hasErrors = (log.error_count ?? 0) > 0;
+
+            return (
+              <div key={log.id} className="bg-white/5 rounded-md border border-white/10">
+                <button
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/5 rounded-md"
+                  onClick={() => setExpandedLog(isExpanded ? null : log.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    {hasErrors ? (
+                      <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm text-white">
+                        {log.synced_count ?? 0} synced · {log.error_count ?? 0} errors
+                        {details?.total_projects != null && <span className="text-slate-400"> / {details.total_projects} total</span>}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {getTenantName(log.tenant_id)} · {log.created_at ? formatDistanceToNow(new Date(log.created_at), { addSuffix: true }) : ""}
+                        {details?.automated ? " · automated" : " · manual"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hasErrors && <Badge className="text-[10px] bg-red-600/40">{log.error_count} errors</Badge>}
+                    {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="px-3 pb-3 space-y-2 border-t border-white/5 pt-2">
+                    {errorDetails.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-red-400">Errors:</p>
+                        {errorDetails.map((err, i) => (
+                          <p key={i} className="text-xs text-red-300 bg-red-500/10 rounded px-2 py-1">{err}</p>
+                        ))}
+                      </div>
+                    )}
+                    {syncDetails.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-slate-400">Project details:</p>
+                        {syncDetails.map((d: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs bg-white/5 rounded px-2 py-1">
+                            <span className="text-white truncate max-w-[200px]">{d.project_name || d.project_link_id}</span>
+                            <div className="flex items-center gap-2">
+                              {d.changes && <span className="text-blue-300 text-[10px]">{(d.changes as string[]).join(', ')}</span>}
+                              <Badge className={`text-[10px] ${
+                                d.status === 'updated' ? 'bg-blue-600/40 text-blue-300' :
+                                d.status === 'up_to_date' ? 'bg-slate-600/40 text-slate-300' :
+                                d.status === 'error' ? 'bg-red-600/40 text-red-300' :
+                                'bg-amber-600/40 text-amber-300'
+                              }`}>
+                                {d.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!(syncLogs ?? []).length && <p className="text-slate-400 text-sm text-center py-4">No sync logs yet</p>}
+        </div>
+      </ScrollArea>
     </div>
   );
 };
