@@ -2063,7 +2063,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
       {/* Scrollable PDF Container */}
       <div
         ref={canvasContainerRef}
-        className="flex-1 min-h-0 overflow-auto bg-muted/50 p-4"
+        className="flex-1 min-h-0 overflow-auto bg-muted/50 p-2 sm:p-4"
         style={{ 
           overflowX: 'auto', 
           overflowY: 'auto',
