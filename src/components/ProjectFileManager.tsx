@@ -507,9 +507,9 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
   return (
     <div>
       <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Project Files</CardTitle>
-          <CardDescription>
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="text-sm sm:text-lg">Project Files</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Manage files associated with this project
           </CardDescription>
         </CardHeader>
@@ -518,13 +518,13 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative ${isDragging ? 'border-2 border-dashed border-primary bg-primary/5' : ''}`}
+          className={`relative px-3 sm:px-6 ${isDragging ? 'border-2 border-dashed border-primary bg-primary/5' : ''}`}
         >
           {isDragging && (
             <div className="absolute inset-0 flex items-center justify-center bg-primary/10 rounded-lg z-10">
               <div className="text-center">
-                <FileUp className="mx-auto h-12 w-12 text-primary mb-2" />
-                <p className="text-lg font-medium text-primary">Drop files here to upload</p>
+                <FileUp className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-primary mb-2" />
+                <p className="text-sm sm:text-lg font-medium text-primary">Drop files here</p>
               </div>
             </div>
           )}
@@ -533,7 +533,7 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
+              <AlertDescription className="text-xs sm:text-sm">
                 {error}
               </AlertDescription>
             </Alert>
@@ -551,16 +551,16 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
             <Button
               onClick={handleUploadClick}
               disabled={uploading}
-              className="w-full"
+              className="w-full h-9 sm:h-10 text-xs sm:text-sm"
             >
               {uploading ? (
                 <div className="flex items-center justify-center w-full">
-                  <Upload className="mr-2 h-4 w-4 animate-pulse" />
+                  <Upload className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
                   <span>Uploading...</span>
                 </div>
               ) : (
                 <>
-                  <FileUp className="mr-2 h-4 w-4" />
+                  <FileUp className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Upload Files
                 </>
               )}
@@ -569,7 +569,7 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
             {uploading && (
               <div className="mt-2">
                 <Progress value={uploadProgress} className="h-2" />
-                <p className="text-xs text-center mt-1 text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-center mt-1 text-muted-foreground">
                   {uploadProgress}% complete
                 </p>
               </div>
