@@ -14,7 +14,7 @@ import { workstationService } from '@/services/workstationService';
 import { workstationTasksService, WorkstationTask } from '@/services/workstationTasksService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { workstationErrorService } from '@/services/workstationErrorService';
-import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map, QrCode, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Package, Wrench, Warehouse, Scissors, CheckCircle, PackageCheck, Calendar, Cog, Settings, MoreVertical, Play, Hammer, Drill, Zap, Truck, Factory, Map, QrCode, AlertTriangle, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/QRCodeScanner';
+import { KeyboardScannerListener } from '@/components/KeyboardScannerListener';
 import { qrCodeService } from '@/services/qrCodeService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
@@ -44,6 +45,7 @@ const Workstations: React.FC = () => {
   const [workstationTasks, setWorkstationTasks] = useState<WorkstationTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState<string | null>(null);
+  const [showKeyboardScanner, setShowKeyboardScanner] = useState<string | null>(null);
   const [showErrorDialog, setShowErrorDialog] = useState<string | null>(null);
   const [newErrorMessage, setNewErrorMessage] = useState('');
   const [newErrorType, setNewErrorType] = useState('general');
@@ -361,6 +363,13 @@ const Workstations: React.FC = () => {
                                  </DropdownMenuItem>
                                  <DropdownMenuItem onClick={e => {
                           e.stopPropagation();
+                          setShowKeyboardScanner(workstation.id);
+                        }}>
+                                   <Radio className="mr-2 h-4 w-4" />
+                                   Listen for Scan
+                                 </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={e => {
+                          e.stopPropagation();
                           setShowErrorDialog(workstation.id);
                         }}>
                                    <AlertTriangle className="mr-2 h-4 w-4" />
@@ -454,7 +463,15 @@ const Workstations: React.FC = () => {
         workstationId={showQRScanner || undefined}
       />
 
-      {/* Create Error Dialog */}
+      {/* Keyboard/COM Scanner Listener */}
+      <KeyboardScannerListener
+        isOpen={!!showKeyboardScanner}
+        onClose={() => setShowKeyboardScanner(null)}
+        onCodeDetected={handleQRCodeDetected}
+        workstationName={workstations.find(ws => ws.id === showKeyboardScanner)?.name || ''}
+        workstationId={showKeyboardScanner || undefined}
+      />
+
       <Dialog open={!!showErrorDialog} onOpenChange={() => setShowErrorDialog(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
