@@ -1080,5 +1080,20 @@
   "ro_camera_error": "Camera Error",
   "ro_camera_error_desc": "Unable to access camera. Please check permissions.",
   "ro_storage_error": "Storage Error",
-  "ro_storage_error_desc": "There was a problem setting up file storage. Some features might be limited."
+  "ro_storage_error_desc": "There was a problem setting up file storage. Some features might be limited.",
+
+  "inv_invoices": "Invoices",
+  "inv_billing_history": "Billing History",
+  "inv_loading": "Loading...",
+  "inv_no_invoices": "No invoices yet",
+  "inv_due": "Due",
+  "inv_preview": "Preview",
+  "inv_open_new_tab": "Open in new tab",
+  "inv_download": "Download",
+  "inv_close_preview": "Close preview",
+  "inv_status_draft": "Draft",
+  "inv_status_sent": "Sent",
+  "inv_status_paid": "Paid",
+  "inv_status_overdue": "Overdue",
+  "inv_status_cancelled": "Cancelled"
 }

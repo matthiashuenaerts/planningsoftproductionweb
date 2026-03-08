@@ -1558,5 +1558,20 @@
   "ro_camera_error": "Camerafout",
   "ro_camera_error_desc": "Kan geen toegang krijgen tot de camera. Controleer de machtigingen.",
   "ro_storage_error": "Opslagfout",
-  "ro_storage_error_desc": "Er was een probleem bij het instellen van de bestandsopslag. Sommige functies zijn mogelijk beperkt."
+  "ro_storage_error_desc": "Er was een probleem bij het instellen van de bestandsopslag. Sommige functies zijn mogelijk beperkt.",
+
+  "inv_invoices": "Facturen",
+  "inv_billing_history": "Facturatiegeschiedenis",
+  "inv_loading": "Laden...",
+  "inv_no_invoices": "Nog geen facturen",
+  "inv_due": "Vervaldatum",
+  "inv_preview": "Voorbeeld",
+  "inv_open_new_tab": "Openen in nieuw tabblad",
+  "inv_download": "Downloaden",
+  "inv_close_preview": "Voorbeeld sluiten",
+  "inv_status_draft": "Concept",
+  "inv_status_sent": "Verzonden",
+  "inv_status_paid": "Betaald",
+  "inv_status_overdue": "Achterstallig",
+  "inv_status_cancelled": "Geannuleerd"
 }

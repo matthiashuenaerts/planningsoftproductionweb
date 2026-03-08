@@ -1558,5 +1558,20 @@
   "ro_camera_error": "Erreur de Caméra",
   "ro_camera_error_desc": "Impossible d'accéder à la caméra. Vérifiez les autorisations.",
   "ro_storage_error": "Erreur de Stockage",
-  "ro_storage_error_desc": "Un problème est survenu lors de la configuration du stockage. Certaines fonctionnalités peuvent être limitées."
+  "ro_storage_error_desc": "Un problème est survenu lors de la configuration du stockage. Certaines fonctionnalités peuvent être limitées.",
+
+  "inv_invoices": "Factures",
+  "inv_billing_history": "Historique de facturation",
+  "inv_loading": "Chargement...",
+  "inv_no_invoices": "Aucune facture pour le moment",
+  "inv_due": "Échéance",
+  "inv_preview": "Aperçu",
+  "inv_open_new_tab": "Ouvrir dans un nouvel onglet",
+  "inv_download": "Télécharger",
+  "inv_close_preview": "Fermer l'aperçu",
+  "inv_status_draft": "Brouillon",
+  "inv_status_sent": "Envoyée",
+  "inv_status_paid": "Payée",
+  "inv_status_overdue": "En retard",
+  "inv_status_cancelled": "Annulée"
 }
