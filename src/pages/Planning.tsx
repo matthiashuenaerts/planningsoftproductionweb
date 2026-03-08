@@ -2113,6 +2113,7 @@ const Planning = () => {
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
                       variant="outline"
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <Settings className="mr-2 h-4 w-4" />
