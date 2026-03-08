@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { LifeBuoy, ChevronRight, ArrowLeft } from "lucide-react";
+import { LifeBuoy, ChevronRight, ArrowLeft, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import SupportTicketChat from "@/components/support/SupportTicketChat";
+import { useToast } from "@/hooks/use-toast";
 
 const DevSupportManagement: React.FC = () => {
   const qc = useQueryClient();
