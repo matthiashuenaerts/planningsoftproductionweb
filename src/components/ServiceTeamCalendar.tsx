@@ -413,8 +413,8 @@ const ServiceTeamCalendar: React.FC = () => {
       const workEndTotalMin = workEndH * 60 + workEndM;
       const overtime = returnTotalMin > workEndTotalMin;
       const overtimeMsg = overtime 
-        ? ` ⚠️ Estimated return at ${returnTimeStr} exceeds end of workday (${workEndTime})` 
-        : ` Return by ${returnTimeStr}`;
+        ? ` ${t('svc_return_exceeds', { returnTime: returnTimeStr, endTime: workEndTime })}` 
+        : ` ${t('svc_return_by', { time: returnTimeStr })}`;
 
       const warningMsg = unrecognizedAddresses.length > 0 
         ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
