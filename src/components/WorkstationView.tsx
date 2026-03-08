@@ -1192,7 +1192,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      className="group border border-border/60 rounded-xl p-4 relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md"
+                      className={`group border border-border/60 rounded-xl ${isMobile ? 'p-3' : 'p-4'} relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md`}
                       style={{
                         borderLeftWidth: '4px',
                         borderLeftColor: taskColor || 'hsl(var(--border))',
