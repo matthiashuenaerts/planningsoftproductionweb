@@ -363,6 +363,13 @@ const Workstations: React.FC = () => {
                                  </DropdownMenuItem>
                                  <DropdownMenuItem onClick={e => {
                           e.stopPropagation();
+                          setShowKeyboardScanner(workstation.id);
+                        }}>
+                                   <Radio className="mr-2 h-4 w-4" />
+                                   Listen for Scan
+                                 </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={e => {
+                          e.stopPropagation();
                           setShowErrorDialog(workstation.id);
                         }}>
                                    <AlertTriangle className="mr-2 h-4 w-4" />
