@@ -48,6 +48,9 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
   startPoint,
   totalDrivingMinutes,
   unrecognizedAddresses,
+  departureTime,
+  workStartTime,
+  workEndTime,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
