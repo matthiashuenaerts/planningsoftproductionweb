@@ -14,6 +14,9 @@
   "login_failed": "Login failed",
   
   "dashboard": "Dashboard",
+  "good_morning": "☀️ Good morning",
+  "good_afternoon": "🌤️ Good afternoon",
+  "good_evening": "🌙 Good evening",
   "control_panel": "Control Panel",
   "projects": "Projects",
   "workstations": "Workstations",
