@@ -1118,58 +1118,59 @@ const ProjectDetails = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <Button variant="outline" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-4">
-              <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_projects')}
+          <div className="mb-4 sm:mb-6">
+            <Button variant="outline" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm">
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> {t('back_to_projects')}
             </Button>
             
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:gap-4">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
-                <p className="text-muted-foreground">{t('client_label')}: {project?.client}</p>
+                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-3xl'}`}>{project?.name}</h1>
+                <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
               </div>
               
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent md:overflow-visible md:flex-wrap">
-                <Button variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')} className="flex-shrink-0">
-                  <Home className="mr-2 h-4 w-4" /> {t('home')}
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide md:overflow-visible md:flex-wrap">
+                <Button size="sm" variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Home className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('home')}
                 </Button>
-                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn("flex-shrink-0", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : "")}>
-                  <Package className="mr-2 h-4 w-4" /> 
+                <Button size="sm" variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn("flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : "")}>
+                  <Package className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> 
                   {t('orders')}
-                  {undeliveredItemsCount > 0 && <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                  {undeliveredItemsCount > 0 && <span className="ml-1 sm:ml-2 bg-white text-red-500 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold">
                       {undeliveredItemsCount}
                     </span>}
                 </Button>
-                <Button variant={activeTab === 'parts' ? 'default' : 'outline'} onClick={() => setActiveTab('parts')} className="flex-shrink-0">
-                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
+                <Button size="sm" variant={activeTab === 'parts' ? 'default' : 'outline'} onClick={() => setActiveTab('parts')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <List className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('parts_list')}
                 </Button>
-                <Button variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')} className="flex-shrink-0">
-                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
+                <Button size="sm" variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Settings className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('accessories')}
                 </Button>
-                <Button variant={activeTab === 'chat' ? 'default' : 'outline'} onClick={() => setActiveTab('chat')} className="relative flex-shrink-0">
-                  <MessageCircle className="mr-2 h-4 w-4" /> 
+                <Button size="sm" variant={activeTab === 'chat' ? 'default' : 'outline'} onClick={() => setActiveTab('chat')} className="relative flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <MessageCircle className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> 
                   Chat
                   {unreadChatCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
                       {unreadChatCount > 99 ? '99+' : unreadChatCount}
                     </span>
                   )}
                 </Button>
-                <Button variant={activeTab === 'files' ? 'default' : 'outline'} onClick={() => setActiveTab('files')} className="flex-shrink-0">
-                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
+                <Button size="sm" variant={activeTab === 'files' ? 'default' : 'outline'} onClick={() => setActiveTab('files')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <FileText className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('files')}
                 </Button>
-                <Button variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')} className="flex-shrink-0">
-                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
+                <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Folder className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
                   {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
                     <Button
+                      size="sm"
                       variant={activeTab === 'costing' ? 'default' : 'outline'}
                       onClick={() => setActiveTab('costing')}
-                      className="flex-shrink-0"
+                      className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3"
                     >
-                      <DollarSign className="mr-2 h-4 w-4" /> Costing
+                      <DollarSign className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Costing
                     </Button>
                   )}
 
@@ -1177,29 +1178,29 @@ const ProjectDetails = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
             <Card className="py-0">
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{openTasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{openTasks.length}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('open_tasks')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('in_progress')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                <p className="text-xs text-muted-foreground">{t('completed')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('completed')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{tasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{tasks.length}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('total_tasks')}</p>
               </CardContent>
             </Card>
           </div>
@@ -1491,7 +1492,7 @@ const ProjectDetails = () => {
                             </div>
 
                             {/* Compact Order Info with Enhanced Delivery Date */}
-                            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
                               <div className={cn("flex items-center gap-1 p-2 rounded border", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'canceled' ? 'bg-gray-50 border-gray-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200')}>
                                 <Calendar className={cn("h-3 w-3", order.status === 'delivered' ? 'text-green-600' : order.status === 'pending' ? 'text-orange-600' : order.status === 'delayed' ? 'text-red-600' : order.status === 'canceled' ? 'text-gray-600' : order.status === 'charged' ? 'text-purple-600' : 'text-blue-600')} />
                                 <div>
@@ -1593,7 +1594,7 @@ const ProjectDetails = () => {
                     </div>}
                 </div>
               </CardContent>
-            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               <Card className="lg:col-span-1">
                 <CardHeader className="py-[15px]">
                   <CardTitle>{t('project_summary')}</CardTitle>
