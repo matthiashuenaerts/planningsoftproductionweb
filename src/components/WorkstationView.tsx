@@ -1201,18 +1201,18 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       }}
                     >
                       {/* Task Info Section */}
-                      <div className={`${isMobile ? 'space-y-1 mb-2' : 'space-y-2 mb-4'}`}>
-                        <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
-                        <p className="text-sm text-muted-foreground">{task.title}</p>
+                      <div className={`${isMobile ? 'space-y-0.5 mb-2' : 'space-y-2 mb-4'}`}>
+                        <h3 className={`font-semibold leading-tight text-foreground ${isMobile ? 'text-sm' : 'text-base sm:text-lg'}`}>{task.project_name}</h3>
+                        <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{task.title}</p>
                         
                         {task.due_date && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
                               {t('due_date_label', { date: format(new Date(task.due_date), 'MMM dd, yyyy') })}
                             </p>
                             {urgency && (
-                              <Badge variant={urgency.variant} className="text-xs">
-                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                              <Badge variant={urgency.variant} className={isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'}>
+                                {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-0.5" />}
                                 {urgency.label}
                               </Badge>
                             )}
@@ -1221,16 +1221,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       </div>
                       
                       {/* Action Buttons - Grid on mobile, row on desktop */}
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-3' : 'grid-cols-3 sm:grid-cols-5 gap-2'}`}>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleShowProjectParts(task)}
                           title={t('view_parts')}
-                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                          className={`flex flex-col items-center justify-center gap-0.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors ${isMobile ? 'h-10 text-[10px]' : 'h-12 sm:h-9 sm:flex-row gap-1'}`}
                         >
-                          <Package className="h-4 w-4" />
-                          <span className="text-xs sm:text-sm">{t('view_parts')}</span>
+                          <Package className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                          <span className={isMobile ? 'text-[10px] leading-none' : 'text-xs sm:text-sm'}>{t('view_parts')}</span>
                         </Button>
                         
                         {task.project_id && (
@@ -1239,10 +1239,10 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                             size="sm"
                             onClick={() => handleGoToFiles(task)}
                             title={t('view_files')}
-                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                            className={`flex flex-col items-center justify-center gap-0.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors ${isMobile ? 'h-10 text-[10px]' : 'h-12 sm:h-9 sm:flex-row gap-1'}`}
                           >
-                            <FileText className="h-4 w-4" />
-                            <span className="text-xs sm:text-sm">{t('view_files')}</span>
+                            <FileText className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                            <span className={isMobile ? 'text-[10px] leading-none' : 'text-xs sm:text-sm'}>{t('view_files')}</span>
                           </Button>
                         )}
                         
@@ -1252,10 +1252,10 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                             size="sm"
                             onClick={() => handleShowBarcode(task)}
                             title={t('show_barcode')}
-                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                            className={`flex flex-col items-center justify-center gap-0.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors ${isMobile ? 'h-10 text-[10px]' : 'h-12 sm:h-9 sm:flex-row gap-1'}`}
                           >
-                            <Barcode className="h-4 w-4" />
-                            <span className="text-xs sm:text-sm">{t('show_barcode')}</span>
+                            <Barcode className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                            <span className={isMobile ? 'text-[10px] leading-none' : 'text-xs sm:text-sm'}>{t('show_barcode')}</span>
                           </Button>
                         )}
                         
@@ -1265,19 +1265,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                             size="sm"
                             onClick={() => navigate(createLocalizedPath(`/projects/${task.project_id}`))}
                             title={t('go_to_project')}
-                            className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                            className={`flex flex-col items-center justify-center gap-0.5 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors ${isMobile ? 'h-10 text-[10px]' : 'h-12 sm:h-9 sm:flex-row gap-1'}`}
                           >
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="text-xs sm:text-sm">{t('go_to_project')}</span>
+                            <ExternalLink className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                            <span className={isMobile ? 'text-[10px] leading-none' : 'text-xs sm:text-sm'}>{t('go_to_project')}</span>
                           </Button>
                         )}
                         
                         <Button
                           onClick={() => handleTaskUpdate(task.id, 'IN_PROGRESS')}
-                          className="h-12 sm:h-9 flex flex-col sm:flex-row items-center justify-center gap-1 bg-primary hover:bg-primary/90 text-primary-foreground col-span-3 sm:col-span-1"
+                          className={`flex flex-col items-center justify-center gap-0.5 bg-primary hover:bg-primary/90 text-primary-foreground ${isMobile ? 'h-10 text-[10px] col-span-2' : 'h-12 sm:h-9 sm:flex-row gap-1 col-span-3 sm:col-span-1'}`}
                         >
-                          <PlayCircle className="h-4 w-4" />
-                          <span className="text-xs sm:text-sm">{t('start')}</span>
+                          <PlayCircle className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                          <span className={isMobile ? 'text-[10px] leading-none' : 'text-xs sm:text-sm'}>{t('start')}</span>
                         </Button>
                       </div>
                     </div>
