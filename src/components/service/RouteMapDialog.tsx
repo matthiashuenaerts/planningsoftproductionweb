@@ -141,7 +141,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+      <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             Route — {teamName} — {dateLabel}
@@ -150,7 +150,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
             Optimized driving route with return to start
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 flex flex-col min-h-0">
           {/* Unrecognized addresses warning */}
           {unrecognizedAddresses && unrecognizedAddresses.length > 0 && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
@@ -200,8 +200,8 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
           {/* Map container */}
           <div
             ref={mapContainerRef}
-            className="w-full rounded-lg border border-border"
-            style={{ height: '500px', zIndex: 0, position: 'relative' }}
+            className="w-full rounded-lg border border-border flex-1 min-h-0"
+            style={{ zIndex: 0, position: 'relative' }}
           />
         </div>
       </DialogContent>
