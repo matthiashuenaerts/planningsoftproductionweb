@@ -315,7 +315,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       .eq('id', taskLink.standard_task_id)
                       .maybeSingle();
                     
-                    if (taskError) throw taskError;
+                    if (taskError || !task) return null;
                     
                     const { data: rushOrderInfo, error: rushOrderError } = await supabase
                       .from('rush_orders')
