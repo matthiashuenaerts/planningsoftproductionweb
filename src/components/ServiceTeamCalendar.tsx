@@ -473,6 +473,9 @@ const ServiceTeamCalendar: React.FC = () => {
                   const isToday = isSameDay(day, new Date());
                   const dayProjects = getProjectsForTeamAndDate(team.id, dateStr);
                   const totalHours = dayProjects.reduce((sum, p) => sum + (p.assignment.service_hours || 0), 0);
+                  const routeData = optimizedRoutes[`${team.id}_${dateStr}`];
+                  const drivingMin = routeData?.totalDrivingMinutes;
+                  const grandTotal = drivingMin != null ? totalHours + drivingMin / 60 : totalHours;
 
                   return (
                     <div
