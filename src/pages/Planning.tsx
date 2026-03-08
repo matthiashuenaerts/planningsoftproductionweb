@@ -2244,10 +2244,10 @@ const Planning = () => {
                 ) : (
                   <div className="space-y-6">
                     {/* Worker Selection */}
-                    <div className="flex items-center justify-between">
-                      <div className="w-64">
+                    <div className={cn("flex items-center", isMobile ? "flex-col gap-2" : "justify-between")}>
+                      <div className={isMobile ? "w-full" : "w-64"}>
                         <Select value={selectedWorker || ''} onValueChange={setSelectedWorker}>
-                          <SelectTrigger>
+                          <SelectTrigger className={isMobile ? "h-9 text-sm" : ""}>
                             <SelectValue placeholder={t('planning_select_worker')} />
                           </SelectTrigger>
                           <SelectContent>
@@ -2268,19 +2268,23 @@ const Planning = () => {
                       </div>
 
                       {isAdmin && selectedWorker && (
-                        <div className="flex space-x-2">
+                        <div className={cn("flex", isMobile ? "w-full gap-1.5" : "space-x-2")}>
                           <Button
                             onClick={() => generateDailySchedule(selectedWorker)}
                             disabled={generatingSchedule || isSelectedDateHoliday()}
                             variant="outline"
+                            size={isMobile ? "sm" : "default"}
+                            className={cn(isMobile && "flex-1 h-8 text-xs")}
                           >
-                            <Zap className="mr-2 h-4 w-4" />
-                            {t('planning_generate_schedule')}
+                            <Zap className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                            {isMobile ? t('planning_generate_schedule').split(' ').slice(0, 2).join(' ') : t('planning_generate_schedule')}
                           </Button>
                           <Button
                             onClick={() => setShowTaskManager(true)}
+                            size={isMobile ? "sm" : "default"}
+                            className={cn(isMobile && "flex-1 h-8 text-xs")}
                           >
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
                             {t('planning_add_task')}
                           </Button>
                         </div>
