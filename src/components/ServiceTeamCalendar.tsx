@@ -73,6 +73,8 @@ const ServiceTeamCalendar: React.FC = () => {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [assignProjectId, setAssignProjectId] = useState<string>('');
   const [assignHours, setAssignHours] = useState<number>(2);
+  const [assignDescription, setAssignDescription] = useState('');
+  const [assignTodos, setAssignTodos] = useState<string[]>(['']);
   const [optimizing, setOptimizing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [mapWaypoints, setMapWaypoints] = useState<RouteWaypoint[]>([]);
