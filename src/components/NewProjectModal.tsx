@@ -890,10 +890,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 control={form.control}
                 name="is_after_sales"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className={cn(
+                    "flex flex-row items-center justify-between rounded-lg border",
+                    isMobile ? "p-3" : "p-4"
+                  )}>
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">{t('npm_project_type')}</FormLabel>
-                      <div className="text-sm text-muted-foreground">
+                      <FormLabel className={cn(isMobile ? "text-sm" : "text-base")}>{t('npm_project_type')}</FormLabel>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         {field.value ? t('npm_after_sales') : t('npm_normal_project')}
                       </div>
                     </div>
