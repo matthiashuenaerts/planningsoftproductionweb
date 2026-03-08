@@ -578,10 +578,10 @@ const { data, error } = await supabase.functions.invoke(
 
               {/* Status */}
               <div className="flex items-center justify-between pt-2 border-t">
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-[10px] sm:text-xs">
                   Verbonden
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs">
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-[10px] sm:text-xs h-7 sm:h-8">
                   Uitloggen
                 </Button>
               </div>
