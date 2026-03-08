@@ -795,7 +795,7 @@ const ServiceTeamCalendar: React.FC = () => {
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>Estimated Hours</Label>
+              <Label>{t('svc_estimated_hours')}</Label>
               <Input
                 type="number"
                 min="0.5"
