@@ -432,7 +432,7 @@ const Login: React.FC = () => {
       </div>
 
       <div
-        className={`w-full max-w-md space-y-8 relative z-10 transform transition-all duration-1000 ${
+        className={`w-full max-w-md space-y-6 sm:space-y-8 relative z-10 transform transition-all duration-1000 ${
           isVisible
             ? "translate-y-0 opacity-100"
             : "translate-y-8 opacity-0"
