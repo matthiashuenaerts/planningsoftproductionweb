@@ -419,7 +419,7 @@ const Floorplan: React.FC = () => {
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-background`}>
       {!isFullscreen && <Navbar />}
-      <div className={`${isFullscreen ? 'w-screen h-screen' : 'ml-64 relative w-[calc(100vw-16rem)] h-screen'} flex items-center justify-center overflow-hidden relative`}>
+      <div className={`${isFullscreen ? 'w-screen h-screen' : isMobile ? 'w-full h-[calc(100vh-3.5rem)] pt-14' : 'ml-64 relative w-[calc(100vw-16rem)] h-screen'} flex items-center justify-center overflow-hidden relative`}>
         {/* Fullscreen toggle button */}
         <Button
           variant="outline"
