@@ -593,9 +593,9 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.status === 'COMPLETED' && task.completed_at && (
                     <div className="flex items-center gap-2">
                       <div className="text-sm text-gray-500">
-                        Completed: {new Date(task.completed_at).toLocaleString()}
+                        {t('tl_completed_at', { date: new Date(task.completed_at).toLocaleString() })}
                         {task.completed_by_employee?.name && (
-                          <span className="ml-1">by {task.completed_by_employee.name}</span>
+                          <span className="ml-1">{t('tl_completed_by', { name: task.completed_by_employee.name })}</span>
                         )}
                       </div>
                       <Button 
