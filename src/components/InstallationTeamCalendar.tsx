@@ -527,7 +527,7 @@ const TeamCalendar = ({
         
         <CollapsibleContent>
           <div className={cn("rounded-b-lg border-b border-x", teamColor.border)}>
-            <ScrollArea className="h-[800px]" ref={scrollAreaRef}>
+            <ScrollArea className={isMobile ? 'h-[400px]' : 'h-[800px]'} ref={scrollAreaRef}>
               {calendarMonths.map((month, monthIndex) => {
                 const monthDays = generateMonthDays(month);
                 const weeks = [];
@@ -538,16 +538,16 @@ const TeamCalendar = ({
                 const isCurrentMonth = isSameMonth(month, new Date());
 
                 return (
-                  <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
-                    <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
+                  <div key={monthIndex} className={isMobile ? 'mb-2' : 'mb-4'} data-current-month={isCurrentMonth}>
+                    <div className={`sticky top-0 bg-muted ${isMobile ? 'p-1.5 text-xs' : 'p-2 text-sm'} text-center font-medium border-b z-10`}>
                       {format(month, 'MMMM yyyy')}
-                      {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">{t('itc_current')}</span>}
+                      {isCurrentMonth && <span className="ml-2 text-[10px] sm:text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded">{t('itc_current')}</span>}
                     </div>
                     
                     <div className="grid grid-cols-7 border-b">
                       {dayHeaders.map(day => (
-                        <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
-                          {day}
+                        <div key={day} className={`${isMobile ? 'p-0.5 text-[10px]' : 'p-2 text-sm'} text-center font-medium bg-muted/50`}>
+                          {isMobile ? day.charAt(0) : day}
                         </div>
                       ))}
                     </div>
