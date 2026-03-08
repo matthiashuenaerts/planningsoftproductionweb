@@ -246,8 +246,8 @@ const TaskList: React.FC<TaskListProps> = ({
       // Check if current user is the only active user
       if (activeUsers.length === 1 && currentEmployee && activeUsers[0].id !== currentEmployee.id) {
         toast({
-          title: 'Cannot Complete Task',
-          description: `Only ${activeUsers[0].name} can complete this task as they are currently working on it.`,
+          title: t('tl_cannot_complete_task'),
+          description: t('tl_only_active_user_can_complete', { name: activeUsers[0].name }),
           variant: 'destructive'
         });
         return;
