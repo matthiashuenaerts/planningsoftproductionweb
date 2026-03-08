@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import DOMPurify from 'dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const isMobile = useIsMobile();
+  const signedVideoUrl = useSignedUrl('help-media', selectedArticle?.video_url);
+  const signedImageUrl = useSignedUrl('help-media', selectedArticle?.image_url);
 
   useEffect(() => {
     if (open) {
@@ -426,23 +429,23 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
         <div className={`space-y-${isMobile ? '3' : '4'}`}>
           <h2 className={`font-bold ${isMobile ? 'text-lg leading-tight' : 'text-xl'}`}>{selectedArticle.title}</h2>
 
-          {selectedArticle.video_url && (
+          {signedVideoUrl && (
             <div className="aspect-video bg-muted rounded-xl overflow-hidden">
               <video
                 controls
                 className="w-full h-full"
-                poster={selectedArticle.image_url}
+                poster={signedImageUrl || undefined}
               >
-                <source src={selectedArticle.video_url} type="video/mp4" />
+                <source src={signedVideoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </div>
           )}
 
-          {selectedArticle.image_url && !selectedArticle.video_url && (
+          {signedImageUrl && !selectedArticle.video_url && (
             <div className="rounded-xl overflow-hidden">
               <img
-                src={selectedArticle.image_url}
+                src={signedImageUrl}
                 alt={selectedArticle.title}
                 className={`w-full object-cover ${isMobile ? 'max-h-48' : 'max-h-64'}`}
               />
