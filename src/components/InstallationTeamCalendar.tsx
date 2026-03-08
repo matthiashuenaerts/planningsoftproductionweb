@@ -1104,18 +1104,20 @@ const InstallationTeamCalendar = ({
   
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
+      <CardHeader className={isMobile ? 'px-3 py-2' : 'pb-2'}>
+        <div className={`flex ${isMobile ? 'flex-col gap-1' : 'justify-between items-center'}`}>
+          <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+            <CalendarDays className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             {t('itc_title')}
           </CardTitle>
-          <div className="text-sm text-gray-600">
-            {t('itc_description')}
-          </div>
+          {!isMobile && (
+            <div className="text-sm text-muted-foreground">
+              {t('itc_description')}
+            </div>
+          )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className={isMobile ? 'px-2 pb-2' : ''}>
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
