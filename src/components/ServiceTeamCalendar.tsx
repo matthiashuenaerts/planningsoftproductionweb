@@ -749,27 +749,38 @@ const ServiceTeamCalendar: React.FC = () => {
           setAssignProjectId('');
         }
       }}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className={cn("max-h-[90vh] overflow-y-auto", isMobile ? "max-w-[95vw] p-4" : "sm:max-w-lg")}>
           <DialogHeader>
-            <DialogTitle>{t('svc_schedule_service_visit')}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
+            <DialogTitle className={isMobile ? "text-base" : ""}>{t('svc_schedule_service_visit')}</DialogTitle>
+            <p className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>
               {t('svc_add_service_assignment')}
             </p>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>{t('svc_date')}</Label>
-              <Input value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMM d yyyy') : ''} disabled />
+          <div className={cn("py-2", isMobile ? "space-y-3" : "space-y-4")}>
+            {/* Date & Team side by side on mobile */}
+            <div className={cn(isMobile ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+              <div className="space-y-1">
+                <Label className={isMobile ? "text-xs" : ""}>{t('svc_date')}</Label>
+                <Input
+                  value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), isMobile ? 'EEE, MMM d' : 'EEEE, MMM d yyyy') : ''}
+                  disabled
+                  className={isMobile ? "h-8 text-xs" : ""}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className={isMobile ? "text-xs" : ""}>{t('svc_team')}</Label>
+                <Input
+                  value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''}
+                  disabled
+                  className={isMobile ? "h-8 text-xs" : ""}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>{t('svc_team')}</Label>
-              <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>{t('svc_project')} *</Label>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_project')} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", isMobile && "h-8 text-xs")}>
                     {assignProjectId ? (
                       <span className="truncate">
                         {projects.find(p => p.id === assignProjectId)?.name || t('svc_select_project')}
@@ -783,7 +794,7 @@ const ServiceTeamCalendar: React.FC = () => {
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
                     <CommandInput placeholder={t('svc_search_placeholder')} />
-                    <CommandList>
+                    <CommandList className={isMobile ? "max-h-[40vh]" : ""}>
                       <CommandEmpty>{t('svc_no_projects_found')}</CommandEmpty>
                       <CommandGroup>
                         {projects
@@ -795,9 +806,9 @@ const ServiceTeamCalendar: React.FC = () => {
                               onSelect={() => setAssignProjectId(p.id)}
                             >
                               <Check className={cn("mr-2 h-4 w-4", assignProjectId === p.id ? "opacity-100" : "opacity-0")} />
-                              <div className="flex flex-col">
-                                <span>{p.name}</span>
-                                <span className="text-xs text-muted-foreground">{p.client} — {getProjectAddress(p)}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="truncate">{p.name}</span>
+                                <span className="text-xs text-muted-foreground truncate">{p.client} — {getProjectAddress(p)}</span>
                               </div>
                             </CommandItem>
                           ))}
@@ -807,8 +818,8 @@ const ServiceTeamCalendar: React.FC = () => {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="space-y-2">
-              <Label>{t('svc_estimated_hours')}</Label>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_estimated_hours')}</Label>
               <Input
                 type="number"
                 min="0.5"
@@ -816,21 +827,23 @@ const ServiceTeamCalendar: React.FC = () => {
                 step="0.5"
                 value={assignHours}
                 onChange={(e) => setAssignHours(parseFloat(e.target.value) || 2)}
+                className={isMobile ? "h-8 text-xs" : ""}
               />
             </div>
-            <div className="space-y-2">
-              <Label>{t('svc_description')}</Label>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_description')}</Label>
               <Textarea
                 placeholder={t('svc_describe_service')}
                 value={assignDescription}
                 onChange={e => setAssignDescription(e.target.value)}
-                rows={3}
+                rows={isMobile ? 2 : 3}
+                className={isMobile ? "text-xs" : ""}
               />
             </div>
-            <div className="space-y-2">
-              <Label>{t('svc_todos')}</Label>
+            <div className="space-y-1.5">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_todos')}</Label>
               {assignTodos.map((todo, index) => (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-1.5">
                   <Input
                     placeholder={t('svc_todo_item', { index: String(index + 1) })}
                     value={todo}
@@ -839,24 +852,25 @@ const ServiceTeamCalendar: React.FC = () => {
                       updated[index] = e.target.value;
                       setAssignTodos(updated);
                     }}
+                    className={isMobile ? "h-8 text-xs" : ""}
                   />
                   {assignTodos.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => setAssignTodos(assignTodos.filter((_, i) => i !== index))} className="flex-shrink-0">
+                    <Button variant="ghost" size="icon" className={cn("flex-shrink-0", isMobile && "h-8 w-8")} onClick={() => setAssignTodos(assignTodos.filter((_, i) => i !== index))}>
                       <X className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className="w-full">
+              <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className={cn("w-full", isMobile && "h-7 text-xs")}>
                 <Plus className="h-4 w-4 mr-1" /> {t('svc_add_todo')}
               </Button>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className={cn("flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
             <DialogClose asChild>
-              <Button variant="outline">{t('svc_cancel')}</Button>
+              <Button variant="outline" className={isMobile ? "w-full" : ""}>{t('svc_cancel')}</Button>
             </DialogClose>
-            <Button onClick={handleAssignProject} disabled={!assignProjectId}>
+            <Button onClick={handleAssignProject} disabled={!assignProjectId} className={isMobile ? "w-full" : ""}>
               {t('svc_schedule_service')}
             </Button>
           </div>
