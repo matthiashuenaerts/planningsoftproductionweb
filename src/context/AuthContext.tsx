@@ -78,13 +78,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) throw error;
 
       if (employee) {
+        let effectiveTenantId = (employee as any).tenant_id ?? undefined;
+
+        // For developers (null tenant_id), resolve the effective tenant from developer_active_tenants
+        if (!effectiveTenantId) {
+          const { data: tenantIdResult } = await supabase.rpc("get_user_tenant_id", {
+            p_user_id: userId,
+          });
+          if (tenantIdResult) {
+            effectiveTenantId = tenantIdResult;
+          }
+        }
+
         setCurrentEmployee({
           id: employee.id,
           name: employee.name,
           role: employee.role as Employee["role"],
           workstation: employee.workstation,
           logistics: employee.logistics,
-          tenant_id: (employee as any).tenant_id ?? undefined,
+          tenant_id: effectiveTenantId,
         });
       } else {
         setCurrentEmployee(null);
