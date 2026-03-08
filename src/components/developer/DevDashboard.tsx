@@ -297,10 +297,17 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
           {(syncLogs ?? []).map((log: any) => {
             const details = log.details as any;
             const isExpanded = expandedLog === log.id;
-            const syncDetails: any[] = details?.sync_details ?? [];
-            const errorDetails: string[] = details?.error_details ?? [];
+            const syncType = log._sync_type as string;
+            const syncDetails: any[] = syncType === 'order' 
+              ? (details?.details ?? []) 
+              : (details?.sync_details ?? []);
+            const errorDetails: string[] = syncType === 'order'
+              ? (details?.errors ?? [])
+              : (details?.error_details ?? []);
             const hasErrors = (log.error_count ?? 0) > 0;
-            const updatedProjects = syncDetails.filter((d: any) => d.status === 'updated');
+            const updatedProjects = syncType === 'order'
+              ? syncDetails.filter((d: any) => d.status === 'synced' && (d.orders_added > 0 || d.orders_updated > 0))
+              : syncDetails.filter((d: any) => d.status === 'updated');
             const errorProjects = syncDetails.filter((d: any) => d.status === 'error');
 
             return (
