@@ -494,19 +494,19 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           </div>
         </div>
         
-        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_select_tasks')}</label>
+        <div className={`${isMobile ? 'space-y-2.5' : 'space-y-4 md:space-y-6'} min-w-0`}>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_select_tasks')}</label>
             <Card>
-              <CardHeader className="p-3 md:p-4">
-                <CardTitle className="text-sm md:text-base">{t('ro_standard_tasks')}</CardTitle>
+              <CardHeader className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+                <CardTitle className={isMobile ? 'text-xs' : 'text-sm md:text-base'}>{t('ro_standard_tasks')}</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 md:p-4 pt-0">
+              <CardContent className={`${isMobile ? 'p-2.5' : 'p-3 md:p-4'} pt-0`}>
                 {loadingTasks ? (
-                  <div className="flex justify-center p-4 text-sm text-muted-foreground">{t('ro_loading_tasks')}</div>
+                  <div className="flex justify-center p-3 text-xs text-muted-foreground">{t('ro_loading_tasks')}</div>
                 ) : (
-                  <ScrollArea className="h-[200px]">
-                    <div className="grid grid-cols-1 gap-2">
+                  <ScrollArea className={isMobile ? 'h-[150px]' : 'h-[200px]'}>
+                    <div className="grid grid-cols-1 gap-1.5">
                       {standardTasks?.map((task: StandardTask) => (
                         <CheckboxCard
                           key={task.id}
@@ -523,22 +523,22 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
               </CardContent>
             </Card>
             {errors.selectedTasks && selectedTaskIds.length === 0 && (
-              <p className="text-sm text-destructive">{t('ro_select_task_required')}</p>
+              <p className="text-xs text-destructive">{t('ro_select_task_required')}</p>
             )}
           </div>
           
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_assign_users')}</label>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_assign_users')}</label>
             <Card>
-              <CardHeader className="p-3 md:p-4">
-                <CardTitle className="text-sm md:text-base">{t('ro_team_members')}</CardTitle>
+              <CardHeader className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+                <CardTitle className={isMobile ? 'text-xs' : 'text-sm md:text-base'}>{t('ro_team_members')}</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 md:p-4 pt-0">
+              <CardContent className={`${isMobile ? 'p-2.5' : 'p-3 md:p-4'} pt-0`}>
                 {loadingEmployees ? (
-                  <div className="flex justify-center p-4 text-sm text-muted-foreground">{t('ro_loading_users')}</div>
+                  <div className="flex justify-center p-3 text-xs text-muted-foreground">{t('ro_loading_users')}</div>
                 ) : (
-                  <ScrollArea className="h-[200px]">
-                    <div className="grid grid-cols-1 gap-2">
+                  <ScrollArea className={isMobile ? 'h-[150px]' : 'h-[200px]'}>
+                    <div className="grid grid-cols-1 gap-1.5">
                       {employees?.map((employee) => (
                         <CheckboxCard
                           key={employee.id}
@@ -555,14 +555,14 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
               </CardContent>
             </Card>
             {errors.assignedUsers && selectedUserIds.length === 0 && (
-              <p className="text-sm text-destructive">{t('ro_assign_user_required')}</p>
+              <p className="text-xs text-destructive">{t('ro_assign_user_required')}</p>
             )}
           </div>
         </div>
       </div>
       
-      <div className={`flex ${isMobile ? 'pt-2' : ''} justify-end`}>
-        <Button type="submit" disabled={isSubmitting} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
+      <div className={`flex ${isMobile ? 'pt-1' : ''} justify-end`}>
+        <Button type="submit" disabled={isSubmitting} size={isMobile ? 'sm' : 'default'} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
           {isSubmitting ? t('ro_creating') : t('ro_create_rush_order')}
         </Button>
       </div>
