@@ -2122,6 +2122,7 @@ const Planning = () => {
                     <Button
                       onClick={() => setShowSchedulingMethodDialog(true)}
                       disabled={generatingSchedule || isSelectedDateHoliday()}
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <Zap className="mr-2 h-4 w-4" />
