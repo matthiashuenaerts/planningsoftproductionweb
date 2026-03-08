@@ -493,8 +493,8 @@ const ServiceTeamCalendar: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           {totalHours > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              <Clock className="h-3 w-3 mr-1" />{totalHours}h
+                            <Badge variant="outline" className="text-xs" title={drivingMin != null ? `Service: ${totalHours}h + Driving: ${Math.round(drivingMin)}min` : `Service: ${totalHours}h`}>
+                              <Clock className="h-3 w-3 mr-1" />{grandTotal.toFixed(1)}h
                             </Badge>
                           )}
                         </div>
