@@ -26,6 +26,7 @@ import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistD
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
 import { partTrackingService } from '@/services/partTrackingService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface WorkstationViewProps {
   workstationName?: string;
@@ -105,6 +106,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     t,
     createLocalizedPath
   } = useLanguage();
+  const isMobile = useIsMobile();
   
   // Query active time registration for current employee
   const { data: activeRegistration } = useQuery({
@@ -985,13 +987,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const inProgressTasks = sortTasks(tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task));
   const todoTasks = sortTasks(tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task));
   
+  
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{t('workstation_view_title', { name: actualWorkstationName })}</h1>
-        <div className="flex gap-2">
+    <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
+      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
+        <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('workstation_view_title', { name: actualWorkstationName })}</h1>
+        <div className={`flex gap-2 ${isMobile ? 'flex-wrap' : ''}`}>
           {onBack && (
-            <Button variant="outline" onClick={onBack}>
+            <Button variant="outline" size={isMobile ? 'sm' : 'default'} onClick={onBack}>
               {t('back')}
             </Button>
           )}
@@ -1001,7 +1005,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
               if (!wsId) return null;
               return <PartsCountBadge workstationId={wsId} />;
             })()}
-            <Badge variant="outline" className="text-lg px-3 py-1">
+            <Badge variant="outline" className={isMobile ? 'text-sm px-2 py-0.5' : 'text-lg px-3 py-1'}>
               {t('active_tasks', { count: tasks.length.toString() })}
             </Badge>
           </div>
@@ -1027,7 +1031,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      className={`group border border-border/60 rounded-xl p-4 relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md ${isCompleting ? 'opacity-50' : ''}`}
+                      className={`group border border-border/60 rounded-xl ${isMobile ? 'p-3' : 'p-4'} relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md ${isCompleting ? 'opacity-50' : ''}`}
                       style={{
                         borderLeftWidth: '4px',
                         borderLeftColor: taskColor || 'hsl(var(--border))',
@@ -1035,7 +1039,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       }}
                     >
                       {/* Task Info Section */}
-                      <div className="space-y-2 mb-4">
+                      <div className={`${isMobile ? 'space-y-1 mb-2' : 'space-y-2 mb-4'}`}>
                         <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
                         <p className="text-sm text-muted-foreground">{task.title}</p>
                         
@@ -1189,7 +1193,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                   return (
                     <div
                       key={task.id}
-                      className="group border border-border/60 rounded-xl p-4 relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md"
+                      className={`group border border-border/60 rounded-xl ${isMobile ? 'p-3' : 'p-4'} relative transition-all duration-200 bg-card/50 hover:bg-accent/30 hover:border-primary/30 shadow-sm hover:shadow-md`}
                       style={{
                         borderLeftWidth: '4px',
                         borderLeftColor: taskColor || 'hsl(var(--border))',
@@ -1197,7 +1201,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       }}
                     >
                       {/* Task Info Section */}
-                      <div className="space-y-2 mb-4">
+                      <div className={`${isMobile ? 'space-y-1 mb-2' : 'space-y-2 mb-4'}`}>
                         <h3 className="font-semibold text-base sm:text-lg leading-tight text-foreground">{task.project_name}</h3>
                         <p className="text-sm text-muted-foreground">{task.title}</p>
                         
