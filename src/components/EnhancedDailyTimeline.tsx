@@ -197,8 +197,8 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
     return (
       <Card>
         <CardContent className="pt-6 text-center">
-          <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-500">No scheduled tasks for today.</p>
+          <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground/40 mb-3 sm:mb-4" />
+          <p className="text-sm sm:text-base text-muted-foreground">{t('pt_no_tasks') || 'No scheduled tasks for today.'}</p>
         </CardContent>
       </Card>
     );
