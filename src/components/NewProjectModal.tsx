@@ -48,6 +48,7 @@ import { Label } from './ui/label';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Add the missing interface
 interface NewProjectModalProps {
@@ -103,6 +104,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const { toast } = useToast();
   const { tenant } = useTenant();
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -835,14 +837,17 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] sm:w-[95vw] max-w-[700px] max-h-[85vh] sm:max-h-[90vh] p-3 sm:p-6 rounded-lg">
+      <DialogContent className={cn(
+        "max-h-[90vh] overflow-y-auto rounded-lg",
+        isMobile ? "w-[calc(100vw-1rem)] p-3" : "w-[95vw] max-w-[700px] p-6"
+      )}>
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">{t('npm_create_new_project')}</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="max-h-[65vh] sm:max-h-[70vh] pr-2 sm:pr-4">
+        <ScrollArea className={cn("pr-2", isMobile ? "max-h-[70vh]" : "max-h-[72vh] pr-4")}>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className={cn("mt-2", isMobile ? "space-y-3" : "space-y-4 mt-4")}>
               
               {/* Project Link ID + Sync Button - at the top */}
               <FormField
@@ -851,15 +856,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('npm_project_link_id')}</FormLabel>
-                    <div className="flex gap-2">
+                    <div className={cn("flex gap-2", isMobile && "flex-col")}>
                       <FormControl>
-                        <Input placeholder={t('npm_project_link_placeholder')} {...field} />
+                        <Input placeholder={t('npm_project_link_placeholder')} className={cn(isMobile && "h-9 text-sm")} {...field} />
                       </FormControl>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handleSyncProject}
                         disabled={syncing || !field.value?.trim()}
+                        className={cn(isMobile && "h-9 text-sm")}
                       >
                         {syncing ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -884,10 +890,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 control={form.control}
                 name="is_after_sales"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <FormItem className={cn(
+                    "flex flex-row items-center justify-between rounded-lg border",
+                    isMobile ? "p-3" : "p-4"
+                  )}>
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">{t('npm_project_type')}</FormLabel>
-                      <div className="text-sm text-muted-foreground">
+                      <FormLabel className={cn(isMobile ? "text-sm" : "text-base")}>{t('npm_project_type')}</FormLabel>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
                         {field.value ? t('npm_after_sales') : t('npm_normal_project')}
                       </div>
                     </div>
@@ -903,9 +912,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               />
 
               {/* Project Code Display */}
-              <div className="rounded-lg border p-4 bg-muted/50">
-                <div className="text-sm font-medium text-muted-foreground mb-1">{t('npm_generated_code')}</div>
-                <div className="text-lg font-mono font-bold">
+              <div className={cn("rounded-lg border bg-muted/50", isMobile ? "p-3" : "p-4")}>
+                <div className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">{t('npm_generated_code')}</div>
+                <div className={cn("font-mono font-bold", isMobile ? "text-base" : "text-lg")}>
                   {isGeneratingCode ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -924,7 +933,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <FormItem>
                     <FormLabel>{t('npm_project_name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
+                      <Input placeholder="Kitchen Pro - Client XYZ" className={cn(isMobile && "h-9 text-sm")} {...field} />
                     </FormControl>
                     <div className="text-sm text-muted-foreground">
                       {t('npm_full_name_will_be')} <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || t('npm_project_name')}</span>
@@ -935,8 +944,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               />
 
               {/* Address Fields */}
-              <div className="border rounded-md p-3 space-y-3">
-                <Label className="text-sm font-medium">Project Address</Label>
+              <div className={cn("border rounded-lg space-y-2", isMobile ? "p-2.5" : "p-3 space-y-3")}>
+                <Label className="text-xs sm:text-sm font-medium">Project Address</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
@@ -944,7 +953,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Street" {...field} />
+                          <Input placeholder="Street" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -955,7 +964,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Number" {...field} />
+                          <Input placeholder="Number" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -966,7 +975,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Postal Code" {...field} />
+                          <Input placeholder="Postal Code" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -977,7 +986,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="City" {...field} />
+                          <Input placeholder="City" className={cn(isMobile && "h-9 text-sm")} {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -992,7 +1001,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <FormItem>
                     <FormLabel>{t('npm_client')}</FormLabel>
                     <FormControl>
-                      <Input placeholder={t('npm_client_placeholder')} {...field} />
+                      <Input placeholder={t('npm_client_placeholder')} className={cn(isMobile && "h-9 text-sm")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1008,7 +1017,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     <FormControl>
                       <Textarea 
                         placeholder={t('npm_description_placeholder')} 
-                        className="resize-none" 
+                        className={cn("resize-none", isMobile && "text-sm min-h-[60px]")} 
                         {...field} 
                       />
                     </FormControl>
@@ -1030,6 +1039,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         type="number" 
                         min="1" 
                         max="100" 
+                        className={cn(isMobile && "h-9 text-sm")}
                         {...field} 
                         onChange={e => field.onChange(parseInt(e.target.value))}
                       />
@@ -1126,13 +1136,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 />
               </div>
 
-              <div className="border rounded-md p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">{t('npm_project_tasks')}</h3>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="route-select" className="text-sm whitespace-nowrap">{t('npm_production_route')}</Label>
+              <div className={cn("border rounded-lg", isMobile ? "p-2.5" : "p-4")}>
+                <div className={cn(
+                  "mb-3",
+                  isMobile ? "flex flex-col gap-2" : "flex items-center justify-between mb-4"
+                )}>
+                  <h3 className="font-medium text-sm">{t('npm_project_tasks')}</h3>
+                  <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
+                    <Label htmlFor="route-select" className="text-xs whitespace-nowrap">{t('npm_production_route')}</Label>
                     <Select value={selectedRouteId} onValueChange={handleRouteChange}>
-                      <SelectTrigger id="route-select" className="w-[200px]">
+                      <SelectTrigger id="route-select" className={cn(isMobile ? "flex-1 h-9 text-sm" : "w-[200px]")}>
                         <SelectValue placeholder={t('npm_all_tasks')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1151,24 +1164,33 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
+                  <div className={cn(
+                    "space-y-1.5 mb-3 overflow-y-auto pr-1",
+                    isMobile ? "max-h-[200px]" : "max-h-[300px] pr-2"
+                  )}>
                     {tasks.map((task, index) => (
-                      <div key={index} className="flex items-center space-x-2">
+                      <div key={index} className={cn(
+                        "flex items-center gap-2",
+                        isMobile ? "rounded-lg bg-muted/30 p-2" : "space-x-2"
+                      )}>
                         <Checkbox 
                           id={`task-${index}`} 
                           checked={task.selected} 
                           onCheckedChange={() => handleToggleTask(index)} 
                         />
-                        <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
-                          <span className="mr-1">{task.id} - {task.name}</span>
-                          {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
+                        <label htmlFor={`task-${index}`} className={cn(
+                          "flex-1 flex flex-wrap items-center gap-1 min-w-0",
+                          isMobile ? "text-xs" : "text-sm"
+                        )}>
+                          <span className="break-words">{task.id} - {task.name}</span>
+                          {task.workstation && <span className="text-muted-foreground">({task.workstation})</span>}
                           {task.duration && (
-                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
+                            <span className="text-[10px] sm:text-xs bg-muted px-1.5 py-0.5 rounded-full">
                               {task.duration} min
                             </span>
                           )}
                           {task.day_counter !== undefined && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] sm:text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                               -{task.day_counter} days
                             </span>
                           )}
@@ -1177,47 +1199,52 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                           type="button" 
                           variant="ghost" 
                           size="icon" 
+                          className={cn(isMobile && "h-7 w-7")}
                           onClick={() => handleRemoveTask(index)}
                         >
-                          <Trash className="h-4 w-4" />
+                          <Trash className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     ))}
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-2 mt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t('npm_new_task_placeholder')}
-                      value={newTaskName}
-                      onChange={(e) => setNewTaskName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder={t('npm_workstation_placeholder')}
-                      value={newTaskWorkstation}
-                      onChange={(e) => setNewTaskWorkstation(e.target.value)}
-                      className="flex-1"
-                    />
+                <div className="mt-2">
+                  <div className={cn("flex gap-2", isMobile && "flex-col")}>
+                    <div className={cn("flex gap-2", isMobile ? "w-full" : "flex-1")}>
+                      <Input
+                        placeholder={t('npm_new_task_placeholder')}
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        className={cn("flex-1", isMobile && "h-9 text-sm")}
+                      />
+                      <Input
+                        placeholder={t('npm_workstation_placeholder')}
+                        value={newTaskWorkstation}
+                        onChange={(e) => setNewTaskWorkstation(e.target.value)}
+                        className={cn("flex-1", isMobile && "h-9 text-sm")}
+                      />
+                    </div>
                     <Button 
                       type="button" 
-                      size="icon" 
+                      size={isMobile ? "sm" : "icon"}
+                      className={cn(isMobile && "h-9 w-full")}
                       onClick={handleAddCustomTask}
                     >
                       <Plus className="h-4 w-4" />
+                      {isMobile && <span className="ml-1">{t('npm_new_task_placeholder')}</span>}
                     </Button>
                   </div>
                 </div>
               </div>
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className={cn("pt-3", isMobile && "flex-col gap-2")}>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={submitting}>
+                  <Button type="button" variant="outline" disabled={submitting} className={cn(isMobile && "w-full h-10")}>
                     {t('npm_cancel')}
                   </Button>
                 </DialogClose>
-                <Button type="submit" disabled={isGeneratingCode || submitting}>
+                <Button type="submit" disabled={isGeneratingCode || submitting} className={cn(isMobile && "w-full h-10")}>
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
