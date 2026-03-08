@@ -295,8 +295,8 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                       {/* Status indicator */}
                       {task.isActive && (
                         <div className="flex items-center gap-1 text-green-600 flex-shrink-0">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                          <span className="text-xs font-medium">Active</span>
+                          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-[10px] sm:text-xs font-medium">{t('active') || 'Active'}</span>
                         </div>
                       )}
                     </div>
