@@ -10,9 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/components/ui/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Camera, File as FileIcon, Check, X, RotateCcw, Image } from 'lucide-react';
+import { Calendar as CalendarIcon, Camera, File as FileIcon, Check, X, RotateCcw, Image, ChevronsUpDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useAuth } from '@/context/AuthContext';
