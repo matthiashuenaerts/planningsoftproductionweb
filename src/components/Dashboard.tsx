@@ -859,48 +859,58 @@ const Dashboard: React.FC = () => {
     [t('dashboard_completed')]: '#4ade80'
   };
   if (loading) {
-    return <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>;
+    return (
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+        <p className="text-sm text-muted-foreground animate-pulse">{t('dashboard_loading')}...</p>
+      </div>
+    );
   }
-  return <div>
-      {currentEmployee?.role === 'admin' && <Alert className="mb-6 bg-blue-50 border border-blue-200">
-          <ShieldCheck className="h-5 w-5 text-blue-600" />
-          <AlertTitle className="text-blue-800">{t('dashboard_admin_account')}</AlertTitle>
-          <AlertDescription className="text-blue-700">
+
+  return (
+    <div className="space-y-6">
+      {currentEmployee?.role === 'admin' && (
+        <Alert className="rounded-xl border-primary/20 bg-primary/5">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <AlertTitle className="text-foreground">{t('dashboard_admin_account')}</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
             {t('dashboard_admin_description')}
           </AlertDescription>
-        </Alert>}
+        </Alert>
+      )}
 
-      {projects.length === 0 && <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
-          <p className="text-yellow-800">{t('dashboard_no_projects')}</p>
+      {projects.length === 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl">
+          <p className="text-amber-800 dark:text-amber-200">{t('dashboard_no_projects')}</p>
           <SeedDataButton />
-        </div>}
-      
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        </div>
+      )}
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard title={t('dashboard_total_projects')} value={totalProjects.toString()} footer={t('dashboard_projects_managed')} icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} />
-        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />} />
-        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
-        <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />} />
+        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />} />
+        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-violet-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
+        <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />} />
       </div>
       
-      {/* Weekly Loading Schedule */}
-      <Card className="mb-4 sm:mb-6">
+      {/* Weekly Truck Loading Schedule */}
+      <Card className="rounded-xl border-border/60 shadow-sm">
         <CardHeader className="pb-2 px-3 sm:px-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
               {t('dashboard_weekly_schedule')}
             </CardTitle>
-            <div className="flex items-center justify-between sm:justify-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
+            <div className="flex items-center justify-between sm:justify-center bg-muted/50 rounded-lg px-1 py-0.5">
+              <Button variant="ghost" size="icon" onClick={prevWeek} disabled={weekLoading} className="h-7 w-7 sm:h-8 sm:w-8 rounded-md">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-xs font-medium min-w-[130px] text-center px-1">
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
-                {weekLoading && <span className="ml-1 text-xs text-muted-foreground">{t('dashboard_loading')}</span>}
+                {weekLoading && <span className="ml-1 text-xs text-muted-foreground animate-pulse">{t('dashboard_loading')}</span>}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-8 w-8 sm:h-9 sm:w-9">
+              <Button variant="ghost" size="icon" onClick={nextWeek} disabled={weekLoading} className="h-7 w-7 sm:h-8 sm:w-8 rounded-md">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -914,8 +924,8 @@ const Dashboard: React.FC = () => {
             const dayAssignments = getAssignmentsForDate(date);
             const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
-            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-lg p-1.5 sm:p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-border")}>
-                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-red-700" : "text-muted-foreground")}>
+            return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-xl p-1.5 sm:p-2 transition-colors", isCurrentDay ? "border-primary/50 bg-primary/5 shadow-sm" : "border-border/60 hover:border-border")}>
+                  <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-primary" : "text-muted-foreground")}>
                     <div className="text-[10px] sm:text-xs uppercase tracking-wide">{format(date, 'EEE')}</div>
                     <div className="text-sm sm:text-lg font-bold">{format(date, 'd')}</div>
                   </div>
@@ -975,9 +985,9 @@ const Dashboard: React.FC = () => {
       </Card>
       
       {/* Charts Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Task Completion Trend */}
-        <Card>
+        <Card className="rounded-xl border-border/60 shadow-sm">
           <CardHeader className="px-3 sm:px-6 pb-2">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
@@ -1013,10 +1023,10 @@ const Dashboard: React.FC = () => {
         </Card>
         
         {/* Tasks by Status Pie Chart */}
-        <Card>
+        <Card className="rounded-xl border-border/60 shadow-sm">
           <CardHeader className="px-3 sm:px-6 pb-2">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
               {t('dashboard_tasks_by_status')}
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">{t('dashboard_status_distribution')}</CardDescription>
@@ -1041,14 +1051,14 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Workstation Stats Section */}
-      <div className="mt-6 sm:mt-8">
+      <div>
         <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-          <Factory className="h-5 w-5 sm:h-6 sm:w-6" />
+          <Factory className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           {t('dashboard_workstation_overview')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {workstationStats.map(ws => (
-            <Card key={ws.id} className="hover:shadow-lg transition-shadow">
+            <Card key={ws.id} className="rounded-xl border-border/60 shadow-sm hover:shadow-md transition-all hover:border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Package className="h-5 w-5 text-primary" />
@@ -1120,15 +1130,16 @@ const Dashboard: React.FC = () => {
         </div>
         
         {workstationStats.length === 0 && (
-          <Card>
+          <Card className="rounded-xl border-border/60">
             <CardContent className="p-8 text-center text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>{t('dashboard_no_workstations')}</p>
             </CardContent>
           </Card>
         )}
       </div>
-    </div>;
+    </div>
+  );
 };
 interface StatCardProps {
   title: string;
@@ -1148,25 +1159,30 @@ const StatCard: React.FC<StatCardProps> = ({
   onClick,
   valueSubtext
 }) => {
-  return <Card className={cn("overflow-hidden", onClick ? "cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]" : "")} onClick={onClick}>
-      <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-        <CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2">
+  return (
+    <Card className={cn(
+      "overflow-hidden rounded-xl border-border/60 shadow-sm transition-all",
+      onClick ? "cursor-pointer hover:shadow-md hover:border-border active:scale-[0.98]" : ""
+    )} onClick={onClick}>
+      <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-5">
+        <CardTitle className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-1.5 sm:gap-2 uppercase tracking-wider font-medium">
           {icon}
           <span className="truncate">{title}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-        <div className="flex items-baseline gap-1 sm:gap-2">
-          <div className="text-xl sm:text-2xl font-bold">{value}</div>
+      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-5">
+        <div className="flex items-baseline gap-1.5 sm:gap-2">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight">{value}</div>
           {valueSubtext && <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{valueSubtext}</div>}
         </div>
-        <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 space-y-0.5 sm:space-y-1">
+        <div className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 space-y-0.5 sm:space-y-1">
           {footer.split('\n').map((line, index) => <p key={index} className="break-words leading-tight" dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(line, { ALLOWED_TAGS: ['b', 'i', 'u', 'a', 'strong', 'em', 'span', 'br'], ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'] })
         }}></p>)}
         </div>
         {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
 export default Dashboard;
