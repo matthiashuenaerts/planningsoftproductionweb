@@ -319,31 +319,32 @@ const Workstations: React.FC = () => {
                     
                     {/* Production Line Tabs - only show if more than 1 production line */}
                     {hasMultipleLines && (
-                      <div className="flex gap-2 mb-6 border-b">
+                      <div className={`flex gap-1.5 ${isMobile ? 'mb-3 overflow-x-auto pb-1' : 'mb-6'} border-b`}>
                         {productionLines.map(line => (
                           <Button
                             key={line}
                             variant={activeProductionLine === line ? "default" : "ghost"}
-                            className="rounded-b-none"
+                            size={isMobile ? 'sm' : 'default'}
+                            className="rounded-b-none whitespace-nowrap"
                             onClick={() => setSelectedProductionLine(line)}
                           >
-                            Productielijn {line}
+                            {isMobile ? `Lijn ${line}` : `Productielijn ${line}`}
                           </Button>
                         ))}
                       </div>
                     )}
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {filteredWorkstations.map((workstation, index) => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative">
-                          <div className="absolute top-2 left-2 z-10">
-                            <Badge variant="secondary" className="text-xs font-mono">
+                    <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4'}`}>
+                      {filteredWorkstations.map((workstation, index) => <Card key={workstation.id} className="hover:shadow-md transition-shadow cursor-pointer relative active:scale-[0.98]">
+                          <div className="absolute top-1.5 left-1.5 z-10">
+                            <Badge variant="secondary" className={`font-mono ${isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
                               {String(workstation.sort_order).padStart(2, '0')}
                             </Badge>
                           </div>
-                          <div className="absolute top-2 right-2 z-10">
+                          <div className="absolute top-1.5 right-1.5 z-10">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className={isMobile ? 'h-7 w-7' : 'h-8 w-8'} onClick={e => e.stopPropagation()}>
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -379,20 +380,22 @@ const Workstations: React.FC = () => {
                                </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
-                          <CardContent className="p-6 flex flex-col items-center text-center" onClick={() => setSelectedWorkstation(workstation.id)}>
-                            <div className="bg-primary/10 p-4 rounded-full mb-4">
+                          <CardContent className={`flex flex-col items-center text-center ${isMobile ? 'p-3 pt-8' : 'p-6'}`} onClick={() => setSelectedWorkstation(workstation.id)}>
+                            <div className={`bg-primary/10 rounded-full ${isMobile ? 'p-2.5 mb-2' : 'p-4 mb-4'}`}>
                               {workstation.icon_path ? (
                                 <img 
                                   src={workstation.icon_path} 
                                   alt={workstation.name} 
-                                  className="h-8 w-8 object-contain"
+                                  className={isMobile ? 'h-6 w-6 object-contain' : 'h-8 w-8 object-contain'}
                                 />
                               ) : (
-                                workstation.icon
+                                <div className={isMobile ? '[&>svg]:h-6 [&>svg]:w-6' : ''}>
+                                  {workstation.icon}
+                                </div>
                               )}
                             </div>
-                            <h3 className="text-lg font-medium mb-1">{workstation.name}</h3>
-                            {workstation.description && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
+                            <h3 className={`font-medium mb-0.5 ${isMobile ? 'text-xs leading-tight' : 'text-lg mb-1'}`}>{workstation.name}</h3>
+                            {workstation.description && !isMobile && <p className="text-sm text-muted-foreground">{workstation.description}</p>}
                           </CardContent>
                         </Card>)}
                     </div>
