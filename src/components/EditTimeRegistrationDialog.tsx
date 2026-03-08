@@ -50,13 +50,20 @@ export const EditTimeRegistrationDialog: React.FC<EditTimeRegistrationDialogProp
     }
   }, [startTime, endTime]);
 
+  const toISOWithTimezone = (localDateTimeStr: string): string => {
+    // datetime-local gives us "2026-03-08T14:00" in local time
+    // We need to convert to a proper ISO string with timezone offset
+    const date = new Date(localDateTimeStr);
+    return date.toISOString();
+  };
+
   const updateMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
         .from('time_registrations')
         .update({
-          start_time: startTime,
-          end_time: endTime || null,
+          start_time: toISOWithTimezone(startTime),
+          end_time: endTime ? toISOWithTimezone(endTime) : null,
           duration_minutes: durationMinutes ? parseInt(durationMinutes) : null,
         })
         .eq('id', registration.id);
