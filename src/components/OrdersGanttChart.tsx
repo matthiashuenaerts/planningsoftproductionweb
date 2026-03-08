@@ -71,7 +71,10 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
 };
 
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React.ReactNode => {
+  const isMobile = useIsMobile();
   const { tenant } = useTenant();
+  const sideColWidth = isMobile ? '8rem' : '16rem';
+  const sideColClass = isMobile ? 'w-32' : 'w-64';
   const [teams, setTeams] = useState<PlacementTeam[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWeek, setCurrentWeek] = useState(new Date());
