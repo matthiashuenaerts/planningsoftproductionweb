@@ -27,6 +27,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import FilePreview from '@/components/FilePreview';
+import { generateAnnotatedPdf } from '@/services/pdfAnnotationExportService';
 
 interface ProjectFileManagerProps {
   projectId: string;
@@ -330,8 +331,18 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
         throw error;
       }
 
-      // Create a download link and trigger it
-      const url = URL.createObjectURL(data);
+      let blob: Blob = data;
+
+      // For PDF files, overlay annotations if they exist
+      if (fileName.toLowerCase().endsWith('.pdf')) {
+        const rawBytes = await data.arrayBuffer();
+        const annotatedBytes = await generateAnnotatedPdf(projectId, fileName, rawBytes);
+        if (annotatedBytes) {
+          blob = new Blob([annotatedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
@@ -354,18 +365,35 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
     setError(null);
     try {
       const filePath = `${projectId}/${fileName}`;
-      
+
+      // For PDF files, generate annotated version and open as blob URL
+      if (fileName.toLowerCase().endsWith('.pdf')) {
+        const { data: blobData, error: dlError } = await supabase
+          .storage
+          .from('project_files')
+          .download(filePath);
+        if (dlError) throw dlError;
+
+        const rawBytes = await blobData.arrayBuffer();
+        const annotatedBytes = await generateAnnotatedPdf(projectId, fileName, rawBytes);
+        const finalBlob = annotatedBytes
+          ? new Blob([annotatedBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
+          : blobData;
+        const url = URL.createObjectURL(finalBlob);
+        window.open(url, '_blank');
+        // Revoke after a delay so the tab can load
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return;
+      }
+
+      // Non-PDF: use signed URL
       const { data, error } = await supabase
         .storage
         .from('project_files')
-        .createSignedUrl(filePath, 60); // URL valid for 60 seconds
+        .createSignedUrl(filePath, 60);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       if (data?.signedUrl) {
-        // Open the signed URL in a new tab
         window.open(data.signedUrl, '_blank');
       }
     } catch (error: any) {
