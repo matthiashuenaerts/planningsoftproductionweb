@@ -47,6 +47,7 @@ interface AuthContextType {
   session: Session | null;
   login: (email: string, password: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
+  refetchEmployee: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
