@@ -35,12 +35,42 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { 
-      orderId, 
-      baseUrl = 'https://app.thonon.be/fmi/data/vLatest/databases/CrownBasePro-Thonon',
-      username = 'Matthias HUENAERTS',
-      password = '8pJ1A24z'
-    }: DeliveryConfirmationRequest = await req.json();
+    const { orderId }: DeliveryConfirmationRequest = await req.json();
+
+    // Load credentials from external_api_configs table (never hardcode)
+    const { data: apiConfig, error: configError } = await supabase
+      .from('external_api_configs')
+      .select('base_url, username, password')
+      .eq('api_type', 'delivery_confirmation')
+      .maybeSingle();
+
+    // Fallback to the orders API config if no delivery-specific one exists
+    let baseUrl: string;
+    let username: string;
+    let password: string;
+
+    if (apiConfig) {
+      baseUrl = apiConfig.base_url;
+      username = apiConfig.username;
+      password = apiConfig.password;
+    } else {
+      // Try orders API config as fallback
+      const { data: ordersConfig } = await supabase
+        .from('external_api_configs')
+        .select('base_url, username, password')
+        .eq('api_type', 'orders')
+        .maybeSingle();
+      
+      if (!ordersConfig) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'External API credentials not configured. Please configure them in Settings.' 
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      baseUrl = ordersConfig.base_url;
+      username = ordersConfig.username;
+      password = ordersConfig.password;
+    }
 
     console.log(`Processing delivery confirmation for order ${orderId}`);
 
