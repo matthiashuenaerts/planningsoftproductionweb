@@ -79,15 +79,12 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
     const prepareInitialValues = async () => {
       let attachmentFile: File | undefined = undefined;
       
-      if (brokenPart.image_path) {
+      if (brokenPart.image_path && imageUrl) {
         try {
-          const imageUrl = getImageUrl(brokenPart.image_path);
-          if (imageUrl) {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
-            attachmentFile = new File([blob], fileName, { type: blob.type });
-          }
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
+          attachmentFile = new File([blob], fileName, { type: blob.type });
         } catch (error) {
           console.error('Error loading image:', error);
         }
