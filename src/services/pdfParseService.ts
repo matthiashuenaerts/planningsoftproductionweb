@@ -7,8 +7,26 @@ export interface ParsedOrderData {
   orderDate?: string;
   expectedDelivery?: string;
   orderNumber?: string;
+  invoiceNumber?: string;
+  referenceNumber?: string;
+  customerNumber?: string;
+  currency?: string;
+  subtotal?: number;
+  vatAmount?: number;
+  vatPercentage?: number;
+  discount?: number;
+  shippingCost?: number;
+  totalAmount?: number;
+  paymentTerms?: string;
+  deliveryAddress?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  contactEmail?: string;
   notes?: string;
+  rawText?: string;
   items: ParsedOrderItem[];
+  extractionConfidence: 'high' | 'medium' | 'low';
+  warnings: string[];
 }
 
 export interface ParsedOrderItem {
@@ -16,7 +34,11 @@ export interface ParsedOrderItem {
   quantity: number;
   article_code: string;
   unit_price?: number;
+  total_price?: number;
+  unit?: string;
+  discount?: number;
   notes?: string;
+  matchConfidence?: 'exact' | 'partial' | 'none';
 }
 
 interface ProductMatch {
@@ -51,448 +73,227 @@ interface TextItem {
 interface TableRow {
   y: number;
   items: TextItem[];
+  pageIndex: number;
 }
 
-// Common quantity patterns
+// ─── REGEX PATTERNS ────────────────────────────────────────────────────────────
+
 const QUANTITY_PATTERNS = [
-  /(\d+)\s*(st|stuk|stuks|pcs|pieces|x|qty|aantal)/gi,
-  /qty[:\s]*(\d+)/gi,
-  /quantity[:\s]*(\d+)/gi,
-  /aantal[:\s]*(\d+)/gi,
+  /(\d+(?:[,\.]\d+)?)\s*(st|stuk|stuks|pcs|pieces|x|qty|aantal|eenheden|mtr|m|lm|m2|m²|kg|ltr|rol|rollen|set|pak|doos|dozen|paar)\b/gi,
+  /(?:qty|quantity|aantal|hoeveelheid|besteld|geleverd)[:\s]*(\d+(?:[,\.]\d+)?)/gi,
+  /^\s*(\d+(?:[,\.]\d+)?)\s+/,                                    // leading number
 ];
 
-// Article code patterns - more comprehensive
 const ARTICLE_CODE_PATTERNS = [
-  /\b([A-Z0-9]{2,}\/[^\s]{2,})\b/gi, // Codes with slashes: LB4F/EBL9KA500x734
-  /\b([A-Z]{2,5}[\-\.\s]?\d{4,10}[A-Z0-9]*)\b/gi, // XX-12345678
-  /\b(\d{5,13})\b/g, // EAN or numeric codes (5-13 digits)
-  /art[\.:]?\s*(?:nr|code|nummer)?[:\s]*([A-Z0-9\-\.]+)/gi,
-  /article[:\s]*([A-Z0-9\-\.]+)/gi,
-  /code[:\s]*([A-Z0-9\-\.]+)/gi,
-  /\b([A-Z0-9]{3,}\-[A-Z0-9\-]+)\b/g, // Code with dashes
+  /\b([A-Z0-9]{2,}\/[^\s]{2,})\b/gi,                             // Codes with slashes
+  /\b([A-Z]{1,5}[\-\.]\d{3,12}[A-Z0-9\-\.]*)\b/gi,              // XX-12345
+  /\b(\d{6,13})\b/g,                                              // EAN / numeric (6-13 digits)
+  /(?:art[\.:]?\s*(?:nr|code|nummer)?|article|artikelcode|item\s*(?:no|nr))[:\s]*([A-Z0-9\-\.\/]+)/gi,
+  /\b([A-Z0-9]{3,}\-[A-Z0-9\-]{2,})\b/g,                        // Code-with-dashes
+  /\b([A-Z]{2}\d{2}[A-Z0-9]{2,})\b/g,                           // AB12CDE style
 ];
 
-// Price patterns
 const PRICE_PATTERNS = [
-  /€\s*(\d+(?:[,\.]\d{1,2})?)/g,
-  /EUR\s*(\d+(?:[,\.]\d{1,2})?)/gi,
-  /(\d+(?:[,\.]\d{1,2})?)\s*€/g,
-  /prijs[:\s]*€?\s*(\d+(?:[,\.]\d{1,2})?)/gi,
-  /price[:\s]*€?\s*(\d+(?:[,\.]\d{1,2})?)/gi,
+  /€\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2}))/g,                     // €1.234,56
+  /€\s*(\d+(?:,\d{1,2}))/g,                                       // €12,50
+  /€\s*(\d+(?:\.\d{1,2}))/g,                                      // €12.50
+  /EUR\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2}))/gi,                   // EUR 1.234,56
+  /EUR\s*(\d+(?:[,\.]\d{1,2}))/gi,                                // EUR 12,50
+  /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2}))\s*€/g,                      // 1.234,56 €
+  /(\d+(?:,\d{1,2}))\s*€/g,                                       // 12,50 €
+  /(?:prijs|price|bedrag|amount|e\.?\s*prijs)[:\s]*€?\s*(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2}))/gi,
 ];
+
+const UNIT_PATTERNS = /\b(st|stuk|stuks|pcs|pieces|m|mtr|meter|m2|m²|m3|m³|kg|kilogram|ltr|liter|rol|rollen|set|pak|doos|dozen|paar|uur|hour)\b/gi;
+
+// ─── TEXT EXTRACTION ──────────────────────────────────────────────────────────
 
 export async function extractTextFromPDF(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
-  
-  // Use pdfjs-dist v3.x for client-side PDF parsing (v3 doesn't use top-level await)
   const pdfjsLib = await import('pdfjs-dist');
-  
-  // Configure worker for v3.x
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  
   const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
   let fullText = '';
-  
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => item.str)
-      .join(' ');
-    fullText += pageText + '\n';
+    const tc = await page.getTextContent();
+    fullText += tc.items.map((item: any) => item.str).join(' ') + '\n';
   }
-  
   return fullText;
 }
 
-// Extract text items with position information for table parsing
 async function extractTextWithPositions(file: File): Promise<TextItem[][]> {
   const arrayBuffer = await file.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
-  
   const pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  
   const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
   const allPages: TextItem[][] = [];
-  
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    
-    const items: TextItem[] = textContent.items.map((item: any) => ({
+    const tc = await page.getTextContent();
+    allPages.push(tc.items.map((item: any) => ({
       str: item.str,
       transform: item.transform,
       x: item.transform[4],
       y: item.transform[5],
       width: item.width,
-      height: item.height || 10
-    }));
-    
-    allPages.push(items);
+      height: item.height || 10,
+    })));
   }
-  
   return allPages;
 }
 
-// Group text items into rows based on Y-coordinate
-function groupIntoRows(items: TextItem[], yTolerance: number = 5): TableRow[] {
+// ─── ROW / COLUMN DETECTION ──────────────────────────────────────────────────
+
+function groupIntoRows(items: TextItem[], pageIndex: number, yTolerance: number = 4): TableRow[] {
   if (items.length === 0) return [];
-  
-  // Sort by Y (descending - PDF coordinates start from bottom)
   const sorted = [...items].sort((a, b) => b.y - a.y);
-  
   const rows: TableRow[] = [];
-  let currentRow: TableRow = { y: sorted[0].y, items: [] };
-  
+  let cur: TableRow = { y: sorted[0].y, items: [], pageIndex };
   for (const item of sorted) {
-    if (Math.abs(item.y - currentRow.y) <= yTolerance) {
-      currentRow.items.push(item);
+    if (Math.abs(item.y - cur.y) <= yTolerance) {
+      cur.items.push(item);
     } else {
-      if (currentRow.items.length > 0) {
-        // Sort items within row by X coordinate
-        currentRow.items.sort((a, b) => a.x - b.x);
-        rows.push(currentRow);
+      if (cur.items.length > 0) {
+        cur.items.sort((a, b) => a.x - b.x);
+        rows.push(cur);
       }
-      currentRow = { y: item.y, items: [item] };
+      cur = { y: item.y, items: [item], pageIndex };
     }
   }
-  
-  if (currentRow.items.length > 0) {
-    currentRow.items.sort((a, b) => a.x - b.x);
-    rows.push(currentRow);
+  if (cur.items.length > 0) {
+    cur.items.sort((a, b) => a.x - b.x);
+    rows.push(cur);
   }
-  
   return rows;
 }
 
-// Detect column positions from header row
-function detectColumns(rows: TableRow[]): Map<string, number> {
-  const columnHeaders = new Map<string, number>();
-  
-  // Common header keywords and their variations
-  const headerPatterns: Record<string, RegExp> = {
-    'article_code': /^(art|article|code|artikelcode|artikel|artnr|art\.nr|item|sku|ean|product\s*code)/i,
-    'description': /^(description|omschrijving|desc|naam|name|product|artikel\s*naam|item\s*description)/i,
-    'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld)/i,
-    'price': /^(price|prijs|unit\s*price|eenheid|bedrag|€|eur|amount|e\.?\s*prijs|e\.?\s*price|e\.?prijs\s*eur)/i,
-  };
-  
-  // Look for header row in first 10 rows
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const row = rows[i];
-    const rowText = row.items.map(item => item.str.toLowerCase().trim()).join(' ');
-    
-    // Check if this row contains multiple header keywords
-    let headerCount = 0;
-    for (const pattern of Object.values(headerPatterns)) {
-      if (pattern.test(rowText)) headerCount++;
+// Merge adjacent rows that belong to the same logical table row (multi-line cells)
+function mergeMultiLineRows(rows: TableRow[], maxGap: number = 12): TableRow[] {
+  if (rows.length < 2) return rows;
+  const merged: TableRow[] = [rows[0]];
+  for (let i = 1; i < rows.length; i++) {
+    const prev = merged[merged.length - 1];
+    const cur = rows[i];
+    // If gap is small and current row has fewer items (continuation), merge
+    const gap = Math.abs(prev.y - cur.y);
+    if (gap < maxGap && cur.items.length <= prev.items.length && cur.pageIndex === prev.pageIndex) {
+      // Check if any item in cur overlaps an x-range from prev
+      const prevMaxX = Math.max(...prev.items.map(it => it.x + it.width));
+      const curMinX = Math.min(...cur.items.map(it => it.x));
+      if (curMinX < prevMaxX) {
+        // Merge: append text to closest column items
+        for (const ci of cur.items) {
+          const closest = prev.items.reduce((best, pi) => 
+            Math.abs(pi.x - ci.x) < Math.abs(best.x - ci.x) ? pi : best
+          );
+          closest.str += ' ' + ci.str;
+        }
+        continue;
+      }
     }
-    
-    if (headerCount >= 2) {
-      // This is likely a header row
-      for (const item of row.items) {
-        const text = item.str.toLowerCase().trim();
-        for (const [columnName, pattern] of Object.entries(headerPatterns)) {
-          if (pattern.test(text)) {
-            columnHeaders.set(columnName, item.x);
-            break;
-          }
+    merged.push(cur);
+  }
+  return merged;
+}
+
+const COLUMN_HEADER_PATTERNS: Record<string, RegExp> = {
+  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr)/i,
+  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material)/i,
+  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?)/i,
+  'unit': /^(unit|eenheid|enh|uom|me|vpe)/i,
+  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk)/i,
+  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal)/i,
+  'discount': /^(discount|korting|remise|rabat)/i,
+};
+
+function detectColumns(rows: TableRow[]): { columns: Map<string, number>; headerRowIndex: number } {
+  const columns = new Map<string, number>();
+  let headerRowIndex = -1;
+
+  for (let i = 0; i < Math.min(15, rows.length); i++) {
+    const row = rows[i];
+    let matchCount = 0;
+    const tempCols = new Map<string, number>();
+
+    for (const item of row.items) {
+      const text = item.str.trim();
+      if (!text) continue;
+      for (const [colName, pattern] of Object.entries(COLUMN_HEADER_PATTERNS)) {
+        if (pattern.test(text) && !tempCols.has(colName)) {
+          tempCols.set(colName, item.x);
+          matchCount++;
+          break;
         }
       }
-      break;
+    }
+
+    if (matchCount >= 2 && matchCount > columns.size) {
+      columns.clear();
+      tempCols.forEach((v, k) => columns.set(k, v));
+      headerRowIndex = i;
     }
   }
-  
-  return columnHeaders;
+
+  return { columns, headerRowIndex };
+}
+
+// ─── VALUE PARSING ───────────────────────────────────────────────────────────
+
+/** Parse European-style numbers: "1.234,56" → 1234.56 */
+function parseEuropeanNumber(str: string): number | undefined {
+  if (!str) return undefined;
+  let cleaned = str.replace(/\s/g, '').replace(/€/g, '').replace(/EUR/gi, '');
+  // Remove thousands separators (dots) then convert comma to dot
+  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(cleaned)) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else {
+    cleaned = cleaned.replace(',', '.');
+  }
+  cleaned = cleaned.replace(/[^0-9.\-]/g, '');
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 function parseQuantityValue(value?: string): number | undefined {
   if (!value) return undefined;
-  // Support formats like "20,00" or "20.00" or "20"
-  const cleaned = value
-    .replace(/\s/g, '')
-    .replace(/,/g, '.')
-    .replace(/[^0-9.]/g, '');
-  const n = Number.parseFloat(cleaned);
-  if (!Number.isFinite(n) || n <= 0) return undefined;
+  const n = parseEuropeanNumber(value);
+  if (n === undefined || n <= 0) return undefined;
   return Math.round(n);
 }
 
 function parsePriceValue(value?: string): number | undefined {
   if (!value) return undefined;
-  const cleaned = value
-    .replace(/\s/g, '')
-    .replace(/€/g, '')
-    .replace(/EUR/gi, '')
-    .replace(/,/g, '.')
-    .replace(/[^0-9.]/g, '');
-  const n = Number.parseFloat(cleaned);
-  if (!Number.isFinite(n) || n < 0) return undefined;
-  return n;
-}
-
-function extractHeuristicTableData(rows: TableRow[]): Record<string, string>[] {
-  const result: Record<string, string>[] = [];
-
-  for (const row of rows) {
-    const line = row.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
-    if (!line) continue;
-
-    // Skip likely headers/footers
-    if (/^(artikel|omschrijving|aantal|qty|quantity|price|prijs|datum|date)\b/i.test(line)) continue;
-    if (/^totaal/i.test(line)) continue;
-
-    const articleCode = extractArticleCodeFromLine(line);
-    const qty = extractQuantityFromLine(line);
-    const price = extractPriceFromLine(line);
-
-    // Require at least a code OR a quantity to consider it an item row
-    if (!articleCode && !qty) continue;
-
-    let description = line;
-    if (articleCode) {
-      description = description.replace(new RegExp(articleCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
-    }
-    if (price !== undefined) {
-      description = description.replace(/€\s*\d+(?:[\.,]\d{1,2})?/g, '');
-      description = description.replace(/\d+(?:[\.,]\d{1,2})?\s*€/g, '');
-    }
-    if (qty !== undefined) {
-      description = description.replace(/\b\d{1,4}(?:[\.,]\d+)?\b/g, '');
-    }
-    description = description.replace(/\s+/g, ' ').trim();
-    if (!description && articleCode) description = articleCode;
-
-    result.push({
-      description,
-      article_code: articleCode || '',
-      quantity: qty !== undefined ? String(qty) : '1',
-      price: price !== undefined ? String(price) : '',
-    });
-  }
-
-  return result;
-}
-
-// Extract table rows with column assignment
-function extractTableData(rows: TableRow[], columnPositions: Map<string, number>): Record<string, string>[] {
-  const result: Record<string, string>[] = [];
-  const columns = Array.from(columnPositions.entries()).sort((a, b) => a[1] - b[1]);
-  
-  if (columns.length === 0) return result;
-  
-  // Find the header row index
-  let headerIndex = -1;
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const rowText = rows[i].items.map(item => item.str.toLowerCase().trim()).join(' ');
-    if (/artikel|product|beschrijving|quantity|qty|hoeveelheid/i.test(rowText)) {
-      headerIndex = i;
-      break;
-    }
-  }
-  
-  // Process rows after header
-  const dataRows = headerIndex >= 0 ? rows.slice(headerIndex + 1) : rows.slice(3);
-  
-  for (const row of dataRows) {
-    // Skip rows with very few characters (likely empty or separator rows)
-    const totalText = row.items.map(i => i.str).join('').trim();
-    if (totalText.length < 3) continue;
-    
-    const record: Record<string, string> = {};
-    
-    for (const item of row.items) {
-      // Find which column this item belongs to
-      let bestColumn = '';
-      let minDistance = Infinity;
-      
-      for (const [colName, colX] of columns) {
-        const distance = Math.abs(item.x - colX);
-        if (distance < minDistance && distance < 100) { // 100px tolerance
-          minDistance = distance;
-          bestColumn = colName;
-        }
-      }
-      
-      if (bestColumn) {
-        record[bestColumn] = (record[bestColumn] || '') + ' ' + item.str;
-      }
-    }
-    
-    // Clean up values
-    for (const key of Object.keys(record)) {
-      record[key] = record[key].trim();
-    }
-    
-    // Only add if we have some meaningful data
-    if (record['description'] || record['article_code']) {
-      result.push(record);
-    }
-  }
-  
-  return result;
-}
-
-function extractDateFromString(str: string): string | undefined {
-  // Try DD/MM/YYYY format
-  const dmyMatch = str.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
-  if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, '0');
-    const month = dmyMatch[2].padStart(2, '0');
-    const year = dmyMatch[3];
-    return `${year}-${month}-${day}`;
-  }
-
-  // Try YYYY-MM-DD format
-  const ymdMatch = str.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-  if (ymdMatch) {
-    const year = ymdMatch[1];
-    const month = ymdMatch[2].padStart(2, '0');
-    const day = ymdMatch[3].padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  return undefined;
-}
-
-// Match extracted supplier text against database suppliers
-function matchSupplier(extractedText: string, suppliers: SupplierMatch[]): SupplierMatch | undefined {
-  if (!extractedText || suppliers.length === 0) return undefined;
-  
-  const normalizedText = extractedText.toLowerCase().trim();
-  
-  // First, try exact match
-  const exactMatch = suppliers.find(s => 
-    s.name.toLowerCase().trim() === normalizedText
-  );
-  if (exactMatch) return exactMatch;
-  
-  // Try partial match - supplier name contained in text or vice versa
-  let bestMatch: SupplierMatch | undefined;
-  let bestScore = 0;
-  
-  for (const supplier of suppliers) {
-    const supplierName = supplier.name.toLowerCase().trim();
-    
-    // Check if supplier name is in the extracted text
-    if (normalizedText.includes(supplierName)) {
-      const score = supplierName.length;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = supplier;
-      }
-    }
-    
-    // Check if extracted text is in supplier name
-    if (supplierName.includes(normalizedText)) {
-      const score = normalizedText.length;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = supplier;
-      }
-    }
-    
-    // Check word overlap
-    const textWords = normalizedText.split(/\s+/).filter(w => w.length > 2);
-    const supplierWords = supplierName.split(/\s+/).filter(w => w.length > 2);
-    
-    const matchingWords = textWords.filter(tw => 
-      supplierWords.some(sw => sw.includes(tw) || tw.includes(sw))
-    );
-    
-    if (matchingWords.length > 0) {
-      const score = matchingWords.join('').length;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = supplier;
-      }
-    }
-  }
-  
-  return bestMatch;
-}
-
-function extractSupplier(text: string): string | undefined {
-  const supplierPatterns = [
-    /(?:supplier|leverancier|vendor)[:\s]*([^\n]+)/gi,
-    /(?:from|van|afzender)[:\s]*([^\n]+)/gi,
-    /(?:company|bedrijf|firma)[:\s]*([^\n]+)/gi,
-    /(?:verkoper|seller)[:\s]*([^\n]+)/gi,
-  ];
-
-  for (const pattern of supplierPatterns) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(text);
-    if (match) {
-      return match[1].trim().substring(0, 100);
-    }
-  }
-
-  // Try to find company name in first few lines (often contains sender info)
-  const lines = text.split('\n').slice(0, 10);
-  for (const line of lines) {
-    // Look for patterns like "Company Name" or "Company Name B.V." or "Company Name BV"
-    const companyMatch = line.match(/^([A-Z][A-Za-z\s&]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC)?)\s*$/);
-    if (companyMatch) {
-      const name = companyMatch[1].trim();
-      if (name.length > 3 && name.length < 60) {
-        return name;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-function extractOrderNumber(text: string): string | undefined {
-  const patterns = [
-    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer)[:\s#]*([A-Z0-9\-]+)/gi,
-    /(?:po|p\.o\.)[:\s#]*([A-Z0-9\-]+)/gi,
-    /(?:reference|referentie|ref)[:\s#]*([A-Z0-9\-]+)/gi,
-    /(?:document\s*(?:no|nr|nummer))[:\s#]*([A-Z0-9\-]+)/gi,
-  ];
-
-  for (const pattern of patterns) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(text);
-    if (match) {
-      return match[1].trim();
-    }
-  }
-
-  return undefined;
+  return parseEuropeanNumber(value);
 }
 
 function extractQuantityFromLine(line: string): number | undefined {
   for (const pattern of QUANTITY_PATTERNS) {
-    pattern.lastIndex = 0;
-    const match = pattern.exec(line);
-    if (match) {
-      return parseInt(match[1], 10);
+    if (pattern instanceof RegExp) {
+      pattern.lastIndex = 0;
+      const match = pattern.exec(line);
+      if (match) {
+        const n = parseEuropeanNumber(match[1]);
+        if (n && n > 0 && n < 100000) return Math.round(n);
+      }
     }
   }
-  
-  // Try to find standalone numbers that look like quantities (1-4 digits, at start or with context)
-  const qtyMatch = line.match(/^\s*(\d{1,4})\s+/);
-  if (qtyMatch) {
-    const qty = parseInt(qtyMatch[1], 10);
-    if (qty > 0 && qty < 10000) {
-      return qty;
-    }
-  }
-  
   return undefined;
+}
+
+function extractUnitFromLine(line: string): string | undefined {
+  UNIT_PATTERNS.lastIndex = 0;
+  const match = UNIT_PATTERNS.exec(line);
+  return match ? match[1].toLowerCase() : undefined;
 }
 
 function extractPriceFromLine(line: string): number | undefined {
   for (const pattern of PRICE_PATTERNS) {
     pattern.lastIndex = 0;
     const match = pattern.exec(line);
-    if (match) {
-      return parseFloat(match[1].replace(',', '.'));
-    }
+    if (match) return parseEuropeanNumber(match[1]);
   }
   return undefined;
 }
@@ -501,116 +302,403 @@ function extractArticleCodeFromLine(line: string): string {
   for (const pattern of ARTICLE_CODE_PATTERNS) {
     pattern.lastIndex = 0;
     const match = pattern.exec(line);
-    if (match) {
-      return match[1];
-    }
+    if (match) return match[1];
   }
   return '';
 }
 
-function findMatchingProducts(
-  text: string,
-  products: ProductMatch[],
-  materials: MaterialMatch[]
-): ParsedOrderItem[] {
-  const items: ParsedOrderItem[] = [];
-  const lines = text.split('\n').filter(line => line.trim());
-  const foundCodes = new Set<string>();
+// ─── TABLE EXTRACTION ────────────────────────────────────────────────────────
+
+function extractTableData(rows: TableRow[], columnPositions: Map<string, number>, headerRowIndex: number): Record<string, string>[] {
+  const result: Record<string, string>[] = [];
+  const columns = Array.from(columnPositions.entries()).sort((a, b) => a[1] - b[1]);
+  if (columns.length === 0) return result;
+
+  const dataRows = rows.slice(headerRowIndex + 1);
+
+  for (const row of dataRows) {
+    const totalText = row.items.map(i => i.str).join('').trim();
+    if (totalText.length < 2) continue;
+    // Stop at summary rows
+    if (/^(totaal|total|subtotal|sub\s*totaal|btw|vat|netto|bruto)\b/i.test(totalText)) break;
+
+    const record: Record<string, string> = {};
+
+    for (const item of row.items) {
+      let bestColumn = '';
+      let minDistance = Infinity;
+      for (const [colName, colX] of columns) {
+        const distance = Math.abs(item.x - colX);
+        if (distance < minDistance && distance < 120) {
+          minDistance = distance;
+          bestColumn = colName;
+        }
+      }
+      if (bestColumn) {
+        record[bestColumn] = ((record[bestColumn] || '') + ' ' + item.str).trim();
+      }
+    }
+
+    if (record['description'] || record['article_code']) {
+      result.push(record);
+    }
+  }
+
+  return result;
+}
+
+function extractHeuristicTableData(rows: TableRow[]): Record<string, string>[] {
+  const result: Record<string, string>[] = [];
+
+  for (const row of rows) {
+    const line = row.items.map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+    if (!line || line.length < 4) continue;
+    if (/^(artikel|omschrijving|aantal|qty|quantity|price|prijs|datum|date|totaal|total|subtotal|btw|vat)\b/i.test(line)) continue;
+
+    const articleCode = extractArticleCodeFromLine(line);
+    const qty = extractQuantityFromLine(line);
+    const price = extractPriceFromLine(line);
+    const unit = extractUnitFromLine(line);
+
+    if (!articleCode && !qty) continue;
+
+    let description = line;
+    if (articleCode) {
+      description = description.replace(new RegExp(articleCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+    }
+    // Remove prices
+    description = description.replace(/€\s*\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2})?/g, '');
+    description = description.replace(/\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2})?\s*€/g, '');
+    // Remove quantity with unit
+    description = description.replace(/\b\d{1,4}(?:[,\.]\d+)?\s*(?:st|stuk|stuks|pcs|x|m|mtr|kg|ltr|set|rol|pak|doos|paar)\b/gi, '');
+    description = description.replace(/\s+/g, ' ').trim();
+    if (!description && articleCode) description = articleCode;
+
+    result.push({
+      description,
+      article_code: articleCode || '',
+      quantity: qty !== undefined ? String(qty) : '1',
+      price: price !== undefined ? String(price) : '',
+      unit: unit || '',
+    });
+  }
+
+  return result;
+}
+
+// ─── METADATA EXTRACTION ─────────────────────────────────────────────────────
+
+function extractDateFromString(str: string): string | undefined {
+  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const dmy = str.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // YYYY-MM-DD
+  const ymd = str.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // Named months: "8 maart 2026", "March 8, 2026"
+  const MONTHS: Record<string, string> = {
+    jan: '01', januari: '01', january: '01', feb: '02', februari: '02', february: '02',
+    mrt: '03', maart: '03', march: '03', apr: '04', april: '04',
+    mei: '05', may: '05', jun: '06', juni: '06', june: '06',
+    jul: '07', juli: '07', july: '07', aug: '08', augustus: '08', august: '08',
+    sep: '09', sept: '09', september: '09', okt: '10', oct: '10', oktober: '10', october: '10',
+    nov: '11', november: '11', dec: '12', december: '12',
+  };
+  const namedMatch = str.match(/(\d{1,2})[\s\-\.]*([a-zA-Z]+)[\s\-\.,]*(\d{4})/);
+  if (namedMatch) {
+    const monthKey = namedMatch[2].toLowerCase();
+    const m = MONTHS[monthKey];
+    if (m) return `${namedMatch[3]}-${m}-${namedMatch[1].padStart(2, '0')}`;
+  }
+  // "March 8, 2026"
+  const namedMatch2 = str.match(/([a-zA-Z]+)[\s\-\.]*(\d{1,2})[\s\-\.,]*(\d{4})/);
+  if (namedMatch2) {
+    const monthKey = namedMatch2[1].toLowerCase();
+    const m = MONTHS[monthKey];
+    if (m) return `${namedMatch2[3]}-${m}-${namedMatch2[2].padStart(2, '0')}`;
+  }
+  return undefined;
+}
+
+function extractAllDatesWithContext(text: string): Array<{ date: string; context: string; label?: string }> {
+  const results: Array<{ date: string; context: string; label?: string }> = [];
+  const lines = text.split('\n');
   
-  // Create lookup maps for faster matching
+  for (const line of lines) {
+    const parsed = extractDateFromString(line);
+    if (!parsed) continue;
+    
+    const lower = line.toLowerCase();
+    let label: string | undefined;
+    if (/order\s*(?:date|datum)|besteldatum|bestelingsdatum/i.test(lower)) label = 'orderDate';
+    else if (/delivery|levering|lever\s*datum|aflever|bezorg/i.test(lower)) label = 'deliveryDate';
+    else if (/invoice\s*date|factuur\s*datum/i.test(lower)) label = 'invoiceDate';
+    else if (/vervaldatum|due\s*date|betaal\s*datum/i.test(lower)) label = 'dueDate';
+    
+    results.push({ date: parsed, context: line.trim(), label });
+  }
+  
+  return results;
+}
+
+function extractSupplier(text: string): string | undefined {
+  const patterns = [
+    /(?:supplier|leverancier|vendor|geleverd\s*door)[:\s]*([^\n]+)/gi,
+    /(?:from|van|afzender|verzender)[:\s]*([^\n]+)/gi,
+    /(?:company|bedrijf|firma)[:\s]*([^\n]+)/gi,
+    /(?:verkoper|seller)[:\s]*([^\n]+)/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1].trim().substring(0, 100);
+  }
+  // Try company name in first lines
+  const lines = text.split('\n').slice(0, 10);
+  for (const line of lines) {
+    const cm = line.match(/^([A-Z][A-Za-z\s&]+(?:B\.?V\.?|N\.?V\.?|BV|NV|GmbH|Inc|Ltd|LLC|S\.?A\.?|BVBA)?)\s*$/);
+    if (cm && cm[1].trim().length > 3 && cm[1].trim().length < 60) return cm[1].trim();
+  }
+  return undefined;
+}
+
+function extractOrderNumber(text: string): string | undefined {
+  const patterns = [
+    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer|bestelling)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:po|p\.o\.)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:reference|referentie|ref)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:document\s*(?:no|nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:onze\s*ref|uw\s*ref|your\s*ref|our\s*ref)[:\s#]*([A-Z0-9\-\/]+)/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+function extractInvoiceNumber(text: string): string | undefined {
+  const patterns = [
+    /(?:invoice\s*(?:no|nr|number|nummer)|factuur\s*(?:no|nr|nummer)|factuurnummer)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:bill\s*(?:no|nr))[:\s#]*([A-Z0-9\-\/]+)/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+function extractCustomerNumber(text: string): string | undefined {
+  const patterns = [
+    /(?:klant(?:en)?(?:\s*nr|nummer)|customer\s*(?:no|nr|number|id)|debiteurnummer|debiteur\s*(?:nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1].trim();
+  }
+  return undefined;
+}
+
+function extractCurrency(text: string): string {
+  if (/€|EUR\b/i.test(text)) return 'EUR';
+  if (/\$|USD\b/i.test(text)) return 'USD';
+  if (/£|GBP\b/i.test(text)) return 'GBP';
+  return 'EUR'; // default
+}
+
+function extractTotals(text: string): { subtotal?: number; vatAmount?: number; vatPercentage?: number; discount?: number; shippingCost?: number; totalAmount?: number } {
+  const result: ReturnType<typeof extractTotals> = {};
+
+  // Subtotal
+  const subMatch = text.match(/(?:subtotaal|subtotal|netto\s*bedrag|net\s*amount)[:\s]*€?\s*([\d.,]+)/i);
+  if (subMatch) result.subtotal = parseEuropeanNumber(subMatch[1]);
+
+  // VAT / BTW
+  const vatMatch = text.match(/(?:btw|vat|tva|mwst|tax)[:\s]*€?\s*([\d.,]+)/i);
+  if (vatMatch) result.vatAmount = parseEuropeanNumber(vatMatch[1]);
+  
+  const vatPctMatch = text.match(/(?:btw|vat|tva|mwst|tax)\s*(\d{1,2})\s*%/i);
+  if (vatPctMatch) result.vatPercentage = parseInt(vatPctMatch[1], 10);
+
+  // Discount
+  const discMatch = text.match(/(?:korting|discount|remise|rabat)[:\s]*-?\s*€?\s*([\d.,]+)/i);
+  if (discMatch) result.discount = parseEuropeanNumber(discMatch[1]);
+
+  // Shipping
+  const shipMatch = text.match(/(?:verzend(?:kosten)?|shipping|transport|bezorg(?:kosten)?|franco|vracht)[:\s]*€?\s*([\d.,]+)/i);
+  if (shipMatch) result.shippingCost = parseEuropeanNumber(shipMatch[1]);
+
+  // Grand total
+  const totalPatterns = [
+    /(?:totaal\s*(?:bedrag|incl|inc)|total\s*(?:amount|incl)|grand\s*total|te\s*betalen|totaal\s*€)[:\s]*€?\s*([\d.,]+)/i,
+    /(?:^|\n)\s*(?:totaal|total)\s*€?\s*([\d.,]+)\s*(?:$|\n)/im,
+  ];
+  for (const p of totalPatterns) {
+    const m = text.match(p);
+    if (m) { result.totalAmount = parseEuropeanNumber(m[1]); break; }
+  }
+
+  return result;
+}
+
+function extractPaymentTerms(text: string): string | undefined {
+  const patterns = [
+    /(?:betaal(?:termijn|conditie|voorwaarden)|payment\s*(?:terms?|conditions?)|betalingsvoorwaarden)[:\s]*([^\n]+)/gi,
+    /(?:betaling\s*binnen|payment\s*within|net\s*)\s*(\d+)\s*(?:dagen|days)/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1]?.trim() || m[0].trim();
+  }
+  return undefined;
+}
+
+function extractDeliveryAddress(text: string): string | undefined {
+  const patterns = [
+    /(?:aflever\s*adres|delivery\s*address|bezorg\s*adres|ship\s*to|levering\s*aan)[:\s]*\n?((?:[^\n]+\n?){1,4})/gi,
+  ];
+  for (const p of patterns) {
+    p.lastIndex = 0;
+    const m = p.exec(text);
+    if (m) return m[1].replace(/\n/g, ', ').trim().substring(0, 200);
+  }
+  return undefined;
+}
+
+function extractContactInfo(text: string): { person?: string; phone?: string; email?: string } {
+  const result: { person?: string; phone?: string; email?: string } = {};
+
+  const personMatch = text.match(/(?:contact\s*(?:person|persoon)?|t\.a\.v\.?|attn\.?)[:\s]*([^\n]+)/i);
+  if (personMatch) result.person = personMatch[1].trim().substring(0, 80);
+
+  const phoneMatch = text.match(/(?:tel(?:efoon)?|phone|fax|gsm|mobiel)[:\s]*([\+\d\s\-\(\)]{8,20})/i);
+  if (phoneMatch) result.phone = phoneMatch[1].trim();
+
+  const emailMatch = text.match(/[\w.\-+]+@[\w.\-]+\.\w{2,}/i);
+  if (emailMatch) result.email = emailMatch[0];
+
+  return result;
+}
+
+// ─── SUPPLIER MATCHING ──────────────────────────────────────────────────────
+
+function matchSupplier(extractedText: string, suppliers: SupplierMatch[]): SupplierMatch | undefined {
+  if (!extractedText || suppliers.length === 0) return undefined;
+  const norm = extractedText.toLowerCase().trim();
+
+  // Exact match
+  const exact = suppliers.find(s => s.name.toLowerCase().trim() === norm);
+  if (exact) return exact;
+
+  // Best partial match
+  let best: SupplierMatch | undefined;
+  let bestScore = 0;
+
+  for (const s of suppliers) {
+    const sn = s.name.toLowerCase().trim();
+    if (norm.includes(sn) && sn.length > bestScore) { bestScore = sn.length; best = s; }
+    if (sn.includes(norm) && norm.length > bestScore) { bestScore = norm.length; best = s; }
+    
+    const words = norm.split(/\s+/).filter(w => w.length > 2);
+    const sWords = sn.split(/\s+/).filter(w => w.length > 2);
+    const overlap = words.filter(tw => sWords.some(sw => sw.includes(tw) || tw.includes(sw)));
+    const score = overlap.join('').length;
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
+  return best;
+}
+
+// ─── PRODUCT MATCHING ────────────────────────────────────────────────────────
+
+function findMatchingProducts(text: string, products: ProductMatch[], materials: MaterialMatch[]): ParsedOrderItem[] {
+  const items: ParsedOrderItem[] = [];
+  const lines = text.split('\n').filter(l => l.trim());
+  const foundCodes = new Set<string>();
+
   const productByCode = new Map<string, ProductMatch>();
   const productByName = new Map<string, ProductMatch>();
-  
-  for (const product of products) {
-    if (product.article_code) {
-      productByCode.set(product.article_code.toLowerCase(), product);
-    }
-    if (product.name) {
-      productByName.set(product.name.toLowerCase(), product);
-    }
+  for (const p of products) {
+    if (p.article_code) productByCode.set(p.article_code.toLowerCase(), p);
+    if (p.name) productByName.set(p.name.toLowerCase(), p);
   }
 
   const materialBySku = new Map<string, MaterialMatch>();
-  const materialByName = new Map<string, MaterialMatch>();
-  
-  for (const material of materials) {
-    if (material.sku) {
-      materialBySku.set(material.sku.toLowerCase(), material);
-    }
-    materialByName.set(material.name.toLowerCase(), material);
+  for (const m of materials) {
+    if (m.sku) materialBySku.set(m.sku.toLowerCase(), m);
   }
 
-  // Process each line looking for items
   for (const line of lines) {
-    const lineLower = line.toLowerCase();
-    
-    // Skip header-like lines
-    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|totaal|total|subtotal)/i.test(line.trim())) {
-      continue;
-    }
-    
-    // Try to find product by article code first
+    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|totaal|total|subtotal)/i.test(line.trim())) continue;
+
     for (const pattern of ARTICLE_CODE_PATTERNS) {
       pattern.lastIndex = 0;
       let match;
       while ((match = pattern.exec(line)) !== null) {
         const code = match[1];
-        const codeLower = code.toLowerCase();
-        
-        if (foundCodes.has(codeLower)) continue;
-        
-        const product = productByCode.get(codeLower);
+        const cl = code.toLowerCase();
+        if (foundCodes.has(cl)) continue;
+
+        const product = productByCode.get(cl);
         if (product) {
-          const quantity = extractQuantityFromLine(line) || 1;
-          const price = extractPriceFromLine(line);
           items.push({
             description: product.name,
-            quantity: quantity,
+            quantity: extractQuantityFromLine(line) || 1,
             article_code: product.article_code,
-            unit_price: price,
+            unit_price: extractPriceFromLine(line),
+            unit: extractUnitFromLine(line),
+            matchConfidence: 'exact',
           });
-          foundCodes.add(codeLower);
+          foundCodes.add(cl);
+          continue;
         }
-        
-        // Check materials
-        const material = materialBySku.get(codeLower);
-        if (material && !foundCodes.has(codeLower)) {
-          const quantity = extractQuantityFromLine(line) || 1;
-          const price = extractPriceFromLine(line);
+
+        const material = materialBySku.get(cl);
+        if (material) {
           items.push({
             description: `${material.name} (${material.category})`,
-            quantity: quantity,
+            quantity: extractQuantityFromLine(line) || 1,
             article_code: material.sku,
-            unit_price: price,
+            unit_price: extractPriceFromLine(line),
+            unit: extractUnitFromLine(line),
+            matchConfidence: 'exact',
           });
-          foundCodes.add(codeLower);
+          foundCodes.add(cl);
         }
       }
     }
 
-    // Try to find product by name (partial matching for names > 5 chars)
+    // Name-based matching
     for (const [name, product] of productByName) {
-      if (name.length > 5 && lineLower.includes(name)) {
-        const codeKey = (product.article_code || name).toLowerCase();
-        if (!foundCodes.has(codeKey)) {
-          const quantity = extractQuantityFromLine(line) || 1;
-          const price = extractPriceFromLine(line);
+      if (name.length > 5 && line.toLowerCase().includes(name)) {
+        const key = (product.article_code || name).toLowerCase();
+        if (!foundCodes.has(key)) {
           items.push({
             description: product.name,
-            quantity: quantity,
+            quantity: extractQuantityFromLine(line) || 1,
             article_code: product.article_code,
-            unit_price: price,
+            unit_price: extractPriceFromLine(line),
+            unit: extractUnitFromLine(line),
+            matchConfidence: 'partial',
           });
-          foundCodes.add(codeKey);
+          foundCodes.add(key);
         }
       }
     }
   }
 
-  // If no matches found, try to extract generic items from table-like structures
   if (items.length === 0) {
-    const tableItems = extractTableItems(text);
-    items.push(...tableItems);
+    return extractTableItems(text);
   }
 
   return items;
@@ -618,179 +706,205 @@ function findMatchingProducts(
 
 function extractTableItems(text: string): ParsedOrderItem[] {
   const items: ParsedOrderItem[] = [];
-  const lines = text.split('\n').filter(line => line.trim());
-  
-  // Look for lines that appear to be table rows with item data
+  const lines = text.split('\n').filter(l => l.trim());
+
   for (const line of lines) {
-    // Skip header-like lines
-    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|total)/i.test(line.trim())) {
-      continue;
-    }
-    
-    // Skip very short lines or lines that are just numbers
-    if (line.trim().length < 5 || /^\d+$/.test(line.trim())) {
-      continue;
-    }
-    
-    // Look for lines with numeric data that suggest they're order items
-    const hasQuantity = /\b\d{1,4}\s*(st|stuk|pcs|x)?\b/i.test(line);
-    const hasCode = /\b[A-Z0-9\-\.]{5,}\b/.test(line);
-    
+    if (/^(item|artikel|description|omschrijving|qty|quantity|price|prijs|total|totaal|subtotal|btw|vat)/i.test(line.trim())) continue;
+    if (line.trim().length < 5 || /^\d+$/.test(line.trim())) continue;
+
+    const hasQuantity = /\b\d{1,4}\s*(st|stuk|pcs|x|m|kg|ltr|rol|set|pak)?\b/i.test(line);
+    const hasCode = /\b[A-Z0-9\-\.\/]{5,}\b/.test(line);
+
     if (hasQuantity || hasCode) {
       const quantity = extractQuantityFromLine(line) || 1;
       const price = extractPriceFromLine(line);
       const articleCode = extractArticleCodeFromLine(line);
-      
-      // Clean description: remove prices, quantities, and article codes
+      const unit = extractUnitFromLine(line);
+
       let description = line
-        .replace(/\d+[,\.]\d{2}\s*€?/g, '') // Remove prices
-        .replace(/€\s*\d+/g, '')
-        .replace(/\b\d{1,4}\s*(st|stuk|pcs|x)?\b/gi, '') // Remove quantities
+        .replace(/€\s*\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2})?/g, '')
+        .replace(/\d{1,3}(?:[\.\s]\d{3})*(?:,\d{1,2})?\s*€/g, '')
+        .replace(/\b\d{1,4}\s*(?:st|stuk|stuks|pcs|x|m|mtr|kg|ltr|set|rol|pak|doos|paar)\b/gi, '')
         .trim();
-      
-      // Remove the article code from description if found
+
       if (articleCode) {
         description = description.replace(new RegExp(articleCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
       }
-      
       description = description.replace(/\s+/g, ' ').trim().substring(0, 200);
-      
       if (description.length > 3) {
-        items.push({
-          description,
-          quantity,
-          article_code: articleCode,
-          unit_price: price,
-        });
+        items.push({ description, quantity, article_code: articleCode, unit_price: price, unit, matchConfidence: 'none' });
       }
     }
   }
-  
-  return items.slice(0, 100); // Limit to 100 items
+
+  return items.slice(0, 200);
 }
 
-// Main parse function with enhanced features
+// ─── MAIN PARSE ──────────────────────────────────────────────────────────────
+
 export async function parsePDFForOrder(
   file: File,
   products: ProductMatch[],
   materials: MaterialMatch[],
   suppliers?: SupplierMatch[]
 ): Promise<ParsedOrderData> {
+  const warnings: string[] = [];
+
   // Extract text with positions for table parsing
   let tableData: Record<string, string>[] = [];
-  
+
   try {
-    const textWithPositions = await extractTextWithPositions(file);
-    
-    for (const pageItems of textWithPositions) {
-      const rows = groupIntoRows(pageItems);
-      const columnPositions = detectColumns(rows);
-      
-      if (columnPositions.size >= 2) {
-        const pageData = extractTableData(rows, columnPositions);
+    const pagesItems = await extractTextWithPositions(file);
+    let detectedColumns: Map<string, number> | null = null;
+    let detectedHeaderRow = -1;
+
+    for (let pi = 0; pi < pagesItems.length; pi++) {
+      const rows = groupIntoRows(pagesItems[pi], pi);
+      const merged = mergeMultiLineRows(rows);
+
+      // Try to detect columns from this page (re-use across pages)
+      if (!detectedColumns || detectedColumns.size < 2) {
+        const { columns, headerRowIndex } = detectColumns(merged);
+        if (columns.size >= 2) {
+          detectedColumns = columns;
+          detectedHeaderRow = headerRowIndex;
+          const pageData = extractTableData(merged, columns, headerRowIndex);
+          tableData.push(...pageData);
+          continue;
+        }
+      }
+
+      if (detectedColumns && detectedColumns.size >= 2) {
+        // Continuation page – use same columns, start from row 0
+        const pageData = extractTableData(merged, detectedColumns, -1);
         tableData.push(...pageData);
-        } else {
-          // Fallback: attempt to parse item rows even when headers/columns aren't detected reliably
-          const heuristic = extractHeuristicTableData(rows);
-          tableData.push(...heuristic);
+      } else {
+        const heuristic = extractHeuristicTableData(merged);
+        tableData.push(...heuristic);
       }
     }
   } catch (e) {
-    console.log('Table extraction failed, falling back to text extraction:', e);
+    console.warn('Table extraction failed, falling back to text extraction:', e);
+    warnings.push('Table structure could not be parsed; used text fallback');
   }
-  
-  // Also extract plain text for metadata and fallback matching
+
+  // Plain text for metadata
   const text = await extractTextFromPDF(file);
-  
-  console.log('Extracted PDF text:', text.substring(0, 1000));
+
+  console.log('Extracted PDF text (first 1500 chars):', text.substring(0, 1500));
   console.log('Table data extracted:', tableData.length, 'rows');
-  
+
+  // ── Metadata extraction ──
   const extractedSupplier = extractSupplier(text);
   const orderNumber = extractOrderNumber(text);
-  
-  // Match supplier against database
+  const invoiceNumber = extractInvoiceNumber(text);
+  const customerNumber = extractCustomerNumber(text);
+  const currency = extractCurrency(text);
+  const totals = extractTotals(text);
+  const paymentTerms = extractPaymentTerms(text);
+  const deliveryAddress = extractDeliveryAddress(text);
+  const contact = extractContactInfo(text);
+
+  // Supplier matching
   let matchedSupplier: SupplierMatch | undefined;
-  if (extractedSupplier && suppliers && suppliers.length > 0) {
+  if (extractedSupplier && suppliers?.length) {
     matchedSupplier = matchSupplier(extractedSupplier, suppliers);
     console.log('Matched supplier:', matchedSupplier?.name || 'none', 'from extracted:', extractedSupplier);
   }
-  
-  // Extract dates
-  const orderDateMatch = text.match(/(?:order\s*date|besteldatum|datum|date)[:\s]*([^\n]+)/gi);
-  const deliveryDateMatch = text.match(/(?:delivery|levering|lever|expected)[^\n]*[:\s]*([^\n]+)/gi);
-  
-  let orderDate: string | undefined;
-  let expectedDelivery: string | undefined;
-  
-  if (orderDateMatch) {
-    orderDate = extractDateFromString(orderDateMatch[0]);
+
+  // Date extraction
+  const datesWithContext = extractAllDatesWithContext(text);
+  let orderDate = datesWithContext.find(d => d.label === 'orderDate')?.date;
+  let expectedDelivery = datesWithContext.find(d => d.label === 'deliveryDate')?.date;
+
+  if (!orderDate && !expectedDelivery) {
+    const allDates = datesWithContext.map(d => d.date).sort();
+    if (allDates.length > 0) orderDate = allDates[0];
+    if (allDates.length > 1) expectedDelivery = allDates[allDates.length - 1];
   }
-  
-  if (deliveryDateMatch) {
-    expectedDelivery = extractDateFromString(deliveryDateMatch[0]);
+  if (!orderDate && datesWithContext.length > 0) {
+    orderDate = datesWithContext[0].date;
   }
-  
-  // If no specific dates found, look for any dates in the document
-  if (!orderDate || !expectedDelivery) {
-    const allDates: string[] = [];
-    const datePattern = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/g;
-    let match;
-    while ((match = datePattern.exec(text)) !== null) {
-      const parsed = extractDateFromString(match[0]);
-      if (parsed) allDates.push(parsed);
-    }
-    
-    if (allDates.length > 0) {
-      allDates.sort();
-      if (!orderDate) orderDate = allDates[0];
-      if (!expectedDelivery && allDates.length > 1) expectedDelivery = allDates[allDates.length - 1];
-    }
-  }
-  
-  // Build items from table data first
+
+  // ── Build items ──
   let items: ParsedOrderItem[] = [];
-  
+
   if (tableData.length > 0) {
-    items = tableData
-      .map(row => {
-        let description = row['description'] || '';
-        let article_code = row['article_code'] || '';
-        const quantity = parseQuantityValue(row['quantity']) || 1;
-        const unit_price = parsePriceValue(row['price']);
+    items = tableData.map(row => {
+      let description = row['description'] || '';
+      let article_code = row['article_code'] || '';
+      const quantity = parseQuantityValue(row['quantity']) || 1;
+      const unit_price = parsePriceValue(row['price']);
+      const total_price = parsePriceValue(row['total']);
+      const unit = row['unit'] || extractUnitFromLine(row['quantity'] || '') || undefined;
+      const discount = parsePriceValue(row['discount']);
 
-        // Some suppliers put the full line in "Artikel" (incl. description). Ensure we always have a description.
-        if (!description && article_code) {
-          description = article_code;
-        }
+      if (!description && article_code) description = article_code;
+      if ((!article_code || article_code.length > 30) && description) {
+        const extracted = extractArticleCodeFromLine(description);
+        if (extracted) article_code = extracted;
+      }
 
-        // Try to extract a clean article code from description if needed
-        if ((!article_code || article_code.length > 30) && description) {
-          const extracted = extractArticleCodeFromLine(description);
-          if (extracted) article_code = extracted;
-        }
+      // Determine match confidence by checking against products DB
+      let matchConfidence: 'exact' | 'partial' | 'none' = 'none';
+      if (article_code) {
+        const acLower = article_code.toLowerCase();
+        if (products.some(p => p.article_code?.toLowerCase() === acLower)) matchConfidence = 'exact';
+        else if (materials.some(m => m.sku?.toLowerCase() === acLower)) matchConfidence = 'exact';
+      }
 
-        return {
-          description,
-          quantity,
-          article_code,
-          unit_price,
-        };
-      })
-      .filter(item => item.description || item.article_code);
+      return { description, quantity, article_code, unit_price, total_price, unit, discount, matchConfidence };
+    }).filter(item => item.description || item.article_code);
   }
-  
-  // If no table items, try text-based matching
+
   if (items.length === 0) {
     items = findMatchingProducts(text, products, materials);
   }
-  
+
+  // Warnings
+  if (items.length === 0) warnings.push('No order items could be extracted from this PDF');
+  if (!extractedSupplier && !matchedSupplier) warnings.push('Supplier could not be detected');
+  if (!orderDate) warnings.push('Order date could not be detected');
+
+  // Confidence scoring
+  let confidence: 'high' | 'medium' | 'low' = 'low';
+  const signals = [
+    items.length > 0,
+    !!matchedSupplier || !!extractedSupplier,
+    !!orderDate,
+    !!orderNumber || !!invoiceNumber,
+    items.some(i => i.matchConfidence === 'exact'),
+    tableData.length > 0,
+  ];
+  const trueCount = signals.filter(Boolean).length;
+  if (trueCount >= 5) confidence = 'high';
+  else if (trueCount >= 3) confidence = 'medium';
+
   return {
     supplier: matchedSupplier?.name || extractedSupplier,
     matchedSupplierId: matchedSupplier?.id,
     orderDate,
     expectedDelivery,
     orderNumber,
-    notes: orderNumber ? `Order #${orderNumber}` : undefined,
+    invoiceNumber,
+    referenceNumber: orderNumber, // alias
+    customerNumber,
+    currency,
+    subtotal: totals.subtotal,
+    vatAmount: totals.vatAmount,
+    vatPercentage: totals.vatPercentage,
+    discount: totals.discount,
+    shippingCost: totals.shippingCost,
+    totalAmount: totals.totalAmount,
+    paymentTerms,
+    deliveryAddress,
+    contactPerson: contact.person,
+    contactPhone: contact.phone,
+    contactEmail: contact.email,
+    notes: [orderNumber && `Order #${orderNumber}`, invoiceNumber && `Invoice #${invoiceNumber}`].filter(Boolean).join(' · ') || undefined,
+    rawText: text,
     items,
+    extractionConfidence: confidence,
+    warnings,
   };
 }
