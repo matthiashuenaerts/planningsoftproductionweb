@@ -169,6 +169,7 @@ function App() {
                     <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
                     <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
+                    <Route path=":lang/service-installation" element={<P><ServiceInstallation /></P>} />
                   </Route>
                 </Routes>
                 <Toaster />
