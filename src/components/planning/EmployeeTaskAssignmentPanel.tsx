@@ -171,58 +171,67 @@ const EmployeeTaskAssignmentPanel: React.FC<EmployeeTaskAssignmentPanelProps> = 
 
           return (
             <Card key={employee.id} className="overflow-hidden border-border/60 hover:shadow-md transition-shadow">
-              {/* Employee header */}
-              <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/40">
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                    {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{employee.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{employee.role}</p>
-                  </div>
-                </div>
-                <Badge
-                  variant={assignedCount > 0 ? 'default' : 'secondary'}
-                  className="text-xs"
-                >
-                  {assignedCount}/{standardTasks.length} taken
-                </Badge>
-              </div>
-
-              {/* Task checkboxes */}
-              <CardContent className="p-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {sortedTasks.map(task => {
-                    const isAssigned = empLinks.has(task.id);
-                    return (
-                      <label
-                        key={task.id}
-                        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-sm ${
-                          isAssigned
-                            ? 'bg-primary/5 hover:bg-primary/10'
-                            : 'hover:bg-muted/50'
-                        }`}
+              <Collapsible>
+                {/* Employee header - clickable to toggle */}
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b border-border/40 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                        {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="text-left">
+                        <p className="font-medium text-sm">{employee.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{employee.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={assignedCount > 0 ? 'default' : 'secondary'}
+                        className="text-xs"
                       >
-                        <Checkbox
-                          checked={isAssigned}
-                          onCheckedChange={() => handleToggle(employee.id, task.id)}
-                          className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                        <span className={`truncate ${isAssigned ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          <span className="font-mono text-xs mr-1 opacity-60">{task.task_number}</span>
-                          {task.task_name}
-                        </span>
-                        {task.multi_user_task && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto shrink-0">
-                            Multi
-                          </Badge>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </CardContent>
+                        {assignedCount}/{standardTasks.length} taken
+                      </Badge>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+
+                {/* Task checkboxes - collapsible */}
+                <CollapsibleContent>
+                  <CardContent className="p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                      {sortedTasks.map(task => {
+                        const isAssigned = empLinks.has(task.id);
+                        return (
+                          <label
+                            key={task.id}
+                            className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors text-sm ${
+                              isAssigned
+                                ? 'bg-primary/5 hover:bg-primary/10'
+                                : 'hover:bg-muted/50'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isAssigned}
+                              onCheckedChange={() => handleToggle(employee.id, task.id)}
+                              className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <span className={`truncate ${isAssigned ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              <span className="font-mono text-xs mr-1 opacity-60">{task.task_number}</span>
+                              {task.task_name}
+                            </span>
+                            {task.multi_user_task && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 ml-auto shrink-0">
+                                Multi
+                              </Badge>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
             </Card>
           );
         })}
