@@ -17,7 +17,6 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 
-// Define project type
 interface Project {
   id: string;
   name: string;
@@ -28,7 +27,6 @@ interface Project {
   [key: string]: any;
 }
 
-// Define assignment type
 interface Assignment {
   id: string;
   project_id: string;
@@ -40,7 +38,6 @@ interface Assignment {
   updated_at?: string;
 }
 
-// Define truck assignment type
 interface TruckAssignment {
   id: string;
   project_id: string;
@@ -52,14 +49,12 @@ interface TruckAssignment {
   };
 }
 
-// Define truck type
 interface Truck {
   id: string;
   truck_number: string;
   description?: string;
 }
 
-// Define item type for drag and drop
 interface DragItem {
   type: string;
   id: string;
@@ -68,13 +63,11 @@ interface DragItem {
   assignment?: Assignment;
 }
 
-// Helper function to skip weekends
 const addBusinessDays = (date: Date, days: number): Date => {
   let result = new Date(date);
   let addedDays = 0;
   while (addedDays < days) {
     result = addDays(result, 1);
-    // Skip weekends (Saturday = 6, Sunday = 0)
     if (result.getDay() !== 0 && result.getDay() !== 6) {
       addedDays++;
     }
@@ -82,13 +75,11 @@ const addBusinessDays = (date: Date, days: number): Date => {
   return result;
 };
 
-// Helper function to calculate business days between dates
 const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
   const days: Date[] = [];
   let currentDate = new Date(startDate);
   let addedDays = 0;
   while (addedDays < duration) {
-    // Skip weekends
     if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
       days.push(new Date(currentDate));
       addedDays++;
@@ -98,7 +89,6 @@ const getBusinessDaysArray = (startDate: Date, duration: number): Date[] => {
   return days;
 };
 
-// Define team colors with flexible color mapping
 const getColorClasses = (colorName: string) => {
   const colorMap: Record<string, { bg: string; text: string; border: string; header: string; project: string }> = {
     green: {
@@ -155,7 +145,6 @@ const getColorClasses = (colorName: string) => {
   return colorMap[colorName] || colorMap.unassigned;
 };
 
-// Get truck color for visual distinction
 const getTruckColor = (truckNumber: string) => {
   switch (truckNumber) {
     case '01':
@@ -169,19 +158,18 @@ const getTruckColor = (truckNumber: string) => {
   }
 };
 
-// Duration selector component
 const DurationSelector = ({
   value,
   onChange,
   disabled = false
 }) => {
+  const { t } = useLanguage();
   return <div className="flex items-center gap-1">
-      <span className="text-xs">Days:</span>
+      <span className="text-xs">{t('itc_days')}</span>
       <Input type="number" min="1" max="30" value={value} onChange={e => onChange(parseInt(e.target.value) || 1)} disabled={disabled} className="h-6 w-16 text-xs" />
     </div>;
 };
 
-// Enhanced project item component with navigation button
 const ProjectItem = ({
   project,
   team,
@@ -197,7 +185,7 @@ const ProjectItem = ({
   totalDays = 1
 }) => {
   const navigate = useNavigate();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [{
     isDragging
   }, drag] = useDrag(() => ({
@@ -212,7 +200,6 @@ const ProjectItem = ({
       isDragging: !!monitor.isDragging()
     })
   }));
-  // Map team names to colors based on content  
   const getTeamColor = (teamName: string) => {
     if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
     if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
@@ -220,7 +207,7 @@ const ProjectItem = ({
     if (teamName?.toLowerCase().includes('red') || teamName?.toLowerCase().includes('rood')) return getColorClasses('red');
     if (teamName?.toLowerCase().includes('yellow') || teamName?.toLowerCase().includes('geel')) return getColorClasses('yellow');
     if (teamName?.toLowerCase().includes('purple') || teamName?.toLowerCase().includes('paars')) return getColorClasses('purple');
-    return getColorClasses('blue'); // default
+    return getColorClasses('blue');
   };
   const teamColor = team ? getTeamColor(team) : getColorClasses('unassigned');
   const handleDurationChange = (newDuration: number) => {
@@ -236,7 +223,6 @@ const ProjectItem = ({
     navigate(createLocalizedPath(`/projects/${project.id}`));
   };
 
-  // Show full content only on the start day
   const showFullContent = isStart;
   return <div ref={drag} className={cn("relative cursor-move border-2 rounded-lg mb-1", teamColor.project, isDragging ? "opacity-50 z-50" : "opacity-100", isContinuation ? "border-l-0 rounded-l-none" : "", dayPosition === totalDays - 1 && totalDays > 1 ? "border-r-0 rounded-r-none" : "", totalDays > 1 && dayPosition > 0 && dayPosition < totalDays - 1 ? "border-x-0 rounded-none" : "")} style={{
     opacity: isDragging ? 0.5 : 1
@@ -254,16 +240,14 @@ const ProjectItem = ({
               
               <Button size="sm" variant="ghost" onClick={handleNavigateToProject} className="h-6 w-full justify-start p-1 text-xs hover:bg-white/50">
                 <ExternalLink className="h-3 w-3 mr-1" />
-                View Details
+                {t('itc_view_details')}
               </Button>
             </div>
             
-            {/* Duration Selector */}
             {team && assignment && <div className="mb-2">
                 <DurationSelector value={assignment.duration} onChange={handleDurationChange} />
               </div>}
             
-            {/* Truck Assignment */}
             {team && <div className="mb-2">
                 <TruckSelector value={truckAssignment?.truck_id || ''} onValueChange={handleTruckChange} truckNumber={truckAssignment?.truck?.truck_number} />
               </div>}
@@ -272,11 +256,10 @@ const ProjectItem = ({
                 {format(new Date(assignment.start_date), 'MMM d')}
                 {assignment.duration > 1 && <span> - {format(addBusinessDays(new Date(assignment.start_date), assignment.duration - 1), 'MMM d')}</span>}
                 {truckAssignment && <div className="text-xs text-blue-600">
-                    Load: {format(new Date(truckAssignment.loading_date), 'MMM d')}
+                    {t('itc_load')}: {format(new Date(truckAssignment.loading_date), 'MMM d')}
                   </div>}
               </div>}
           </> :
-      // Continuation indicator - show only project name
       <div className="h-8 flex items-center justify-center">
             <div className={cn("text-xs font-medium truncate", teamColor.text)}>
               {project.name}
@@ -286,12 +269,12 @@ const ProjectItem = ({
     </div>;
 };
 
-// Truck selector component
 const TruckSelector = ({
   value,
   onValueChange,
   truckNumber
 }) => {
+  const { t } = useLanguage();
   const [trucks, setTrucks] = useState<Truck[]>([]);
   useEffect(() => {
     const fetchTrucks = async () => {
@@ -306,14 +289,14 @@ const TruckSelector = ({
       <Truck className="h-3 w-3" />
       <Select value={value} onValueChange={onValueChange}>
         <SelectTrigger className="h-6 text-xs flex-1">
-          <SelectValue placeholder="Assign truck">
+          <SelectValue placeholder={t('itc_assign_truck')}>
             {truckNumber ? <Badge className={getTruckColor(truckNumber)}>
                 T{truckNumber}
-              </Badge> : "No truck"}
+              </Badge> : t('itc_no_truck')}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">No truck assigned</SelectItem>
+          <SelectItem value="none">{t('itc_no_truck_assigned')}</SelectItem>
           {trucks.map(truck => <SelectItem key={truck.id} value={truck.id}>
               <div className="flex items-center gap-2">
                 <Badge className={getTruckColor(truck.truck_number)}>
@@ -327,7 +310,6 @@ const TruckSelector = ({
     </div>;
 };
 
-// Enhanced day cell component with current day highlighting
 const DayCell = ({
   date,
   team,
@@ -342,6 +324,7 @@ const DayCell = ({
   currentMonth,
   onRefreshData
 }) => {
+  const { t } = useLanguage();
   const [{
     isOver
   }, drop] = useDrop(() => ({
@@ -351,10 +334,8 @@ const DayCell = ({
       console.log(`Dropping project ${item.id} on date: ${dropDate}, team: ${team}, teamId: ${teamId}`);
       
       if (item.teamId === teamId && item.assignment) {
-        // Moving within same team - just update start date
         handleDateChange(item.assignment.id, dropDate);
       } else {
-        // Moving to different team or from unassigned
         onDropProject(item.id, team, teamId, dropDate);
       }
     },
@@ -373,7 +354,6 @@ const DayCell = ({
       }).eq('id', assignmentId);
       if (error) throw error;
 
-      // Refresh data while maintaining scroll position
       if (onRefreshData) {
         onRefreshData();
       }
@@ -387,14 +367,11 @@ const DayCell = ({
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
   const isToday = isSameDay(date, new Date());
 
-  // Get projects that should be displayed on this day
   const projectsForDay = assignments.filter(assignment => assignment.team === team).map(assignment => {
     const project = projects.find(p => p.id === assignment.project_id);
     if (!project) return null;
     const startDate = new Date(assignment.start_date);
     const businessDays = getBusinessDaysArray(startDate, assignment.duration);
-
-    // Check if this date is one of the business days for this project
     const dayIndex = businessDays.findIndex(businessDay => format(businessDay, 'yyyy-MM-dd') === dateStr);
     if (dayIndex === -1) return null;
     const isStart = dayIndex === 0;
@@ -416,11 +393,11 @@ const DayCell = ({
       isToday && isCurrentMonthDay && "bg-yellow-100 border-yellow-400 border-2",
       isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "",
       isCurrentMonthDay ? "bg-white" : ""
-    )}>
+    )} data-today={isToday ? "true" : undefined}>
       <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400", isToday && "text-yellow-800 font-bold")}>
         <div className="text-xs">{format(date, 'EEE')}</div>
         <div className="text-lg">{format(date, 'd')}</div>
-        {isToday && <div className="text-xs font-bold">Today</div>}
+        {isToday && <div className="text-xs font-bold">{t('itc_today')}</div>}
       </div>
       
       <div className="space-y-1">
@@ -439,7 +416,6 @@ const DayCell = ({
     </div>;
 };
 
-// Enhanced team calendar component with collapsible functionality - starts collapsed
 const TeamCalendar = ({
   team,
   teamId,
@@ -457,21 +433,20 @@ const TeamCalendar = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  // Get team color - look up from database teams or fallback to color detection
+  const { t } = useLanguage();
   const getTeamColor = (teamName: string) => {
-    // Try to find color from team name keywords
     if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
     if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
     if (teamName?.toLowerCase().includes('orange') || teamName?.toLowerCase().includes('oranje')) return getColorClasses('orange');
     if (teamName?.toLowerCase().includes('red') || teamName?.toLowerCase().includes('rood')) return getColorClasses('red');
     if (teamName?.toLowerCase().includes('yellow') || teamName?.toLowerCase().includes('geel')) return getColorClasses('yellow');
     if (teamName?.toLowerCase().includes('purple') || teamName?.toLowerCase().includes('paars')) return getColorClasses('purple');
-    return getColorClasses('blue'); // default
+    return getColorClasses('blue');
   };
   const teamColor = getTeamColor(team);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToToday = useRef(false);
 
-  // Generate multiple months for scrolling (current month in the middle)
   const generateCalendarMonths = () => {
     const months = [];
     for (let i = -2; i <= 2; i++) {
@@ -483,27 +458,27 @@ const TeamCalendar = ({
 
   const calendarMonths = generateCalendarMonths();
 
-  // Auto-scroll to current month on initial load
   useEffect(() => {
-    if (scrollAreaRef.current && !scrollPositions[team]) {
-      const currentMonthElement = scrollAreaRef.current.querySelector('[data-current-month="true"]');
-      if (currentMonthElement) {
-        currentMonthElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }
-  }, [team, scrollPositions]);
+    if (!isCollapsed && scrollAreaRef.current) {
+      const timer = setTimeout(() => {
+        const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+        if (!viewport) return;
 
-  // Restore scroll position when it exists
-  useEffect(() => {
-    if (scrollAreaRef.current && scrollPositions[team] !== undefined) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTop = scrollPositions[team];
-      }
-    }
-  }, [scrollPositions, team]);
+        const todayCell = scrollAreaRef.current?.querySelector('[data-today="true"]');
+        if (todayCell) {
+          todayCell.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
 
-  // Save scroll position on scroll
+        const currentMonthElement = scrollAreaRef.current?.querySelector('[data-current-month="true"]');
+        if (currentMonthElement) {
+          currentMonthElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isCollapsed]);
+
   const handleScroll = (e: Event) => {
     const target = e.target as HTMLElement;
     if (target) {
@@ -522,18 +497,17 @@ const TeamCalendar = ({
     }
   }, [team, setScrollPositions]);
 
-  // Generate calendar days for a specific month, starting on Monday
   const generateMonthDays = (month: Date) => {
     const monthStart = startOfMonth(month);
     const monthEnd = endOfMonth(month);
-    
-    // Start calendar on the Monday of the week containing the first day of the month
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    // End calendar on the Sunday of the week containing the last day of the month
     const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   };
+
+  const dayHeaders = [
+    t('itc_mon'), t('itc_tue'), t('itc_wed'), t('itc_thu'), t('itc_fri'), t('itc_sat'), t('itc_sun')
+  ];
 
   return <Collapsible open={!isCollapsed} onOpenChange={(open) => setIsCollapsed(!open)} className="mb-6">
       <div className={cn("rounded-lg border", teamColor.border)}>
@@ -558,22 +532,19 @@ const TeamCalendar = ({
 
                 return (
                   <div key={monthIndex} className="mb-4" data-current-month={isCurrentMonth}>
-                    {/* Month header */}
                     <div className="sticky top-0 bg-gray-100 p-2 text-center font-medium border-b z-10">
                       {format(month, 'MMMM yyyy')}
-                      {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">Current</span>}
+                      {isCurrentMonth && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">{t('itc_current')}</span>}
                     </div>
                     
-                    {/* Day headers - starting with Monday */}
                     <div className="grid grid-cols-7 border-b">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                      {dayHeaders.map(day => (
                         <div key={day} className="p-2 text-center font-medium text-sm bg-gray-50">
                           {day}
                         </div>
                       ))}
                     </div>
                     
-                    {/* Calendar grid */}
                     {weeks.map((week, weekIndex) => (
                       <div key={weekIndex} className="grid grid-cols-7">
                         {week.map((date, dayIndex) => (
@@ -605,7 +576,6 @@ const TeamCalendar = ({
     </Collapsible>;
 };
 
-// Function to get status badge color
 const getStatusColor = status => {
   switch (status?.toLowerCase()) {
     case 'active':
@@ -621,7 +591,6 @@ const getStatusColor = status => {
   }
 };
 
-// Enhanced unassigned projects component with proper badge logic
 const UnassignedProjects = ({
   projects,
   assignments,
@@ -629,6 +598,7 @@ const UnassignedProjects = ({
   onTruckAssign,
   onDropProject
 }) => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [{
     isOver
@@ -636,7 +606,6 @@ const UnassignedProjects = ({
     accept: 'PROJECT',
     drop: (item: DragItem) => {
       console.log('Dropping project to unassigned:', item);
-      // Move project back to unassigned by removing its team assignment
       onDropProject(item.id, null, null, null);
     },
     collect: monitor => ({
@@ -648,11 +617,11 @@ const UnassignedProjects = ({
   
   return <div className="mb-6">
       <div className={cn("p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
-        <h3 className="text-lg font-medium">Unassigned Projects ({unassignedProjects.length})</h3>
+        <h3 className="text-lg font-medium">{t('itc_unassigned_projects', { count: String(unassignedProjects.length) })}</h3>
       </div>
       
       <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-gray-300 bg-white min-h-[100px]", isOver ? "bg-gray-100" : "")}>
-        {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">No unassigned projects</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+        {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">{t('itc_no_unassigned')}</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {unassignedProjects.map(project => {
           const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
           const hasTeamAssignment = assignments.some(a => a.project_id === project.id);
@@ -660,10 +629,9 @@ const UnassignedProjects = ({
           return <div key={project.id} className="border rounded-lg p-3">
               <ProjectItem project={project} team={null} teamId={null} assignment={null} truckAssignment={truckAssignment} onExtendProject={() => {}} onDurationChange={() => {}} onTruckAssign={onTruckAssign} />
               
-              {/* Show planned vs to plan badge */}
               <div className="mt-2 flex justify-center">
                 <Badge variant={hasTeamAssignment ? "default" : "outline"}>
-                  {hasTeamAssignment ? "Planned" : "To Plan"}
+                  {hasTeamAssignment ? t('itc_planned') : t('itc_to_plan')}
                 </Badge>
               </div>
             </div>;
@@ -673,7 +641,6 @@ const UnassignedProjects = ({
     </div>;
 };
 
-// Define team interface
 interface Team {
   id: string;
   name: string;
@@ -682,12 +649,12 @@ interface Team {
   is_active: boolean;
 }
 
-// Main installation team calendar component with enhanced scroll preservation and default collapsed state
 const InstallationTeamCalendar = ({
   projects
 }: {
   projects: Project[];
 }) => {
+  const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [truckAssignments, setTruckAssignments] = useState<TruckAssignment[]>([]);
@@ -695,13 +662,11 @@ const InstallationTeamCalendar = ({
   const [loading, setLoading] = useState(true);
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const [pageScrollPosition, setPageScrollPosition] = useState(0);
-  // Start with all calendars collapsed - will be dynamically generated
   const [teamCollapsedStates, setTeamCollapsedStates] = useState<Record<string, boolean>>({});
   const {
     toast
   } = useToast();
 
-  // Helper function to update individual team collapsed state
   const setTeamCollapsed = (team: string, collapsed: boolean) => {
     setTeamCollapsedStates(prev => ({
       ...prev,
@@ -709,12 +674,10 @@ const InstallationTeamCalendar = ({
     }));
   };
 
-  // Store page scroll position before operations
   const storePageScrollPosition = () => {
     setPageScrollPosition(window.pageYOffset);
   };
 
-  // Restore page scroll position after operations
   const restorePageScrollPosition = () => {
     setTimeout(() => {
       window.scrollTo({
@@ -724,12 +687,10 @@ const InstallationTeamCalendar = ({
     }, 50);
   };
 
-  // Fetch teams, team assignments and truck assignments
   const fetchAssignments = async () => {
     try {
       setLoading(true);
 
-      // Fetch active placement teams
       const {
         data: teamsData,
         error: teamsError
@@ -744,18 +705,16 @@ const InstallationTeamCalendar = ({
       const fetchedTeams = teamsData || [];
       setTeams(fetchedTeams);
       
-      // Initialize collapsed states for all teams - only on first load
       setTeamCollapsedStates(prev => {
         const hasExistingStates = Object.keys(prev).length > 0;
-        if (hasExistingStates) return prev; // Preserve existing states on refresh
+        if (hasExistingStates) return prev;
         const initialCollapsedStates: Record<string, boolean> = {};
         fetchedTeams.forEach(team => {
-          initialCollapsedStates[team.id] = true; // Start collapsed
+          initialCollapsedStates[team.id] = true;
         });
         return initialCollapsedStates;
       });
 
-      // Fetch team assignments
       const {
         data: teamData,
         error: teamError
@@ -765,7 +724,6 @@ const InstallationTeamCalendar = ({
       if (teamError) throw teamError;
       setAssignments(teamData || []);
 
-      // Fetch truck assignments
       const {
         data: truckData,
         error: truckError
@@ -782,8 +740,8 @@ const InstallationTeamCalendar = ({
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
-        title: "Error",
-        description: "Failed to load assignments",
+        title: t('itc_error'),
+        description: t('itc_error_assignments'),
         variant: "destructive"
       });
     } finally {
@@ -794,31 +752,19 @@ const InstallationTeamCalendar = ({
     fetchAssignments();
   }, [toast]);
 
-  // Helper function to update truck loading date - enhanced version
   const updateTruckLoadingDate = async (projectId: string, installationDateStr: string, startDateStr: string) => {
     const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
     if (truckAssignmentIndex >= 0) {
       const truckAssignment = truckAssignments[truckAssignmentIndex];
-
-      // Calculate new loading date (one business day before installation START)
       const startDate = new Date(startDateStr);
       const loadingDate = new Date(startDate);
-      
-      // Move back one day initially
       loadingDate.setDate(loadingDate.getDate() - 1);
-
-      // Weekend adjustment - if loading falls on weekend, move to Friday
       if (loadingDate.getDay() === 0) {
-        // Sunday - move to Friday
         loadingDate.setDate(loadingDate.getDate() - 2);
       } else if (loadingDate.getDay() === 6) {
-        // Saturday - move to Friday
         loadingDate.setDate(loadingDate.getDate() - 1);
       }
-      
       const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
-      
-      console.log(`Updating truck loading date for project ${projectId}: installation=${installationDateStr}, loading=${loadingDateStr}`);
       
       const { error } = await supabase
         .from('project_truck_assignments')
@@ -827,10 +773,8 @@ const InstallationTeamCalendar = ({
           loading_date: loadingDateStr
         })
         .eq('id', truckAssignment.id);
-        
       if (error) throw error;
 
-      // Update local state
       const updatedTruckAssignments = [...truckAssignments];
       updatedTruckAssignments[truckAssignmentIndex] = {
         ...truckAssignment,
@@ -838,44 +782,33 @@ const InstallationTeamCalendar = ({
         loading_date: loadingDateStr
       };
       setTruckAssignments(updatedTruckAssignments);
-      
-      console.log(`Successfully updated truck loading date: ${loadingDateStr}`);
     }
   };
 
-  // Enhanced project drop handling with truck loading date calculation
   const handleDropProject = async (projectId: string, team: string | null, teamId: string | null, newStartDate?: string) => {
     try {
-      // Store current page scroll position
       storePageScrollPosition();
       
-      console.log(`Handling drop for project ${projectId} to team ${team} (ID: ${teamId}) on date ${newStartDate}`);
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
-        // Reset project completely - remove team assignment and truck assignment
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-
-          // Remove team assignment
           const { error } = await supabase
             .from('project_team_assignments')
             .delete()
             .eq('id', existingAssignment.id);
           if (error) throw error;
 
-          // Remove from assignments array
           const updatedAssignments = assignments.filter(a => a.project_id !== projectId);
           setAssignments(updatedAssignments);
 
-          // Reset project installation_date to null
           const { error: projectError } = await supabase
             .from('projects')
             .update({ installation_date: null })
             .eq('id', projectId);
           if (projectError) throw projectError;
 
-          // Remove truck assignment if exists
           const truckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
           if (truckAssignmentIndex >= 0) {
             const truckAssignment = truckAssignments[truckAssignmentIndex];
@@ -884,21 +817,17 @@ const InstallationTeamCalendar = ({
               .delete()
               .eq('id', truckAssignment.id);
             if (truckError) throw truckError;
-            
             const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
             setTruckAssignments(updatedTruckAssignments);
           }
           
           toast({
-            title: "Project Reset",
-            description: "Project has been moved to unassigned and reset"
+            title: t('itc_project_reset'),
+            description: t('itc_project_reset_desc')
           });
-
-          // Preserve both page and calendar scroll positions
           restorePageScrollPosition();
         }
       } else {
-        // Assign to team
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
           const updateData: Partial<Assignment> = { team, team_id: teamId };
@@ -919,28 +848,25 @@ const InstallationTeamCalendar = ({
           };
           setAssignments(updatedAssignments);
 
-          // Calculate and update installation date using business days
           const startDate = new Date(updateData.start_date || existingAssignment.start_date);
           const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           const startDateStr = format(startDate, 'yyyy-MM-dd');
 
-          // Update project installation_date
           const { error: projectError } = await supabase
             .from('projects')
             .update({ installation_date: installationDateStr })
             .eq('id', projectId);
           if (projectError) throw projectError;
 
-          // Update truck assignment loading date if exists
           await updateTruckLoadingDate(projectId, installationDateStr, startDateStr);
           
           toast({
-            title: "Team Updated",
-            description: `Project has been assigned to ${team} team${newStartDate ? ` starting ${format(new Date(newStartDate), 'MMM d')}` : ''}`
+            title: t('itc_team_updated'),
+            description: newStartDate 
+              ? t('itc_team_updated_desc', { team, date: format(new Date(newStartDate), 'MMM d') })
+              : t('itc_team_assigned_desc', { team })
           });
-
-          // Preserve both page and calendar scroll positions
           restorePageScrollPosition();
         } else {
           const newAssignment = {
@@ -959,42 +885,36 @@ const InstallationTeamCalendar = ({
           
           setAssignments([...assignments, data[0]]);
 
-          // Calculate and update installation date using business days
           const startDate = new Date(newAssignment.start_date);
           const installationDate = addBusinessDays(startDate, newAssignment.duration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           const startDateStr = format(startDate, 'yyyy-MM-dd');
 
-          // Update project installation_date
           const { error: projectError } = await supabase
             .from('projects')
             .update({ installation_date: installationDateStr })
             .eq('id', projectId);
           if (projectError) throw projectError;
 
-          // Update truck assignment loading date if exists (for newly assigned projects)
           await updateTruckLoadingDate(projectId, installationDateStr, startDateStr);
           
           toast({
-            title: "Team Assigned",
-            description: `Project has been assigned to ${team} team`
+            title: t('itc_team_assigned'),
+            description: t('itc_team_assigned_desc', { team })
           });
-
-          // Preserve both page and calendar scroll positions
           restorePageScrollPosition();
         }
       }
     } catch (error) {
       console.error('Error handling project assignment:', error);
       toast({
-        title: "Error",
-        description: "Failed to handle project assignment",
+        title: t('itc_error'),
+        description: t('itc_error_assignment'),
         variant: "destructive"
       });
     }
   };
 
-  // Handle duration change with truck loading date update
   const handleDurationChange = async (assignmentId: string, newDuration: number) => {
     try {
       storePageScrollPosition();
@@ -1016,67 +936,58 @@ const InstallationTeamCalendar = ({
       };
       setAssignments(updatedAssignments);
 
-      // Calculate and update installation date using business days
       const startDate = new Date(assignment.start_date);
       const installationDate = addBusinessDays(startDate, newDuration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
       const startDateStr = format(startDate, 'yyyy-MM-dd');
 
-      // Update project installation_date
       const { error: projectError } = await supabase
         .from('projects')
         .update({ installation_date: installationDateStr })
         .eq('id', assignment.project_id);
       if (projectError) throw projectError;
 
-      // Update truck assignment loading date if exists
       await updateTruckLoadingDate(assignment.project_id, installationDateStr, startDateStr);
       
       toast({
-        title: "Duration Updated",
-        description: `Project duration is now ${newDuration} day${newDuration > 1 ? 's' : ''}`
+        title: t('itc_duration_updated'),
+        description: t('itc_duration_updated_desc', { count: String(newDuration) })
       });
 
       restorePageScrollPosition();
     } catch (error) {
       console.error('Error updating project duration:', error);
       toast({
-        title: "Error",
-        description: "Failed to update project duration",
+        title: t('itc_error'),
+        description: t('itc_error_duration'),
         variant: "destructive"
       });
     }
   };
 
-  // Handle project extension (legacy - keeping for compatibility)
   const handleExtendProject = async (projectId: string, direction: string) => {
-    // This is handled by the duration change now
     console.log('Extension handled by duration change');
   };
 
-  // Handle truck assignment
   const handleTruckAssign = async (projectId: string, truckId: string) => {
     try {
       storePageScrollPosition();
       
-      // Find the team assignment to get installation date
       const assignment = assignments.find(a => a.project_id === projectId);
       if (!assignment) {
         toast({
-          title: "Error",
-          description: "Project must be assigned to a team first",
+          title: t('itc_error'),
+          description: t('itc_error_team_first'),
           variant: "destructive"
         });
         return;
       }
 
-      // Calculate installation date from team assignment using business days
       const startDate = new Date(assignment.start_date);
       const installationDate = addBusinessDays(startDate, assignment.duration - 1);
       const installationDateStr = format(installationDate, 'yyyy-MM-dd');
       const existingTruckAssignmentIndex = truckAssignments.findIndex(ta => ta.project_id === projectId);
       if (truckId === 'none' || truckId === '') {
-        // Remove truck assignment
         if (existingTruckAssignmentIndex >= 0) {
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
           const { error } = await supabase
@@ -1087,26 +998,20 @@ const InstallationTeamCalendar = ({
           const updatedTruckAssignments = truckAssignments.filter(ta => ta.project_id !== projectId);
           setTruckAssignments(updatedTruckAssignments);
           toast({
-            title: "Truck Unassigned",
-            description: "Truck has been removed from project"
+            title: t('itc_truck_unassigned'),
+            description: t('itc_truck_unassigned_desc')
           });
         }
       } else {
-        // Calculate loading date (one business day before installation)
         const loadingDate = new Date(installationDate);
         loadingDate.setDate(loadingDate.getDate() - 1);
-
-        // Weekend adjustment
         if (loadingDate.getDay() === 0) {
-          // Sunday
-          loadingDate.setDate(loadingDate.getDate() - 2); // Friday
+          loadingDate.setDate(loadingDate.getDate() - 2);
         } else if (loadingDate.getDay() === 6) {
-          // Saturday
-          loadingDate.setDate(loadingDate.getDate() - 1); // Friday
+          loadingDate.setDate(loadingDate.getDate() - 1);
         }
         const loadingDateStr = format(loadingDate, 'yyyy-MM-dd');
         if (existingTruckAssignmentIndex >= 0) {
-          // Update existing truck assignment
           const existingAssignment = truckAssignments[existingTruckAssignmentIndex];
           const { error } = await supabase
             .from('project_truck_assignments')
@@ -1118,7 +1023,6 @@ const InstallationTeamCalendar = ({
             .eq('id', existingAssignment.id);
           if (error) throw error;
 
-          // Fetch updated assignment with truck info
           const { data: updatedData, error: fetchError } = await supabase
             .from('project_truck_assignments')
             .select(`
@@ -1135,11 +1039,10 @@ const InstallationTeamCalendar = ({
           };
           setTruckAssignments(updatedTruckAssignments);
           toast({
-            title: "Truck Updated",
-            description: `Project assigned to truck ${updatedData.trucks.truck_number}`
+            title: t('itc_truck_updated'),
+            description: t('itc_truck_updated_desc', { truck: updatedData.trucks.truck_number })
           });
         } else {
-          // Create new truck assignment
           const newTruckAssignment = {
             project_id: projectId,
             truck_id: truckId,
@@ -1160,8 +1063,8 @@ const InstallationTeamCalendar = ({
           };
           setTruckAssignments([...truckAssignments, formattedAssignment]);
           toast({
-            title: "Truck Assigned",
-            description: `Project assigned to truck ${data[0].trucks.truck_number}`
+            title: t('itc_truck_updated'),
+            description: t('itc_truck_updated_desc', { truck: data[0].trucks.truck_number })
           });
         }
       }
@@ -1170,14 +1073,13 @@ const InstallationTeamCalendar = ({
     } catch (error) {
       console.error('Error assigning truck:', error);
       toast({
-        title: "Error",
-        description: "Failed to assign truck",
+        title: t('itc_error'),
+        description: t('itc_error_truck'),
         variant: "destructive"
       });
     }
   };
 
-  // Refresh data while maintaining scroll positions
   const refreshDataWithScrollPreservation = async () => {
     storePageScrollPosition();
     await fetchAssignments();
@@ -1196,10 +1098,10 @@ const InstallationTeamCalendar = ({
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
-            Installation Team Calendar - Enhanced View
+            {t('itc_title')}
           </CardTitle>
           <div className="text-sm text-gray-600">
-            Calendars show ~1.5 months. Scroll to navigate through time. Click team headers to collapse/expand.
+            {t('itc_description')}
           </div>
         </div>
       </CardHeader>
@@ -1207,7 +1109,6 @@ const InstallationTeamCalendar = ({
         <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
-          // Get assignments for this team based on team_id
           const teamAssignments = assignments.filter(assignment => 
             assignment.team_id === team.id || team.external_team_names.includes(assignment.team)
           );
