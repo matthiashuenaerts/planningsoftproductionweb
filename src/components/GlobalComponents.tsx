@@ -29,6 +29,7 @@ const GlobalComponents = () => {
 
   const isControlPanel = location.pathname.includes('/control-panel');
   const isMarketingSite = location.pathname.startsWith('/site');
+  const isDevPortal = location.pathname.startsWith('/dev');
 
   if (isMarketingSite) {
     return null;
@@ -37,7 +38,7 @@ const GlobalComponents = () => {
   return (
     <>
       <GeneralMessageBanner />
-      {!isControlPanel && <TaskTimer />}
+      {!isControlPanel && !isDevPortal && <TaskTimer />}
       <NotificationBanner />
     </>
   );
