@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import RouteMapDialog, { type RouteWaypoint } from '@/components/service/RouteMapDialog';
+import { workingHoursService, type WorkingHours } from '@/services/workingHoursService';
 
 interface ServiceTeam {
   id: string;
@@ -85,6 +86,9 @@ const ServiceTeamCalendar: React.FC = () => {
     startPoint?: { lat: number; lng: number; address: string };
     totalDrivingMinutes?: number;
     unrecognizedAddresses?: string[];
+    departureTime?: string;
+    workStartTime?: string;
+    workEndTime?: string;
   }>>({});
 
   const weekDays = eachDayOfInterval({
@@ -207,6 +211,15 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
+      // Fetch installation working hours for this day
+      const targetDate = new Date(dateStr + 'T12:00:00');
+      const dayOfWeek = targetDate.getDay(); // 0=Sun, 6=Sat
+      const allWorkingHours = await workingHoursService.getWorkingHours(tenant?.id);
+      const installationHours = workingHoursService.getWorkingHoursForDay(allWorkingHours, 'installation', dayOfWeek);
+      
+      const workStartTime = installationHours?.start_time || '08:00';
+      const workEndTime = installationHours?.end_time || '17:00';
+
       // Geocode team start address
       const teamStartAddress = [team?.start_street, team?.start_number, team?.start_postal_code, team?.start_city].filter(Boolean).join(' ');
       const startCoords = teamStartAddress ? await geocodeAddress(teamStartAddress) : null;
@@ -224,13 +237,11 @@ const ServiceTeamCalendar: React.FC = () => {
       const unrecognizedAddresses = geocodedProjects
         .filter(p => p.coords === null && p.fullAddress !== 'No address')
         .map(p => `${p.name}: ${p.fullAddress}`);
-      // Also include projects with no address at all
       geocodedProjects
         .filter(p => p.fullAddress === 'No address')
         .forEach(p => unrecognizedAddresses.push(`${p.name}: No address set`));
       
       if (projectsWithCoords.length < 2) {
-        // Fallback to postal code heuristic if geocoding fails
         toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
         await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
         return;
@@ -244,14 +255,13 @@ const ServiceTeamCalendar: React.FC = () => {
       projectsWithCoords.forEach(p => {
         coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
       });
-      // Add start again as destination for return trip
       if (startCoords) {
         coordinates.push(`${startCoords.lng},${startCoords.lat}`);
       }
 
       // Use OSRM Trip API - roundtrip with source=first and destination=last (return home)
       const sourceParam = startCoords ? '&source=first&destination=last' : '';
-      const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false${sourceParam}&roundtrip=false`;
+      const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration${sourceParam}&roundtrip=false`;
       
       const osrmResp = await fetch(osrmUrl);
       const osrmData = await osrmResp.json();
@@ -266,9 +276,8 @@ const ServiceTeamCalendar: React.FC = () => {
       const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
       
       // Map OSRM waypoint order back to projects
-      // Skip first (start) and last (return home) if start point was included
       const offset = startCoords ? 1 : 0;
-      const endOffset = startCoords ? 1 : 0; // last coordinate is return-to-start
+      const endOffset = startCoords ? 1 : 0;
       const projectWaypoints = waypointOrder.slice(offset, waypointOrder.length - endOffset);
       const orderedProjects = projectWaypoints
         .map((wpIdx: number) => {
@@ -285,21 +294,72 @@ const ServiceTeamCalendar: React.FC = () => {
           .eq('id', orderedProjects[i].assignment.id);
       }
 
-      // Build route geometry (GeoJSON coords are [lng, lat], Leaflet needs [lat, lng])
+      // Extract leg durations from the trip
+      const legDurations: number[] = trip.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+
+      // Calculate departure time based on working hours
+      // The team needs to arrive at the first stop by workStartTime
+      // So departure = workStartTime - driving time to first stop
+      const firstLegMinutes = legDurations.length > 0 ? legDurations[0] : 0;
+      const [workStartH, workStartM] = workStartTime.split(':').map(Number);
+      const workStartTotalMin = workStartH * 60 + workStartM;
+      const departureTotalMin = Math.max(0, workStartTotalMin - Math.ceil(firstLegMinutes));
+      const departureH = Math.floor(departureTotalMin / 60);
+      const departureM = departureTotalMin % 60;
+      const departureTimeStr = `${String(departureH).padStart(2, '0')}:${String(departureM).padStart(2, '0')}`;
+
+      // Calculate estimated arrival and departure times for each stop
+      let currentTimeMin = workStartTotalMin; // Arrive at first stop at work start
+      const mapWps: RouteWaypoint[] = orderedProjects.map((p: any, i: number) => {
+        const arrivalMin = currentTimeMin;
+        const serviceMin = (p.assignment.service_hours || 0) * 60;
+        const departureMin = arrivalMin + serviceMin;
+        
+        const arrivalH = Math.floor(arrivalMin / 60);
+        const arrivalM = arrivalMin % 60;
+        const depH = Math.floor(departureMin / 60);
+        const depM = departureMin % 60;
+
+        const wp: RouteWaypoint = {
+          name: p.name,
+          client: p.client,
+          address: p.fullAddress,
+          lat: p.coords!.lat,
+          lng: p.coords!.lng,
+          order: i + 1,
+          serviceHours: p.assignment.service_hours,
+          estimatedArrival: `${String(arrivalH).padStart(2, '0')}:${String(arrivalM).padStart(2, '0')}`,
+          estimatedDeparture: `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`,
+        };
+
+        // Next stop: departure from this stop + driving to next stop
+        // legDurations[0] = start->stop1, legDurations[1] = stop1->stop2, etc.
+        const nextLegIdx = i + 1; // leg from this stop to next
+        const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
+        currentTimeMin = departureMin + Math.ceil(drivingToNext);
+
+        return wp;
+      });
+
+      // Calculate return time
+      const returnLegIdx = legDurations.length - 1;
+      const lastStopDepartureMin = mapWps.length > 0 
+        ? (() => {
+            const lastWp = mapWps[mapWps.length - 1];
+            const [h, m] = lastWp.estimatedDeparture!.split(':').map(Number);
+            return h * 60 + m;
+          })()
+        : workStartTotalMin;
+      const returnDrivingMin = returnLegIdx >= 0 ? legDurations[returnLegIdx] : 0;
+      const returnTotalMin = lastStopDepartureMin + Math.ceil(returnDrivingMin);
+      const returnH = Math.floor(returnTotalMin / 60);
+      const returnM = returnTotalMin % 60;
+      const returnTimeStr = `${String(returnH).padStart(2, '0')}:${String(returnM).padStart(2, '0')}`;
+
+      // Build route geometry
       const routeGeometry: [number, number][] = trip.geometry.coordinates.map(
         (c: [number, number]) => [c[1], c[0]] as [number, number]
       );
-
-      // Build waypoints for map
-      const mapWps: RouteWaypoint[] = orderedProjects.map((p: any, i: number) => ({
-        name: p.name,
-        client: p.client,
-        address: p.fullAddress,
-        lat: p.coords!.lat,
-        lng: p.coords!.lng,
-        order: i + 1,
-        serviceHours: p.assignment.service_hours,
-      }));
 
       const routeKey = `${teamId}_${dateStr}`;
       const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
@@ -313,13 +373,28 @@ const ServiceTeamCalendar: React.FC = () => {
           startPoint: startPt,
           totalDrivingMinutes,
           unrecognizedAddresses,
+          departureTime: departureTimeStr,
+          workStartTime,
+          workEndTime,
         }
       }));
+
+      // Check if the total day exceeds working hours
+      const [workEndH, workEndM] = workEndTime.split(':').map(Number);
+      const workEndTotalMin = workEndH * 60 + workEndM;
+      const overtime = returnTotalMin > workEndTotalMin;
+      const overtimeMsg = overtime 
+        ? ` ⚠️ Estimated return at ${returnTimeStr} exceeds end of workday (${workEndTime})` 
+        : ` Return by ${returnTimeStr}`;
 
       const warningMsg = unrecognizedAddresses.length > 0 
         ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
         : '';
-      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops with return home${warningMsg}` });
+      toast({ 
+        title: 'Route Optimized', 
+        description: `Depart ${departureTimeStr}, ${orderedProjects.length} stops.${overtimeMsg}${warningMsg}`,
+        variant: overtime ? 'destructive' : 'default',
+      });
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -372,6 +447,9 @@ const ServiceTeamCalendar: React.FC = () => {
 
   const [mapDrivingMinutes, setMapDrivingMinutes] = useState<number | undefined>();
   const [mapUnrecognized, setMapUnrecognized] = useState<string[]>([]);
+  const [mapDepartureTime, setMapDepartureTime] = useState<string | undefined>();
+  const [mapWorkStartTime, setMapWorkStartTime] = useState<string | undefined>();
+  const [mapWorkEndTime, setMapWorkEndTime] = useState<string | undefined>();
 
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
@@ -383,6 +461,9 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapStartPoint(route.startPoint);
     setMapDrivingMinutes(route.totalDrivingMinutes);
     setMapUnrecognized(route.unrecognizedAddresses || []);
+    setMapDepartureTime(route.departureTime);
+    setMapWorkStartTime(route.workStartTime);
+    setMapWorkEndTime(route.workEndTime);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
@@ -687,6 +768,9 @@ const ServiceTeamCalendar: React.FC = () => {
         startPoint={mapStartPoint}
         totalDrivingMinutes={mapDrivingMinutes}
         unrecognizedAddresses={mapUnrecognized}
+        departureTime={mapDepartureTime}
+        workStartTime={mapWorkStartTime}
+        workEndTime={mapWorkEndTime}
       />
     </div>
   );
