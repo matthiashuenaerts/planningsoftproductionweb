@@ -9,7 +9,7 @@ import { orderService } from '@/services/orderService';
 import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
-import { Truck, Calendar, AlertTriangle, Search, Scan, Clock } from 'lucide-react';
+import { Truck, Calendar, AlertTriangle, Search, Scan, Clock, PackageCheck } from 'lucide-react';
 import { EanBarcodeScanner } from '@/components/logistics/EanBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
