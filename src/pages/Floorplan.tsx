@@ -17,6 +17,7 @@ import { Upload, ImageIcon, Maximize2, Minimize2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FloorplanProject {
   project_id: string;
@@ -53,6 +54,7 @@ const Floorplan: React.FC = () => {
   const { currentEmployee } = useAuth();
   const isAdmin = currentEmployee?.role === 'admin';
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
 
   // Resolve signed URL for the private attachments bucket
   const signedFloorplanUrl = useSignedUrl('attachments', floorplanImagePath);
@@ -417,7 +419,7 @@ const Floorplan: React.FC = () => {
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-background`}>
       {!isFullscreen && <Navbar />}
-      <div className={`${isFullscreen ? 'w-screen h-screen' : 'ml-64 relative w-[calc(100vw-16rem)] h-screen'} flex items-center justify-center overflow-hidden relative`}>
+      <div className={`${isFullscreen ? 'w-screen h-screen' : isMobile ? 'w-full h-[calc(100vh-3.5rem)] pt-14' : 'ml-64 relative w-[calc(100vw-16rem)] h-screen'} flex items-center justify-center overflow-hidden relative`}>
         {/* Fullscreen toggle button */}
         <Button
           variant="outline"
@@ -653,7 +655,7 @@ const Floorplan: React.FC = () => {
         />
 
         {/* Admin: Upload Floorplan Image */}
-        {isAdmin && (
+        {isAdmin && !isMobile && (
           <div className="absolute top-4 right-4 z-10">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
@@ -700,31 +702,31 @@ const Floorplan: React.FC = () => {
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 right-4 bg-background/95 backdrop-blur rounded-lg shadow-lg p-4">
-          <h3 className="text-sm font-semibold mb-3">Legend</h3>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+        <div className={`absolute bg-background/95 backdrop-blur rounded-lg shadow-lg ${isMobile ? 'bottom-2 right-2 p-2' : 'bottom-4 right-4 p-4'}`}>
+          <h3 className={`font-semibold ${isMobile ? 'text-[10px] mb-1.5' : 'text-sm mb-3'}`}>Legend</h3>
+          <div className={`${isMobile ? 'text-[10px] space-y-1' : 'text-xs space-y-2'}`}>
+            <div className="flex items-center space-x-1.5">
+              <div className={`${isMobile ? 'w-2 h-2' : 'w-3 h-3'} bg-green-500 rounded-full shrink-0`}></div>
               <span>In Use (Active)</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+            <div className="flex items-center space-x-1.5">
+              <div className={`${isMobile ? 'w-2 h-2' : 'w-3 h-3'} bg-orange-500 rounded-full shrink-0`}></div>
               <span>Not in Use</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <div className="flex items-center space-x-1.5">
+              <div className={`${isMobile ? 'w-2 h-2' : 'w-3 h-3'} bg-red-500 rounded-full shrink-0`}></div>
               <span>Error Status</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1 bg-blue-500"></div>
+            <div className="flex items-center space-x-1.5">
+              <div className={`${isMobile ? 'w-3 h-0.5' : 'w-4 h-1'} bg-blue-500 shrink-0`}></div>
               <span>Production Flow</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="px-1 py-0.5 rounded text-[8px] bg-primary text-primary-foreground">AB</div>
+            <div className="flex items-center space-x-1.5">
+              <div className="px-1 py-0.5 rounded text-[8px] bg-primary text-primary-foreground shrink-0">AB</div>
               <span>Active Project</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="px-1 py-0.5 rounded text-[8px] bg-muted text-muted-foreground border">AB</div>
+            <div className="flex items-center space-x-1.5">
+              <div className="px-1 py-0.5 rounded text-[8px] bg-muted text-muted-foreground border shrink-0">AB</div>
               <span>Buffered Project</span>
             </div>
           </div>
