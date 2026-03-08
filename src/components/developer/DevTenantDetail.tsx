@@ -523,4 +523,135 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
   );
 };
 
+// OneDrive Settings sub-component
+const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [clientId, setClientId] = useState("");
+  const [directoryId, setDirectoryId] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ["dev", "onedrive-settings", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tenant_onedrive_settings" as any)
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  React.useEffect(() => {
+    if (settings) {
+      setClientId(settings.microsoft_client_id || "");
+      setDirectoryId(settings.tenant_directory_id || "");
+      setNotes(settings.notes || "");
+    }
+  }, [settings]);
+
+  const handleSave = async () => {
+    if (!clientId.trim()) {
+      toast({ title: "Client ID is required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("tenant_onedrive_settings" as any)
+        .upsert({
+          tenant_id: tenantId,
+          microsoft_client_id: clientId.trim(),
+          tenant_directory_id: directoryId.trim() || null,
+          notes: notes.trim() || null,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "tenant_id" });
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["dev", "onedrive-settings", tenantId] });
+      toast({ title: "OneDrive settings saved" });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!settings) return;
+    try {
+      const { error } = await supabase
+        .from("tenant_onedrive_settings" as any)
+        .delete()
+        .eq("tenant_id", tenantId);
+      if (error) throw error;
+      setClientId("");
+      setDirectoryId("");
+      setNotes("");
+      qc.invalidateQueries({ queryKey: ["dev", "onedrive-settings", tenantId] });
+      toast({ title: "OneDrive settings removed" });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Card className="bg-white/5 border-white/10">
+      <CardHeader>
+        <CardTitle className="text-white text-sm flex items-center gap-2">
+          <CloudCog className="h-4 w-4" /> OneDrive / Microsoft Integration
+          {settings && <Badge className="bg-emerald-600/60 text-emerald-200 text-[10px]">Configured</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-slate-400">
+          Configure the Microsoft Azure App Registration for this tenant's OneDrive integration.
+          Each tenant needs their own Azure App with redirect URI: <code className="text-blue-300">https://automattion-compass.com/onedrive-callback</code>
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-slate-300 text-xs">Application (Client) ID *</Label>
+            <Input
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="e.g. beb98151-1a9c-4705-a914-..."
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+          <div>
+            <Label className="text-slate-300 text-xs">Directory (Tenant) ID</Label>
+            <Input
+              value={directoryId}
+              onChange={(e) => setDirectoryId(e.target.value)}
+              placeholder="e.g. fdf0d555-953a-444d-915e-..."
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+        </div>
+        <div>
+          <Label className="text-slate-300 text-xs">Notes</Label>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Azure subscription owner, supported account types..."
+            className="bg-white/10 border-white/20 text-white text-xs h-8"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8" disabled={saving || !clientId.trim()} onClick={handleSave}>
+            <Save className="h-3 w-3 mr-1" /> {saving ? "Saving..." : "Save"}
+          </Button>
+          {settings && (
+            <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 text-xs h-8" onClick={handleDelete}>
+              <Trash2 className="h-3 w-3 mr-1" /> Remove
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default DevTenantDetail;
