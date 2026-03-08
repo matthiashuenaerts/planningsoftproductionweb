@@ -724,10 +724,20 @@ const ServiceTeamCalendar: React.FC = () => {
       })}
 
       {/* Assign Project Dialog */}
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {
+        setIsAssignDialogOpen(open);
+        if (!open) {
+          setAssignDescription('');
+          setAssignTodos(['']);
+          setAssignProjectId('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Schedule Service Visit</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Add a new service installation assignment
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -739,7 +749,7 @@ const ServiceTeamCalendar: React.FC = () => {
               <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Project</Label>
+              <Label>Project *</Label>
               <Select value={assignProjectId} onValueChange={setAssignProjectId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a project" />
@@ -760,7 +770,7 @@ const ServiceTeamCalendar: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Service Hours</Label>
+              <Label>Estimated Hours</Label>
               <Input
                 type="number"
                 min="0.5"
@@ -770,13 +780,46 @@ const ServiceTeamCalendar: React.FC = () => {
                 onChange={(e) => setAssignHours(parseFloat(e.target.value) || 2)}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe the service needed..."
+                value={assignDescription}
+                onChange={e => setAssignDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Todos</Label>
+              {assignTodos.map((todo, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input
+                    placeholder={`Todo item ${index + 1}...`}
+                    value={todo}
+                    onChange={e => {
+                      const updated = [...assignTodos];
+                      updated[index] = e.target.value;
+                      setAssignTodos(updated);
+                    }}
+                  />
+                  {assignTodos.length > 1 && (
+                    <Button variant="ghost" size="icon" onClick={() => setAssignTodos(assignTodos.filter((_, i) => i !== index))} className="flex-shrink-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setAssignTodos([...assignTodos, ''])} className="w-full">
+                <Plus className="h-4 w-4 mr-1" /> Add Todo
+              </Button>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
             <Button onClick={handleAssignProject} disabled={!assignProjectId}>
-              Schedule
+              Schedule Service
             </Button>
           </div>
         </DialogContent>
