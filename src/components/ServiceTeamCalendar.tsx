@@ -762,7 +762,7 @@ const ServiceTeamCalendar: React.FC = () => {
                         {projects.find(p => p.id === assignProjectId)?.name || t('svc_select_project')}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground">Search projects...</span>
+                      <span className="text-muted-foreground">{t('svc_search_projects')}</span>
                     )}
                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
