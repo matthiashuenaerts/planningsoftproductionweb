@@ -48,6 +48,7 @@ const ServiceInstallation: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
