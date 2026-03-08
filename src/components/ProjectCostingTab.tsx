@@ -1471,21 +1471,21 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Additional Costs Input */}
       <Card>
-        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+        <CardHeader className="px-3 sm:px-6 py-2.5 sm:py-6">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
             <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_additional_costs')}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_additional_materials')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1495,19 +1495,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     materialCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Building className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Building className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_office_preparation')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1517,19 +1517,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     officePreparationCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Truck className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <Truck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_transport_installation')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1539,19 +1539,19 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     transportInstallationCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2">
+                <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 {t('costing_other_costs')}
               </label>
               <div className="relative">
-                <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Euro className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   min="0"
@@ -1561,7 +1561,7 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                     ...prev,
                     otherCost: parseFloat(e.target.value) || 0
                   }))}
-                  className="pl-9"
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
                   placeholder="0.00"
                 />
               </div>
