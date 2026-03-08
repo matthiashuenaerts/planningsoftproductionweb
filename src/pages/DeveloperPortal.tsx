@@ -196,29 +196,29 @@ const DeveloperPortal: React.FC = () => {
               />
             ) : (
               <div className="space-y-3">
-                <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-                  <Building2 className="h-5 w-5" /> All Tenants
+                <h2 className="text-base sm:text-lg font-semibold text-slate-200 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5" /> All Tenants
                 </h2>
                 {tenantsLoading ? (
-                  <p className="text-slate-400">Loading...</p>
+                  <p className="text-slate-400 text-sm">Loading...</p>
                 ) : !tenants?.length ? (
-                  <p className="text-slate-400">No tenants yet.</p>
+                  <p className="text-slate-400 text-sm">No tenants yet.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {tenants.map((t) => (
                       <Card
                         key={t.id}
-                        className="bg-white/5 border-white/10 cursor-pointer hover:bg-white/10 transition"
+                        className="bg-white/5 border-white/10 cursor-pointer hover:bg-white/10 active:scale-[0.98] transition-all"
                         onClick={() => setSelectedTenantId(t.id)}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-white">{t.name}</span>
-                            <Badge variant={t.is_active ? "default" : "secondary"} className={t.is_active ? "bg-emerald-600/80" : "bg-red-600/80"}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                            <span className="font-medium text-white text-sm sm:text-base truncate mr-2">{t.name}</span>
+                            <Badge variant={t.is_active ? "default" : "secondary"} className={`text-[10px] sm:text-xs flex-shrink-0 ${t.is_active ? "bg-emerald-600/80" : "bg-red-600/80"}`}>
                               {t.is_active ? "Active" : "Inactive"}
                             </Badge>
                           </div>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-[11px] sm:text-xs text-slate-400 truncate">
                             <code className="text-blue-300">{t.slug}</code>
                             {t.custom_domain && <> · <code className="text-purple-300">{t.custom_domain}</code></>}
                           </p>
