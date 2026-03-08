@@ -1012,17 +1012,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         </div>
       </div>
       
-      <div className="space-y-6">
+      <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PlayCircle className="h-5 w-5" />
+          <CardHeader className={isMobile ? 'px-3 py-2' : ''}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+              <PlayCircle className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
               {t('in_progress_tasks', { count: inProgressTasks.length.toString() })}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
             {inProgressTasks.length > 0 ? (
-              <div className="space-y-3">
+              <div className={isMobile ? 'space-y-2' : 'space-y-3'}>
                 {inProgressTasks.map((task) => {
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
                   const taskColor = getTaskColor(task);
@@ -1177,15 +1177,15 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+          <CardHeader className={isMobile ? 'px-3 py-2' : ''}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+              <Clock className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
               {t('todo_tasks', { count: todoTasks.length.toString() })}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
             {todoTasks.length > 0 ? (
-              <div className="space-y-3">
+              <div className={isMobile ? 'space-y-2' : 'space-y-3'}>
                 {todoTasks.map((task) => {
                   const urgency = task.due_date ? getUrgencyClass(task.due_date) : null;
                   const taskColor = getTaskColor(task);
