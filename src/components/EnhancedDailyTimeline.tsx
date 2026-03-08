@@ -317,69 +317,24 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      {/* Quick action buttons - only show if project_id exists */}
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {task.project_id && task.project_id !== null && (
                         <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Files button clicked for project:', task.project_id);
-                              handleShowFiles(task.project_id!);
-                            }}
-                            title="Project Files"
-                          >
-                            <FileText className="h-3 w-3" />
+                          <Button variant="outline" size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowFiles(task.project_id!); }} title={t('project_files') || 'Project Files'}>
+                            <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Orders button clicked for project:', task.project_id);
-                              handleShowOrders(task.project_id!);
-                            }}
-                            title="Project Orders"
-                          >
-                            <ShoppingCart className="h-3 w-3" />
-                            <ExternalLink className="h-2 w-2 ml-1" />
+                          <Button variant="outline" size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowOrders(task.project_id!); }} title={t('orders') || 'Orders'}>
+                            <ShoppingCart className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Parts button clicked for project:', task.project_id);
-                              handleShowParts(task.project_id!);
-                            }}
-                            title="Parts List"
-                          >
-                            <Package2 className="h-3 w-3" />
+                          <Button variant="outline" size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowParts(task.project_id!); }} title={t('parts_list') || 'Parts List'}>
+                            <Package2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              console.log('Barcode button clicked for project:', task.project_id);
-                              handleShowBarcode(task.project_id!);
-                            }}
-                            title="Project Barcode"
-                          >
-                            <QrCode className="h-3 w-3" />
+                          <Button variant="outline" size="sm" className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowBarcode(task.project_id!); }} title={t('barcode') || 'Barcode'}>
+                            <QrCode className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           </Button>
                         </div>
                       )}
