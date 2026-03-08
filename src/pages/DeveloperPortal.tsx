@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
   ChevronDown, ChevronRight, LogOut, Shield, Rocket, UserPlus,
-  FileText, LifeBuoy, Activity, Upload,
+  FileText, LifeBuoy, Activity, Upload, HelpCircle,
 } from "lucide-react";
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 import DevTenantDetail from "@/components/developer/DevTenantDetail";
 import DevDeveloperManagement from "@/components/developer/DevDeveloperManagement";
 import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
+import DevHelpManagement from "@/components/developer/DevHelpManagement";
 
 type TenantRow = {
   id: string;
