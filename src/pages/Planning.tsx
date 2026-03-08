@@ -2173,31 +2173,34 @@ const Planning = () => {
             )}
 
             {/* View Toggle */}
-            <div className="mb-6">
-              <div className="flex flex-wrap gap-2">
+            <div className={cn(isMobile ? "mb-3" : "mb-6")}>
+              <div className="flex flex-wrap gap-1.5">
                 <Button
                   onClick={() => setActiveView('worker')}
                   variant={activeView === 'worker' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <Users className="mr-2 h-4 w-4" />
-                  {t('planning_worker_schedules')}
+                  <Users className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? t('planning_worker_schedules').split(' ')[0] : t('planning_worker_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('workstation')}
                   variant={activeView === 'workstation' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t('planning_workstation_schedules')}
+                  <Settings className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? t('planning_workstation_schedules').split(' ')[0] : t('planning_workstation_schedules')}
                 </Button>
                 <Button
                   onClick={() => setActiveView('gantt')}
                   variant={activeView === 'gantt' ? "default" : "outline"}
                   size="sm"
+                  className={isMobile ? "h-7 text-xs px-2" : ""}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {t('planning_gantt_chart')}
+                  <CalendarIcon className={cn(isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2")} />
+                  {isMobile ? 'Gantt' : t('planning_gantt_chart')}
                 </Button>
               </div>
             </div>
