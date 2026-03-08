@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { holidayService, Holiday } from '@/services/holidayService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Project {
   id: string;
@@ -32,6 +33,7 @@ interface LoadingAssignment {
 const TruckLoadingCalendar = () => {
   const { tenant } = useTenant();
   const { t, createLocalizedPath } = useLanguage();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
@@ -308,54 +310,52 @@ const TruckLoadingCalendar = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Today's Loading - Big Sign */}
-      <Card className="border-2 border-red-500">
-        <CardHeader className="bg-red-500 text-white">
-          <CardTitle className="text-2xl flex items-center gap-3">
-            <Truck className="h-8 w-8" />
+    <div className={cn("space-y-4", isMobile ? "space-y-3" : "space-y-6")}>
+      {/* Today's Loading */}
+      <Card className="border-2 border-destructive">
+        <CardHeader className={cn("bg-destructive text-destructive-foreground", isMobile ? "p-3" : "")}>
+          <CardTitle className={cn("flex items-center gap-2", isMobile ? "text-base" : "text-2xl gap-3")}>
+            <Truck className={isMobile ? "h-5 w-5" : "h-8 w-8"} />
             {t('truck_todays_schedule')}
-            <Badge className="bg-white text-red-500 text-lg px-3 py-1">
-              {format(new Date(), 'EEEE, MMMM d')}
+            <Badge className={cn("bg-background text-destructive", isMobile ? "text-xs px-2 py-0.5" : "text-lg px-3 py-1")}>
+              {format(new Date(), isMobile ? 'EEE, MMM d' : 'EEEE, MMMM d')}
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className={isMobile ? "p-3" : "p-6"}>
           {todayAssignments.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "md:grid-cols-2 lg:grid-cols-3 gap-4")}>
               {todayAssignments.map((assignment, index) => (
                 <div
                   key={`${assignment.project.id}-${index}`}
                   className={cn(
-                    "p-4 rounded-lg border-2 cursor-pointer hover:shadow-md transition-shadow",
+                    "rounded-lg border-2 cursor-pointer hover:shadow-md transition-shadow",
+                    isMobile ? "p-3" : "p-4",
                     !assignment.project.team_color && getProjectColor(assignment.project.status)
                   )}
                   style={assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
                   onClick={() => handleProjectClick(assignment.project.id)}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge className={cn("text-lg px-3 py-1", !assignment.project.team_color && getProjectColor(assignment.project.status))}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Badge className={cn(isMobile ? "text-xs px-2" : "text-lg px-3 py-1", !assignment.project.team_color && getProjectColor(assignment.project.status))}
                       style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
                     >
                       {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
-                    <div className="text-sm text-muted-foreground">
+                    <div className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>
                       {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
-                  <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
-                  <p className="text-muted-foreground mb-2">{assignment.project.client}</p>
-                  <div className="text-sm text-muted-foreground">
-                    {t('truck_loading_today')}
-                  </div>
+                  <h3 className={cn("font-bold mb-0.5", isMobile ? "text-sm" : "text-lg")}>{assignment.project.name}</h3>
+                  <p className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>{assignment.project.client}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Truck className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-xl font-medium text-gray-600 mb-2">{t('truck_no_loading_today')}</h3>
-              <p className="text-gray-500">{t('truck_all_ready')}</p>
+            <div className={cn("text-center", isMobile ? "py-4" : "py-8")}>
+              <Truck className={cn("mx-auto text-muted-foreground mb-2", isMobile ? "h-10 w-10" : "h-16 w-16 mb-4")} />
+              <h3 className={cn("font-medium text-muted-foreground", isMobile ? "text-base mb-1" : "text-xl mb-2")}>{t('truck_no_loading_today')}</h3>
+              <p className="text-muted-foreground text-sm">{t('truck_all_ready')}</p>
             </div>
           )}
         </CardContent>
@@ -363,27 +363,38 @@ const TruckLoadingCalendar = () => {
 
       {/* Weekly Overview */}
       <Card>
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+        <CardHeader className={cn("pb-2", isMobile ? "p-3 pb-1" : "")}>
+          <div className={cn("flex items-center", isMobile ? "flex-col gap-2" : "justify-between")}>
+            <CardTitle className={cn("flex items-center gap-2", isMobile ? "text-sm" : "")}>
+              <Calendar className={isMobile ? "h-4 w-4" : "h-5 w-5"} />
               {t('truck_weekly_schedule')}
             </CardTitle>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" onClick={prevWeek}>
+              <Button variant="outline" size="icon" className={isMobile ? "h-7 w-7" : ""} onClick={prevWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm font-medium min-w-[200px] text-center">
+              <span className={cn("font-medium text-center", isMobile ? "text-xs min-w-[140px]" : "text-sm min-w-[200px]")}>
                 {format(weekStartDate, 'MMM d')} - {format(addDays(weekStartDate, 6), 'MMM d, yyyy')}
               </span>
-              <Button variant="outline" size="icon" onClick={nextWeek}>
+              <Button variant="outline" size="icon" className={isMobile ? "h-7 w-7" : ""} onClick={nextWeek}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-2">
+        <CardContent className={isMobile ? "p-1.5" : ""}>
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-0.5 mb-0.5">
+            {weekDates.map((date, index) => (
+              <div key={`header-${index}`} className={cn(
+                "text-center font-medium bg-muted/50 rounded-t",
+                isMobile ? "text-[10px] py-0.5" : "text-sm py-1"
+              )}>
+                {isMobile ? format(date, 'EEEEE') : format(date, 'EEE')}
+              </div>
+            ))}
+          </div>
+          <div className={cn("grid grid-cols-7", isMobile ? "gap-0.5" : "gap-2")}>
             {weekDates.map((date, index) => {
               const dayAssignments = getAssignmentsForDate(date);
               const isCurrentDay = isToday(date);
@@ -392,57 +403,59 @@ const TruckLoadingCalendar = () => {
                 <div
                   key={index}
                   className={cn(
-                    "min-h-[120px] border rounded p-2",
-                    isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200"
+                    "border rounded",
+                    isMobile ? "min-h-[70px] p-0.5" : "min-h-[120px] p-2",
+                    isCurrentDay ? "border-destructive bg-destructive/5" : "border-border"
                   )}
                 >
                   <div className={cn(
-                    "text-center text-sm font-medium mb-2",
-                    isCurrentDay ? "text-red-700" : "text-gray-700"
+                    "text-center mb-0.5",
+                    isCurrentDay ? "text-destructive" : "text-muted-foreground"
                   )}>
-                    <div>{format(date, 'EEE')}</div>
-                    <div className="text-lg">{format(date, 'd')}</div>
+                    {!isMobile && <div className="text-sm font-medium">{format(date, 'EEE')}</div>}
+                    <div className={cn("font-semibold", isMobile ? "text-xs" : "text-lg")}>{format(date, 'd')}</div>
                   </div>
                   
-                  <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => {
+                  <div className={cn("space-y-0.5", isMobile ? "space-y-px" : "space-y-1")}>
+                    {dayAssignments.map((assignment, idx) => {
                       const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
                       const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                       
                       return (
                         <div
-                          key={`${assignment.project.id}-${index}`}
+                          key={`${assignment.project.id}-${idx}`}
                           className={cn(
-                            "p-1 rounded text-xs border group relative cursor-pointer hover:shadow-sm transition-shadow",
+                            "rounded border group relative cursor-pointer hover:shadow-sm transition-shadow",
+                            isMobile ? "p-0.5 text-[9px]" : "p-1 text-xs",
                             !assignment.project.team_color && getProjectColor(assignment.project.status),
                             isManuallyAdjusted && "border-orange-400 bg-orange-50"
                           )}
                           style={!isManuallyAdjusted && assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
                           onClick={() => handleProjectClick(assignment.project.id)}
                         >
-                          <div className="font-medium leading-tight break-words">
+                          <div className="font-medium leading-tight break-words line-clamp-2">
                             {assignment.project.name}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
-                          </div>
-                          <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
-                              className="text-xs text-blue-600 hover:text-blue-800"
-                            >
-                              ←
-                            </button>
-                            <span className="text-xs text-gray-600">
-                              {format(new Date(effectiveLoadingDate), 'MMM d')}
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
-                              className="text-xs text-blue-600 hover:text-blue-800"
-                            >
-                              →
-                            </button>
-                          </div>
+                          {!isMobile && (
+                            <>
+                              <div className="text-xs text-muted-foreground">
+                                {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                              </div>
+                              <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
+                                  className="text-xs text-primary hover:text-primary/80"
+                                >←</button>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(effectiveLoadingDate), 'MMM d')}
+                                </span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
+                                  className="text-xs text-primary hover:text-primary/80"
+                                >→</button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
@@ -454,17 +467,17 @@ const TruckLoadingCalendar = () => {
         </CardContent>
       </Card>
 
-      {/* Upcoming Loading - Small Column */}
+      {/* Upcoming Loading */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
+        <CardHeader className={isMobile ? "p-3 pb-2" : ""}>
+          <CardTitle className={cn("flex items-center gap-2", isMobile ? "text-sm" : "")}>
+            <Clock className={isMobile ? "h-4 w-4" : "h-5 w-5"} />
             {t('truck_upcoming_loading')} ({upcomingAssignments.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isMobile ? "p-3 pt-0" : ""}>
           {upcomingAssignments.length > 0 ? (
-            <div className="space-y-3">
+            <div className={cn("space-y-2", isMobile ? "space-y-1.5" : "space-y-3")}>
               {upcomingAssignments.slice(0, 10).map((assignment, index) => {
                 const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
                 const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
@@ -473,7 +486,8 @@ const TruckLoadingCalendar = () => {
                   <div
                     key={`${assignment.project.id}-${index}`}
                     className={cn(
-                      "p-3 rounded-lg border-l-4 border group cursor-pointer hover:shadow-md transition-shadow",
+                      "rounded-lg border-l-4 border group cursor-pointer hover:shadow-md transition-shadow",
+                      isMobile ? "p-2" : "p-3",
                       !assignment.project.team_color && getLoadingPriority(effectiveLoadingDate),
                       isManuallyAdjusted && "border-orange-400 bg-orange-50"
                     )}
@@ -481,9 +495,9 @@ const TruckLoadingCalendar = () => {
                     onClick={() => handleProjectClick(assignment.project.id)}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge className={!assignment.project.team_color ? getProjectColor(assignment.project.status) : ''}
+                      <div className="flex-1 min-w-0">
+                        <div className={cn("flex items-center gap-1.5 mb-0.5", isMobile ? "flex-wrap" : "gap-2 mb-1")}>
+                          <Badge className={cn(isMobile ? "text-[10px] px-1.5 py-0" : "", !assignment.project.team_color ? getProjectColor(assignment.project.status) : '')}
                             style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
                           >
                             {assignment.project.status.replace('_', ' ').toUpperCase()}
@@ -491,26 +505,22 @@ const TruckLoadingCalendar = () => {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'left'); }}
-                              className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              ←
-                            </button>
-                            <span className="text-sm text-gray-600">
+                              className={cn("text-primary hover:text-primary/80", isMobile ? "text-xs" : "text-sm opacity-0 group-hover:opacity-100 transition-opacity")}
+                            >←</button>
+                            <span className={cn("text-muted-foreground", isMobile ? "text-[10px]" : "text-sm")}>
                               {t('truck_load')}: {format(new Date(effectiveLoadingDate), 'MMM d')}
                               {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
                             </span>
                             <button
                               onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
-                              className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              →
-                            </button>
+                              className={cn("text-primary hover:text-primary/80", isMobile ? "text-xs" : "text-sm opacity-0 group-hover:opacity-100 transition-opacity")}
+                            >→</button>
                           </div>
                         </div>
-                        <h4 className="font-medium">{assignment.project.name}</h4>
-                        <p className="text-sm text-gray-600">{assignment.project.client}</p>
+                        <h4 className={cn("font-medium truncate", isMobile ? "text-sm" : "")}>{assignment.project.name}</h4>
+                        <p className={cn("text-muted-foreground truncate", isMobile ? "text-xs" : "text-sm")}>{assignment.project.client}</p>
                       </div>
-                      <div className="text-xs text-gray-500 text-right">
+                      <div className={cn("text-muted-foreground text-right shrink-0 ml-2", isMobile ? "text-[10px]" : "text-xs")}>
                         <div>{t('truck_install')}:</div>
                         <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
                       </div>
@@ -520,14 +530,14 @@ const TruckLoadingCalendar = () => {
               })}
               
               {upcomingAssignments.length > 10 && (
-                <div className="text-center py-2 text-sm text-gray-500">
+                <div className="text-center py-2 text-sm text-muted-foreground">
                   +{t('truck_more_assignments', { count: String(upcomingAssignments.length - 10) })}
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-center py-6 text-gray-500">
-              <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+            <div className={cn("text-center text-muted-foreground", isMobile ? "py-4" : "py-6")}>
+              <Clock className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
               <p>{t('truck_no_upcoming')}</p>
             </div>
           )}
