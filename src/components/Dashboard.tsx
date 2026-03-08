@@ -12,7 +12,7 @@ import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { projectTeamAssignmentOverrideService } from '@/services/projectTeamAssignmentOverrideService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check } from "lucide-react";
+import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check, Wrench } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
@@ -42,6 +42,18 @@ interface LoadingAssignment {
     name: string;
   };
 }
+
+interface ServiceAssignment {
+  id: string;
+  project_id: string;
+  project_name: string;
+  team_name: string;
+  team_color: string;
+  start_date: string;
+  service_hours: number | null;
+  service_notes: string | null;
+}
+
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
@@ -69,6 +81,7 @@ const Dashboard: React.FC = () => {
   const [manualOverrides, setManualOverrides] = useState<Record<string, string>>({});
   const [teamAssignmentOverrides, setTeamAssignmentOverrides] = useState<any[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]);
   
   // Workstation stats state
   const [workstationStats, setWorkstationStats] = useState<Array<{
@@ -706,6 +719,67 @@ const Dashboard: React.FC = () => {
         return updatedAssignments;
       });
 
+      // Fetch service team assignments for this week
+      try {
+        const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
+        const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+        
+        // Get service teams
+        let serviceTeamsQuery = supabase
+          .from('placement_teams')
+          .select('id, name, color')
+          .eq('is_active', true)
+          .eq('team_type', 'service');
+        if (tenant?.id) serviceTeamsQuery = serviceTeamsQuery.eq('tenant_id', tenant.id);
+        const { data: serviceTeamsData } = await serviceTeamsQuery;
+        
+        if (serviceTeamsData && serviceTeamsData.length > 0) {
+          const serviceTeamIds = serviceTeamsData.map(t => t.id);
+          const serviceTeamMap = new Map(serviceTeamsData.map(t => [t.id, t]));
+          
+          let serviceQuery = supabase
+            .from('project_team_assignments')
+            .select('id, project_id, team_id, start_date, service_hours, service_notes, duration')
+            .in('team_id', serviceTeamIds)
+            .gte('start_date', weekStartStr)
+            .lte('start_date', weekEndStr);
+          if (tenant?.id) serviceQuery = serviceQuery.eq('tenant_id', tenant.id);
+          const { data: serviceData } = await serviceQuery;
+          
+          if (serviceData && serviceData.length > 0) {
+            // Fetch project names for service assignments
+            const serviceProjectIds = [...new Set(serviceData.map(s => s.project_id))];
+            const { data: serviceProjectsData } = await supabase
+              .from('projects')
+              .select('id, name')
+              .in('id', serviceProjectIds);
+            const projectNameMap = new Map((serviceProjectsData || []).map(p => [p.id, p.name]));
+            
+            const newServiceAssignments: ServiceAssignment[] = serviceData.map(s => {
+              const team = serviceTeamMap.get(s.team_id || '');
+              return {
+                id: s.id,
+                project_id: s.project_id,
+                project_name: projectNameMap.get(s.project_id) || 'Unknown',
+                team_name: team?.name || '',
+                team_color: team?.color || '#6b7280',
+                start_date: s.start_date,
+                service_hours: s.service_hours,
+                service_notes: s.service_notes,
+              };
+            });
+            
+            setServiceAssignments(prev => {
+              const existingIds = new Set(prev.map(a => a.id));
+              const toAdd = newServiceAssignments.filter(a => !existingIds.has(a.id));
+              return [...prev, ...toAdd];
+            });
+          }
+        }
+      } catch (serviceError) {
+        console.error('Error fetching service assignments:', serviceError);
+      }
+
       // Mark week as loaded
       setLoadedWeeks(prev => new Set([...prev, weekKey]));
     } catch (error) {
@@ -734,6 +808,12 @@ const Dashboard: React.FC = () => {
       const effectiveLoadingDate = manualOverrides[assignment.project.id] || assignment.loading_date;
       return effectiveLoadingDate === dateStr;
     });
+  };
+
+  // Get service assignments for a specific date
+  const getServiceAssignmentsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return serviceAssignments.filter(sa => sa.start_date === dateStr);
   };
 
   // Get project color for visual distinction
@@ -832,6 +912,7 @@ const Dashboard: React.FC = () => {
             length: 7
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
             const dayAssignments = getAssignmentsForDate(date);
+            const dayServiceAssignments = getServiceAssignmentsForDate(date);
             const isCurrentDay = isToday(date);
             return <div key={index} className={cn("min-h-[120px] border rounded p-2", isCurrentDay ? "border-red-500 bg-red-50" : "border-gray-200")}>
                   <div className={cn("text-center text-sm font-medium mb-2", isCurrentDay ? "text-red-700" : "text-gray-700")}>
@@ -840,10 +921,10 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="space-y-1">
-                    {dayAssignments.map((assignment, index) => {
+                    {dayAssignments.map((assignment, idx) => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                   const isCharged = assignment.orderStatus?.allCharged;
-                  return <div key={`${assignment.project.id}-${index}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} style={getTeamBackgroundStyle(assignment.teamColor)} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
+                  return <div key={`${assignment.project.id}-${idx}`} className={cn("p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity relative", getProjectColor(assignment.project.status), isManuallyAdjusted && "ring-2 ring-orange-400", isCharged && "opacity-50")} style={getTeamBackgroundStyle(assignment.teamColor)} onClick={() => navigate(createLocalizedPath(`/projects/${assignment.project.id}`))}>
                           {/* Order status indicator */}
                           {assignment.orderStatus && <div className={cn("absolute -top-1 -right-1 rounded-full text-xs font-bold text-white flex items-center justify-center min-w-[16px] h-4 px-1", isCharged ? "bg-green-600" : assignment.orderStatus.allDelivered ? "bg-green-500" : "bg-red-500")}>
                               {isCharged || assignment.orderStatus.allDelivered ? "✓" : assignment.orderStatus.undeliveredCount}
@@ -862,6 +943,30 @@ const Dashboard: React.FC = () => {
                           </div>
                         </div>;
                 })}
+
+                    {/* Service installations */}
+                    {dayServiceAssignments.map((sa) => (
+                      <div
+                        key={`service-${sa.id}`}
+                        className="p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{
+                          backgroundColor: `${sa.team_color}25`,
+                          borderColor: `${sa.team_color}80`,
+                          borderLeftWidth: '3px',
+                          borderLeftColor: sa.team_color,
+                        }}
+                        onClick={() => navigate(createLocalizedPath(`/projects/${sa.project_id}`))}
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <Wrench className="h-3 w-3 shrink-0" style={{ color: sa.team_color }} />
+                          <span className="font-medium truncate">{sa.team_name}</span>
+                        </div>
+                        <div className="font-medium break-words whitespace-normal leading-tight">{sa.project_name}</div>
+                        {sa.service_hours && (
+                          <div className="text-xs text-muted-foreground">{sa.service_hours}h</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>;
           })}
