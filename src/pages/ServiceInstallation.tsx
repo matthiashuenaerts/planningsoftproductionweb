@@ -472,7 +472,7 @@ const ServiceInstallation: React.FC = () => {
                   </Badge>
                 )}
                 <Badge variant="secondary" className="gap-1 font-semibold">
-                  ≈ {(totalServiceHours + drivingHours).toFixed(1)}h total
+                  ≈ {(totalServiceHours + drivingHours).toFixed(1)}h {t('si_total')}
                 </Badge>
                 {routeData.returnTime && (
                   <Badge variant={isOvertime ? 'destructive' : 'outline'} className="gap-1 font-semibold">
