@@ -533,10 +533,10 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   return (
     <div className="space-y-4 min-w-0 w-full overflow-hidden">
       <Card className="min-w-0 overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Accessories</CardTitle>
-            <div className="flex flex-wrap gap-2">
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-sm sm:text-lg">Accessories</CardTitle>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <ProductSelector 
                 onProductSelect={handleProductSelect} 
                 onGroupSelect={handleGroupSelect}
@@ -546,45 +546,53 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                 onClick={() => setShowForm(!showForm)}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Custom Accessory
+                <Plus className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Add Custom Accessory</span>
+                <span className="sm:hidden">Custom</span>
               </Button>
               <Button
                 onClick={() => setShowCsvImporter(!showCsvImporter)}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <Upload className="mr-2 h-4 w-4" />
-                Import CSV
+                <Upload className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Import CSV</span>
+                <span className="sm:hidden">CSV</span>
               </Button>
               {selectedAccessories.length > 0 && (
                 <Button
                   onClick={handleCreateOrderFromAccessories}
                   size="sm"
+                  className="h-7 sm:h-8 text-xs sm:text-sm"
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  Create Order ({selectedAccessories.length})
+                  <ShoppingCart className="mr-1 h-3.5 w-3.5" />
+                  Order ({selectedAccessories.length})
                 </Button>
               )}
               <Button
                 onClick={handleOpenQrDialog}
                 size="sm"
                 variant="outline"
+                className="h-7 sm:h-8 text-xs sm:text-sm"
               >
-                <QrCode className="mr-2 h-4 w-4" />
-                QR Codes
+                <QrCode className="mr-1 sm:mr-2 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">QR Codes</span>
+                <span className="sm:hidden">QR</span>
               </Button>
               {processingArticleCount > 0 && (
                 <Button
                   onClick={() => setShowProcessingArticles(!showProcessingArticles)}
                   size="sm"
                   variant={showProcessingArticles ? "default" : "outline"}
+                  className="h-7 sm:h-8 text-xs sm:text-sm"
                 >
                   {showProcessingArticles ? (
-                    <EyeOff className="mr-2 h-4 w-4" />
+                    <EyeOff className="mr-1 h-3.5 w-3.5" />
                   ) : (
-                    <Eye className="mr-2 h-4 w-4" />
+                    <Eye className="mr-1 h-3.5 w-3.5" />
                   )}
                   Processing ({processingArticleCount})
                 </Button>
@@ -832,7 +840,138 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Card>
           )}
 
-          <div className="overflow-x-auto max-w-full">
+          {/* Mobile Card Layout */}
+          <div className="sm:hidden">
+            <div className="divide-y">
+              {filteredAccessories.map((accessory) => (
+                <div key={accessory.id} className={`p-3 ${getRowClassName(accessory.status)} transition-colors`}>
+                  <div className="flex items-start gap-2 mb-1.5">
+                    <Checkbox
+                      checked={selectedAccessories.includes(accessory.id)}
+                      onCheckedChange={(checked) => handleAccessorySelection(accessory.id, checked as boolean)}
+                      disabled={accessory.status !== 'to_order' || !!accessory.order_id}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{accessory.article_name}</p>
+                      {accessory.article_description && (
+                        <p className="text-[10px] text-muted-foreground line-clamp-2">{accessory.article_description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => handleEditAccessory(accessory)} className="h-6 w-6 p-0">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      {accessory.order_id && (
+                        <Button size="sm" variant="outline" onClick={() => handleEditOrder(accessory.order_id!)} className="h-6 w-6 p-0">
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => setAccessoryToDelete(accessory.id)} className="h-6 w-6 p-0 text-destructive hover:text-destructive">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground ml-6">
+                    {accessory.article_code && <span className="font-mono">{accessory.article_code}</span>}
+                    <span className="font-semibold text-foreground">×{accessory.quantity}</span>
+                    {accessory.supplier && <span>{accessory.supplier}</span>}
+                    {accessory.stock_location && <span>📍{accessory.stock_location}</span>}
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 ml-6">
+                    {editingStatusAccessoryId === accessory.id ? (
+                      <Popover
+                        defaultOpen
+                        onOpenChange={(open) => {
+                          if (!open) setEditingStatusAccessoryId(null);
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-6 text-[10px]">
+                            {accessory.status.replace('_', ' ').toUpperCase()}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72">
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs">New Status</Label>
+                              <Select
+                                value={statusUpdateInfo.status}
+                                onValueChange={(value: Accessory['status']) => 
+                                  setStatusUpdateInfo(prev => ({ ...prev, status: value }))
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {statuses.map(status => (
+                                    <SelectItem key={status} value={status}>
+                                      {status.replace('_', ' ').toUpperCase()}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {statusUpdateInfo.status === 'to_order' && (
+                              <div>
+                                <Label className="text-xs">Quantity to Order</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={accessory.quantity}
+                                  value={statusUpdateInfo.quantity}
+                                  onChange={(e) => 
+                                    setStatusUpdateInfo(prev => ({ 
+                                      ...prev, 
+                                      quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
+                                    }))
+                                  }
+                                  className="h-8"
+                                />
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button size="sm" className="h-7" onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)} disabled={loading}>
+                                Update
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7" onClick={() => setEditingStatusAccessoryId(null)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => {
+                          setEditingStatusAccessoryId(accessory.id);
+                          setStatusUpdateInfo({ status: accessory.status, quantity: accessory.quantity });
+                        }}
+                      >
+                        {accessory.status.replace('_', ' ').toUpperCase()}
+                      </Button>
+                    )}
+                    {accessory.order_id && (() => {
+                      const orderInfo = getOrderInfo(accessory.order_id);
+                      return orderInfo ? (
+                        <Button size="sm" variant="ghost" onClick={() => handleGoToOrder(accessory.order_id!)} className="h-6 text-[10px] px-2">
+                          {orderInfo.supplier} <ExternalLink className="ml-1 h-3 w-3" />
+                        </Button>
+                      ) : null;
+                    })()}
+                    <span className="text-[10px] text-muted-foreground">{formatDate(accessory.created_at)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden sm:block overflow-x-auto max-w-full">
             <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
