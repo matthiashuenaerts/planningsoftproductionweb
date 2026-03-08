@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Camera, Upload, X, Package, MapPin, ChevronDown } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Order, OrderItem } from '@/types/order';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   onConfirmed
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [currentStep, setCurrentStep] = useState<DeliveryStep>('confirm');
   const [itemDeliveries, setItemDeliveries] = useState<ItemDelivery[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -267,10 +269,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] overflow-y-auto ${isMobile ? 'max-w-[95vw] p-3' : 'max-w-4xl'}`}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Package className="h-5 w-5 shrink-0" />
+          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+            <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
             <span className="truncate">
               {(t('ed_confirm_delivery') || '').replace('{{supplier}}', order.supplier)}
             </span>
@@ -278,35 +280,35 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         </DialogHeader>
 
         {currentStep === 'confirm' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
+            <div className={`grid grid-cols-2 gap-3 ${isMobile ? 'p-3 text-xs' : 'p-4'} bg-muted/50 rounded-lg`}>
               <div className="min-w-0">
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_id')}</Label>
-                <div className="text-sm truncate">{order.id}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_order_id')}</Label>
+                <div className={`truncate ${isMobile ? 'text-[11px]' : 'text-sm'}`}>{order.id}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_status')}</Label>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_status')}</Label>
                 <div>
-                  <Badge className={getStatusColor(order.status)}>
+                  <Badge className={`${getStatusColor(order.status)} ${isMobile ? 'text-[10px] px-1.5 py-0' : ''}`}>
                     {order.status.replace('_', ' ').toUpperCase()}
                   </Badge>
                 </div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_expected_delivery')}</Label>
-                <div className="text-sm">{new Date(order.expected_delivery).toLocaleDateString()}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_expected_delivery')}</Label>
+                <div className={isMobile ? 'text-[11px]' : 'text-sm'}>{new Date(order.expected_delivery).toLocaleDateString()}</div>
               </div>
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">{t('ed_order_date')}</Label>
-                <div className="text-sm">{new Date(order.order_date).toLocaleDateString()}</div>
+                <Label className={`font-medium text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_order_date')}</Label>
+                <div className={isMobile ? 'text-[11px]' : 'text-sm'}>{new Date(order.order_date).toLocaleDateString()}</div>
               </div>
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={handleClose}>
+              <Button variant="outline" onClick={handleClose} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_cancel')}
               </Button>
-              <Button onClick={() => setCurrentStep('items')}>
+              <Button onClick={() => setCurrentStep('items')} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_continue_items')}
               </Button>
             </div>
@@ -314,41 +316,36 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         )}
 
         {currentStep === 'items' && (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">{t('ed_delivery_details')}</h3>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
+          <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
+            <div className={isMobile ? 'space-y-2' : 'space-y-4'}>
+              <h3 className={`font-semibold ${isMobile ? 'text-sm' : 'text-lg'}`}>{t('ed_delivery_details')}</h3>
+              <div className={`space-y-3 overflow-y-auto ${isMobile ? 'max-h-[55vh]' : 'max-h-96'}`}>
                 {orderItems.map((item, index) => {
                   const delivery = itemDeliveries[index];
                   if (!delivery) return null;
                   const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
 
                   return (
-                    <div key={item.id} className="p-4 md:p-6 border rounded-lg">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="flex-1 space-y-3 min-w-0">
+                    <div key={item.id} className={`border rounded-lg ${isMobile ? 'p-3' : 'p-4 md:p-6'}`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-col sm:flex-row sm:items-start sm:justify-between gap-4'}`}>
+                        <div className="flex-1 space-y-2 min-w-0">
                           <div>
-                            <h4 className="text-base md:text-lg font-semibold truncate">{item.description}</h4>
-                            <p className="text-sm text-muted-foreground truncate">{t('ed_article')}: {item.article_code}</p>
+                            <h4 className={`font-semibold truncate ${isMobile ? 'text-xs' : 'text-base md:text-lg'}`}>{item.description}</h4>
+                            <p className={`text-muted-foreground truncate ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_article')}: {item.article_code}</p>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className={`grid grid-cols-2 gap-1 ${isMobile ? 'text-[11px]' : 'text-sm'}`}>
                             <div>
                               <span className="font-medium">{t('ed_ordered')}:</span> {item.quantity}
                             </div>
-                            {item.delivered_quantity > 0 && (
-                              <div>
-                                <span className="font-medium text-blue-600">{t('ed_previously_delivered')}:</span> {item.delivered_quantity}
-                              </div>
-                            )}
                             <div>
                               <span className="font-medium text-green-600">{t('ed_remaining')}:</span> {remainingQuantity}
                             </div>
                           </div>
 
                           {!delivery.isFullyDelivered && (
-                            <div className="space-y-2">
-                              <Label htmlFor={`delivered-${item.id}`} className="text-sm font-medium text-green-600">
+                            <div className="space-y-1">
+                              <Label htmlFor={`delivered-${item.id}`} className={`font-medium text-green-600 ${isMobile ? 'text-[10px]' : 'text-sm'}`}>
                                 {t('ed_how_many_delivered')}
                               </Label>
                               <Input
@@ -358,10 +355,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                 max={remainingQuantity}
                                 value={delivery.deliveredQuantity}
                                 onChange={(e) => updateItemDelivery(item.id, 'deliveredQuantity', parseInt(e.target.value) || 0)}
-                                className="w-32"
+                                className={isMobile ? 'w-24 h-8 text-sm' : 'w-32'}
                                 placeholder="0"
                               />
-                              <p className="text-xs text-muted-foreground">
+                              <p className={`text-muted-foreground ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
                                 {(t('ed_out_of_remaining') || '').replace('{{count}}', String(remainingQuantity))}
                               </p>
                             </div>
@@ -369,18 +366,18 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
                           {(delivery.isFullyDelivered || delivery.deliveredQuantity > 0) && (
                             <div>
-                              <Label htmlFor={`location-${item.id}`} className="text-sm font-medium flex items-center gap-1">
-                                <MapPin className="h-4 w-4" />
+                              <Label htmlFor={`location-${item.id}`} className={`font-medium flex items-center gap-1 ${isMobile ? 'text-[10px]' : 'text-sm'}`}>
+                                <MapPin className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
                                 {t('ed_stock_location')}
                               </Label>
-                              <div className="flex gap-2 mt-1">
+                              <div className="flex gap-1.5 mt-1">
                                 <Input
                                   id={`location-${item.id}`}
                                   type="text"
                                   value={delivery.stockLocation}
                                   onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
                                   placeholder={t('ed_location_placeholder')}
-                                  className="flex-1"
+                                  className={`flex-1 ${isMobile ? 'h-8 text-xs' : ''}`}
                                 />
                                 {order.project_id && (
                                   <Popover>
@@ -389,10 +386,10 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                         variant="outline"
                                         size="sm"
                                         onClick={() => fetchLocationSuggestions(item.id)}
-                                        className="px-3"
+                                        className={isMobile ? 'h-8 px-2' : 'px-3'}
                                       >
-                                        <ChevronDown className="h-4 w-4" />
-                                        <span className="hidden sm:inline ml-1">{t('ed_suggestions')}</span>
+                                        <ChevronDown className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
+                                        {!isMobile && <span className="hidden sm:inline ml-1">{t('ed_suggestions')}</span>}
                                       </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-60 p-0">
@@ -431,20 +428,18 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                           )}
                         </div>
 
-                        <div className="flex flex-row sm:flex-col items-center gap-3">
-                          <Label className="text-sm font-medium text-center">{t('ed_all_received')}</Label>
+                        <div className={`flex ${isMobile ? 'flex-row items-center gap-2' : 'flex-row sm:flex-col items-center gap-3'}`}>
                           <Checkbox
                             id={`full-delivery-${item.id}`}
                             checked={delivery.isFullyDelivered}
                             onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
-                            className="w-8 h-8 rounded-md"
+                            className={isMobile ? 'w-6 h-6 rounded' : 'w-8 h-8 rounded-md'}
                           />
+                          <Label className={`font-medium ${isMobile ? 'text-[10px]' : 'text-sm text-center'}`}>{t('ed_all_received')}</Label>
                           {delivery.isFullyDelivered && (
-                            <div className="text-center">
-                              <div className="text-sm font-medium text-green-600">
-                                ✓ {(t('ed_all_items') || '').replace('{{count}}', String(remainingQuantity))}
-                              </div>
-                            </div>
+                            <span className={`font-medium text-green-600 ${isMobile ? 'text-[10px]' : 'text-sm'}`}>
+                              ✓ {remainingQuantity}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -455,12 +450,13 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setCurrentStep('confirm')}>
+              <Button variant="outline" onClick={() => setCurrentStep('confirm')} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_back')}
               </Button>
               <Button
                 onClick={() => setCurrentStep('camera')}
                 disabled={!someItemsDelivered}
+                size={isMobile ? 'sm' : 'default'}
               >
                 {t('ed_continue_photo')}
               </Button>
@@ -469,15 +465,15 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
         )}
 
         {currentStep === 'camera' && (
-          <div className="space-y-6">
+          <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">{t('ed_take_photos')}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className={`font-semibold ${isMobile ? 'text-sm mb-1' : 'text-lg mb-2'}`}>{t('ed_take_photos')}</h3>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[11px]' : 'text-sm'}`}>
                 {t('ed_photos_description')}
               </p>
             </div>
 
-            <div className="space-y-4">
+            <div className={isMobile ? 'space-y-2' : 'space-y-4'}>
               <div className="relative bg-black rounded-lg overflow-hidden">
                 {stream ? (
                   <video
@@ -485,14 +481,14 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-60 sm:h-80 object-cover"
+                    className={`w-full object-cover ${isMobile ? 'h-48' : 'h-60 sm:h-80'}`}
                     style={{ background: '#000' }}
                   />
                 ) : (
-                  <div className="w-full h-60 sm:h-80 flex items-center justify-center text-white">
+                  <div className={`w-full flex items-center justify-center text-white ${isMobile ? 'h-48' : 'h-60 sm:h-80'}`}>
                     <div className="text-center">
-                      <Camera className="h-12 w-12 mx-auto mb-2" />
-                      <p>{t('ed_camera_not_started')}</p>
+                      <Camera className={`mx-auto mb-2 ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} />
+                      <p className={isMobile ? 'text-xs' : ''}>{t('ed_camera_not_started')}</p>
                     </div>
                   </div>
                 )}
@@ -501,14 +497,14 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
               <div className="flex flex-wrap justify-center gap-2">
                 {!stream ? (
                   <Button onClick={startCamera} size="sm">
-                    <Camera className="h-4 w-4 mr-2" />
+                    <Camera className="h-4 w-4 mr-1" />
                     {t('ed_start_camera')}
                   </Button>
                 ) : (
                   <>
                     <Button onClick={captureImage} size="sm">
-                      <Camera className="h-4 w-4 mr-2" />
-                      {t('ed_capture_photo')}
+                      <Camera className="h-4 w-4 mr-1" />
+                      {isMobile ? t('ed_capture_photo') : t('ed_capture_photo')}
                     </Button>
                     <Button variant="outline" size="sm" onClick={switchCamera}>
                       {t('ed_switch_camera')}
@@ -519,20 +515,20 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
               {capturedImages.length > 0 && (
                 <div>
-                  <h4 className="font-medium mb-2">
+                  <h4 className={`font-medium mb-1.5 ${isMobile ? 'text-xs' : ''}`}>
                     {(t('ed_captured_images') || '').replace('{{count}}', String(capturedImages.length))}
                   </h4>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${isMobile ? 'grid-cols-4' : 'grid-cols-3'}`}>
                     {capturedImages.map((image, index) => (
                       <div key={index} className="relative">
-                        <img src={image} alt={`Captured ${index + 1}`} className="w-full h-24 sm:h-32 object-cover rounded border" />
+                        <img src={image} alt={`Captured ${index + 1}`} className={`w-full object-cover rounded border ${isMobile ? 'h-16' : 'h-24 sm:h-32'}`} />
                         <Button
                           size="sm"
                           variant="destructive"
-                          className="absolute top-1 right-1 h-6 w-6 p-0"
+                          className="absolute top-0.5 right-0.5 h-5 w-5 p-0"
                           onClick={() => removeImage(index)}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5" />
                         </Button>
                       </div>
                     ))}
@@ -542,7 +538,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setCurrentStep('items')}>
+              <Button variant="outline" onClick={() => setCurrentStep('items')} size={isMobile ? 'sm' : 'default'}>
                 {t('ed_back')}
               </Button>
               <Button
@@ -550,7 +546,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                 disabled={capturedImages.length === 0}
                 size="sm"
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="h-4 w-4 mr-1" />
                 {t('ed_confirm_delivery_btn')}
               </Button>
             </div>

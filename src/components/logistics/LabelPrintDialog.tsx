@@ -6,6 +6,7 @@ import { Order, OrderItem } from '@/types/order';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ItemDelivery {
   itemId: string;
@@ -36,6 +37,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
   onClose
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -166,32 +168,32 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] overflow-y-auto ${isMobile ? 'max-w-[95vw] p-3' : 'max-w-md'}`}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Printer className="h-5 w-5" />
+          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+            <Printer className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             {t('lp_print_labels')}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <div className="space-y-2 text-sm">
+        <div className={isMobile ? 'space-y-3' : 'space-y-4'}>
+          <div className={`bg-muted/50 rounded-lg ${isMobile ? 'p-3' : 'p-4'}`}>
+            <div className={`space-y-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
               <div><strong>{t('lp_project')}:</strong> {projectInfo?.name || t('lp_loading')}</div>
               <div><strong>{t('lp_installation_date')}:</strong> {projectInfo?.installation_date ? new Date(projectInfo.installation_date).toLocaleDateString() : t('lp_not_set')}</div>
             </div>
           </div>
 
           <div>
-            <p className="text-sm mb-3">
+            <p className={`mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
               {(t('lp_print_question') || '').replace('{{count}}', String(deliveredItems.length))}
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {deliveredItems.map((item) => (
-                <div key={item.id} className="p-3 bg-blue-50 rounded-lg">
-                  <div className="text-sm font-medium text-blue-900 truncate">{item.description}</div>
-                  <div className="text-xs text-blue-700">
+                <div key={item.id} className={`bg-blue-50 rounded-lg ${isMobile ? 'p-2' : 'p-3'}`}>
+                  <div className={`font-medium text-blue-900 truncate ${isMobile ? 'text-[11px]' : 'text-sm'}`}>{item.description}</div>
+                  <div className={`text-blue-700 ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                     {t('lp_article')}: {item.article_code} • {t('lp_qty')}: {item.current_delivered_quantity}
                     {item.stock_location && ` • ${t('lp_location')}: ${item.stock_location}`}
                   </div>
@@ -201,7 +203,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
           </div>
 
           <div className="flex justify-between gap-2">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} size={isMobile ? 'sm' : 'default'}>
               {t('lp_no_skip')}
             </Button>
             <Button
@@ -209,7 +211,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
               disabled={deliveredItems.length === 0 || isLoading}
               size="sm"
             >
-              <Printer className="h-4 w-4 mr-2" />
+              <Printer className="h-4 w-4 mr-1" />
               {isLoading ? t('lp_printing') : t('lp_yes_print')}
             </Button>
           </div>
