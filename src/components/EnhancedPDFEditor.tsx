@@ -354,6 +354,9 @@ const EnhancedPDFEditor: React.FC<PDFEditorProps> = ({
                 borderWidth: (annotation.strokeWidth || 1) * scaleX,
               });
               break;
+            case 'path':
+              drawPathOnPage(page, annotation, scaleX, scaleY, height);
+              break;
           }
         }
       }
