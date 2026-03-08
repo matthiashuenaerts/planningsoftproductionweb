@@ -54,6 +54,7 @@ const Floorplan: React.FC = () => {
   const { currentEmployee } = useAuth();
   const isAdmin = currentEmployee?.role === 'admin';
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
 
   // Resolve signed URL for the private attachments bucket
   const signedFloorplanUrl = useSignedUrl('attachments', floorplanImagePath);
