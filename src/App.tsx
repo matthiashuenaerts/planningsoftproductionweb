@@ -39,6 +39,7 @@ import NotesAndTasks from "./pages/NotesAndTasks";
 import ControlPanel from "./pages/ControlPanel";
 import WorkstationControl from "./pages/WorkstationControl";
 import TruckLoadingView from "./pages/TruckLoadingView";
+import ServiceInstallation from "./pages/ServiceInstallation";
 import PDFEditorFullscreen from "./pages/PDFEditorFullscreen";
 import EditProject from "@/pages/EditProject";
 import ProjectCalculation from "@/pages/ProjectCalculation";
