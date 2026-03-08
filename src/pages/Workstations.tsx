@@ -208,29 +208,12 @@ const Workstations: React.FC = () => {
       const selectedWorkstation = workstations.find(ws => ws.id === showQRScanner);
       if (!selectedWorkstation) return;
 
-      // Search for the QR code in all parts
-      const matchingParts = await qrCodeService.findAllPartsByQRCode(qrCode);
-      
-      if (matchingParts.length === 0) {
-        toast({
-          title: 'Geen onderdeel gevonden',
-          description: `Geen onderdeel gevonden voor QR code: "${qrCode}"`,
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Update all matching parts with the workstation name
-      for (const part of matchingParts) {
-        await qrCodeService.updatePartWorkstationStatus(part.id, selectedWorkstation.name);
-      }
-
+      // The scanner already handles part lookup, status update, and tracking completion.
+      // Just show a toast confirmation here — do NOT close the scanner so it keeps scanning.
       toast({
-        title: 'QR Code succesvol verwerkt!',
-        description: `${matchingParts.length} onderdeel(en) bijgewerkt met werkstation "${selectedWorkstation.name}"`
+        title: 'QR Code verwerkt',
+        description: `"${qrCode}" geregistreerd op "${selectedWorkstation.name}"`,
       });
-
-      setShowQRScanner(null);
     } catch (error: any) {
       console.error('Error processing QR code:', error);
       toast({
@@ -468,6 +451,7 @@ const Workstations: React.FC = () => {
         onClose={() => setShowQRScanner(null)}
         onQRCodeDetected={handleQRCodeDetected}
         workstationName={workstations.find(ws => ws.id === showQRScanner)?.name || ''}
+        workstationId={showQRScanner || undefined}
       />
 
       {/* Create Error Dialog */}
