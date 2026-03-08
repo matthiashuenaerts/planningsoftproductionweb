@@ -461,7 +461,7 @@ const TruckLoadingCalendar = () => {
                               ←
                             </button>
                             <span className="text-sm text-gray-600">
-                              Load: {format(new Date(effectiveLoadingDate), 'MMM d')}
+                              {t('truck_load')}: {format(new Date(effectiveLoadingDate), 'MMM d')}
                               {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
                             </span>
                             <button
