@@ -357,8 +357,6 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
               {createTimeRegistrationMutation.isPending ? t("creating") : t("create")}
             </Button>
           </div>
-            </Button>
-          </div>
         </form>
       </DialogContent>
     </Dialog>
