@@ -559,13 +559,13 @@ const Projects = () => {
                         )}
                       </div>
                       
-                      <div className="mt-4">
-                        <div className="flex justify-between text-sm mb-1">
+                      <div className="mt-3 sm:mt-4">
+                        <div className="flex justify-between text-xs sm:text-sm mb-1">
                           <span>{t('progress')}</span>
-                          <span>{project.progress}%</span>
+                          <span className="font-medium">{project.progress}%</span>
                         </div>
-                        <div className="w-full bg-muted rounded-full h-2.5">
-                          <div className="bg-primary h-2.5 rounded-full" style={{
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{
                       width: `${project.progress}%`
                     }}></div>
                         </div>
