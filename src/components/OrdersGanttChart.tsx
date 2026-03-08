@@ -953,7 +953,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 isWeekStart && 'border-l-2 border-l-border',
                                 isToday && 'bg-accent/10'
                               )}
-                              style={{ width: `calc((100% - 16rem) / ${dateRange.length})` }}
+                              style={{ width: `calc((100% - ${sideColWidth}) / ${dateRange.length})` }}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 handleDrop(team.id, date);
