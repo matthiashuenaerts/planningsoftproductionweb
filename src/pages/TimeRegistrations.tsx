@@ -807,14 +807,14 @@ const TimeRegistrations = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-background flex">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
@@ -823,20 +823,20 @@ const TimeRegistrations = () => {
 
   if (!canViewAllRegistrations) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-background flex">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">{t("my_time_registrations")}</h1>
-            <p className="text-gray-600 mt-2">{t("my_time_registrations_description")}</p>
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+          <div className={isMobile ? 'mb-4' : 'mb-8'}>
+            <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("my_time_registrations")}</h1>
+            {!isMobile && <p className="text-muted-foreground mt-2">{t("my_time_registrations_description")}</p>}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4 gap-6'} mb-4 ${!isMobile && 'mb-8'}`}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{t("total_sessions_filtered")}</CardTitle>
@@ -1055,81 +1055,81 @@ const TimeRegistrations = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background flex">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t("time_registration_dashboard")}</h1>
-          <p className="text-gray-600 mt-2">{t("time_registration_dashboard_description")}</p>
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+        <div className={isMobile ? 'mb-4' : 'mb-8'}>
+          <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("time_registration_dashboard")}</h1>
+          {!isMobile && <p className="text-muted-foreground mt-2">{t("time_registration_dashboard_description")}</p>}
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-5 gap-6'} mb-4 ${!isMobile && 'mb-8'}`}>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("today_hours")}</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'p-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t("today_hours")}</CardTitle>
+              <Calendar className={`text-muted-foreground ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatDuration(totalMinutesToday)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatDuration(totalMinutesToday)}</div>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                 {t("in_sessions", { count: todayRegistrations.length.toString() })}
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("active_sessions")}</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'p-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t("active_sessions")}</CardTitle>
+              <Clock className={`text-muted-foreground ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeRegistrations.length}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{activeRegistrations.length}</div>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                 {t("currently_tracking")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("total_employees")}</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'p-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t("total_employees")}</CardTitle>
+              <Users className={`text-muted-foreground ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{getUniqueEmployees(allRegistrations).length}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{getUniqueEmployees(allRegistrations).length}</div>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                 {t("with_registrations")}
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("total_time_filtered")}</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'p-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t("total_time_filtered")}</CardTitle>
+              <BarChart3 className={`text-muted-foreground ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatDuration(totalFilteredMinutes)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatDuration(totalFilteredMinutes)}</div>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                 {t("in_sessions", { count: filteredRegistrations.length.toString() })}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("total_cost_filtered")}</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <Card className={isMobile ? 'col-span-2' : ''}>
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'p-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t("total_cost_filtered")}</CardTitle>
+              <DollarSign className={`text-muted-foreground ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalCost)}</div>
-              <p className="text-xs text-muted-foreground">
+            <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatCurrency(totalCost)}</div>
+              <p className={`text-muted-foreground ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
                 {t("based_on_standard_task_cost")}
               </p>
             </CardContent>
@@ -1137,19 +1137,19 @@ const TimeRegistrations = () => {
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+        <Card className={isMobile ? 'mb-3' : 'mb-6'}>
+          <CardHeader className={isMobile ? 'p-3 pb-2' : ''}>
+            <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : ''}`}>
+              <Filter className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
               {t("filter")}
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="employee-filter">{t("employee")}</Label>
+          <CardContent className={isMobile ? 'p-3 pt-0' : ''}>
+            <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4'}`}>
+              <div className="space-y-1">
+                <Label htmlFor="employee-filter" className={isMobile ? 'text-xs' : ''}>{t("employee")}</Label>
                 <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                     <SelectValue placeholder={t("all_employees")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1163,30 +1163,34 @@ const TimeRegistrations = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="start-date">{t("filter_by_date")} ({t("start_time")})</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={dateFilter.startDate}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
-                />
+              <div className={`${isMobile ? 'grid grid-cols-2 gap-2' : 'contents'}`}>
+                <div className="space-y-1">
+                  <Label htmlFor="start-date" className={isMobile ? 'text-xs' : ''}>{isMobile ? t("start_time") : `${t("filter_by_date")} (${t("start_time")})`}</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={dateFilter.startDate}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
+                    className={isMobile ? 'h-9 text-sm' : ''}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="end-date" className={isMobile ? 'text-xs' : ''}>{isMobile ? t("end_time") : `${t("filter_by_date")} (${t("end_time")})`}</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    value={dateFilter.endDate}
+                    onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
+                    className={isMobile ? 'h-9 text-sm' : ''}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="end-date">{t("filter_by_date")} ({t("end_time")})</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={dateFilter.endDate}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="project-filter">{t("filter_by_project")}</Label>
+              <div className="space-y-1">
+                <Label htmlFor="project-filter" className={isMobile ? 'text-xs' : ''}>{t("filter_by_project")}</Label>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                     <SelectValue placeholder={t("all_projects")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -1199,27 +1203,28 @@ const TimeRegistrations = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                  <Label htmlFor="task-filter">{t("filter_by_task")}</Label>
-                  <Select value={taskFilter} onValueChange={setTaskFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("all_tasks")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t("all_tasks")}</SelectItem>
-                      {getUniqueStandardTasks().map((task: any) => (
-                        <SelectItem key={task.id} value={task.id}>
-                          {task.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-1">
+                <Label htmlFor="task-filter" className={isMobile ? 'text-xs' : ''}>{t("filter_by_task")}</Label>
+                <Select value={taskFilter} onValueChange={setTaskFilter}>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
+                    <SelectValue placeholder={t("all_tasks")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("all_tasks")}</SelectItem>
+                    {getUniqueStandardTasks().map((task: any) => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
-            <div className="flex gap-2 mt-4">
+            <div className={`flex ${isMobile ? 'flex-wrap' : ''} gap-2 mt-3`}>
               <Button
                 variant="outline"
+                size={isMobile ? 'sm' : 'default'}
                 onClick={() => {
                   setSelectedEmployee('all');
                   setDateFilter({ startDate: '', endDate: '' });
@@ -1229,12 +1234,12 @@ const TimeRegistrations = () => {
               >
                 {t("clear_filters")}
               </Button>
-              <Button onClick={exportToPDF} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                {t("export_filtered_data")}
+              <Button onClick={exportToPDF} variant="outline" size={isMobile ? 'sm' : 'default'}>
+                <Download className={`mr-1.5 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4 mr-2'}`} />
+                {isMobile ? 'Export' : t("export_filtered_data")}
               </Button>
-              <Button onClick={() => setShowMonthlyReportDialog(true)} variant="outline">
-                <FileText className="h-4 w-4 mr-2" />
+              <Button onClick={() => setShowMonthlyReportDialog(true)} variant="outline" size={isMobile ? 'sm' : 'default'}>
+                <FileText className={`mr-1.5 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4 mr-2'}`} />
                 {t("monthly_report")}
               </Button>
             </div>
@@ -1243,15 +1248,15 @@ const TimeRegistrations = () => {
 
         {/* Registration History */}
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>{t("time_registration_history")}</CardTitle>
+          <CardHeader className={isMobile ? 'p-3 pb-2' : ''}>
+            <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
+              <CardTitle className={isMobile ? 'text-sm' : ''}>{t("time_registration_history")}</CardTitle>
               <div className="flex gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="destructive" size="sm">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {t("delete_old")}
+                      <Trash2 className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4 mr-2'}`} />
+                      {!isMobile && t("delete_old")}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -1270,12 +1275,12 @@ const TimeRegistrations = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button onClick={() => setShowAddDialog(true)} variant="default" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("add_manual_registration")}
+                  <Plus className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4 mr-2'}`} />
+                  {!isMobile && t("add_manual_registration")}
                 </Button>
               </div>
             </div>
-            <CardDescription>
+            <CardDescription className={isMobile ? 'text-xs' : ''}>
               {t("showing_sessions", { count: filteredRegistrations.length.toString() })}
               {!isFilterActive && allRegistrations.length > 50 && (
                   <span className="text-muted-foreground ml-2">
@@ -1284,66 +1289,124 @@ const TimeRegistrations = () => {
                 )}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("employee")}</TableHead>
-                  <TableHead>{t("project")}</TableHead>
-                  <TableHead>{t("task")}</TableHead>
-                  <TableHead>{t("start_time")}</TableHead>
-                  <TableHead>{t("end_time")}</TableHead>
-                  <TableHead>{t("duration")}</TableHead>
-                   <TableHead>{t("cost")}</TableHead>
-                   <TableHead>{t("status")}</TableHead>
-                   <TableHead></TableHead>
-                 </TableRow>
-              </TableHeader>
-              <TableBody>
+          <CardContent className={isMobile ? 'p-0' : ''}>
+            {isMobile ? (
+              /* Mobile: Card-based layout instead of table */
+              <div className="divide-y divide-border">
                 {filteredRegistrations.map((registration: any) => {
-                   const duration = registration.duration_minutes || 0;
-                   const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
-                   let cost = 0;
-                   if (hourlyCost && duration > 0) {
-                     cost = (duration / 60) * hourlyCost;
-                   }
+                  const duration = registration.duration_minutes || 0;
+                  const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
+                  let cost = 0;
+                  if (hourlyCost && duration > 0) {
+                    cost = (duration / 60) * hourlyCost;
+                  }
                   return (
-                  <TableRow key={registration.id}>
-                    <TableCell className="font-medium">
-                      {registration.employees?.name || t("unknown_employee")}
-                    </TableCell>
-                    <TableCell>
-                      {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
-                    </TableCell>
-                    <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}</TableCell>
-                    <TableCell>{formatDateTime(registration.start_time)}</TableCell>
-                    <TableCell>
-                      {registration.end_time ? formatDateTime(registration.end_time) : '-'}
-                    </TableCell>
-                    <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
-                    <TableCell>{formatCurrency(cost)}</TableCell>
-                     <TableCell>
-                       <Badge variant={registration.is_active ? 'default' : 'secondary'}>
-                         {registration.is_active ? t("active") : t("completed")}
-                       </Badge>
-                     </TableCell>
-                     <TableCell>
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           setSelectedRegistration(registration);
-                           setShowEditDialog(true);
-                         }}
-                       >
-                         <Edit className="h-4 w-4" />
-                       </Button>
-                     </TableCell>
-                   </TableRow>
+                    <div key={registration.id} className="p-3 space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">
+                            {registration.employees?.name || registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : '')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Badge variant={registration.is_active ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0.5">
+                            {registration.is_active ? t("active") : t("completed")}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setSelectedRegistration(registration);
+                              setShowEditDialog(true);
+                            }}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}
+                      </p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {formatDateTime(registration.start_time)}
+                          {registration.end_time ? ` → ${formatDateTime(registration.end_time)}` : ''}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{formatDuration(registration.duration_minutes)}</span>
+                          {cost > 0 && <span className="text-muted-foreground">{formatCurrency(cost)}</span>}
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </div>
+            ) : (
+              /* Desktop: Table layout */
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("employee")}</TableHead>
+                    <TableHead>{t("project")}</TableHead>
+                    <TableHead>{t("task")}</TableHead>
+                    <TableHead>{t("start_time")}</TableHead>
+                    <TableHead>{t("end_time")}</TableHead>
+                    <TableHead>{t("duration")}</TableHead>
+                     <TableHead>{t("cost")}</TableHead>
+                     <TableHead>{t("status")}</TableHead>
+                     <TableHead></TableHead>
+                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRegistrations.map((registration: any) => {
+                     const duration = registration.duration_minutes || 0;
+                     const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
+                     let cost = 0;
+                     if (hourlyCost && duration > 0) {
+                       cost = (duration / 60) * hourlyCost;
+                     }
+                    return (
+                    <TableRow key={registration.id}>
+                      <TableCell className="font-medium">
+                        {registration.employees?.name || t("unknown_employee")}
+                      </TableCell>
+                      <TableCell>
+                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
+                      </TableCell>
+                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}</TableCell>
+                      <TableCell>{formatDateTime(registration.start_time)}</TableCell>
+                      <TableCell>
+                        {registration.end_time ? formatDateTime(registration.end_time) : '-'}
+                      </TableCell>
+                      <TableCell>{formatDuration(registration.duration_minutes)}</TableCell>
+                      <TableCell>{formatCurrency(cost)}</TableCell>
+                       <TableCell>
+                         <Badge variant={registration.is_active ? 'default' : 'secondary'}>
+                           {registration.is_active ? t("active") : t("completed")}
+                         </Badge>
+                       </TableCell>
+                       <TableCell>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => {
+                             setSelectedRegistration(registration);
+                             setShowEditDialog(true);
+                           }}
+                         >
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                       </TableCell>
+                     </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
         
@@ -1360,133 +1423,69 @@ const TimeRegistrations = () => {
 
         {/* Monthly Report Dialog */}
         <Dialog open={showMonthlyReportDialog} onOpenChange={setShowMonthlyReportDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className={`${isMobile ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4' : 'max-w-2xl'}`}>
             <DialogHeader>
-              <DialogTitle>{t("monthly_report")}</DialogTitle>
-              <CardDescription>{t("select_report_period")}</CardDescription>
+              <DialogTitle className={isMobile ? 'text-base' : ''}>{t("monthly_report")}</DialogTitle>
+              <CardDescription className={isMobile ? 'text-xs' : ''}>{t("select_report_period")}</CardDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t("quick_select")}</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const today = format(new Date(), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: today, endDate: today });
-                    }}
-                  >
+            <div className={isMobile ? 'space-y-3' : 'space-y-4'}>
+              <div className="space-y-1.5">
+                <Label className={isMobile ? 'text-xs' : ''}>{t("quick_select")}</Label>
+                <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4 gap-2'}`}>
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const today = format(new Date(), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: today, endDate: today }); }}>
                     {t("today")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: yesterday, endDate: yesterday });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: yesterday, endDate: yesterday }); }}>
                     {t("yesterday")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const startOfWeek = format(new Date(now.setDate(now.getDate() - now.getDay() + 1)), 'yyyy-MM-dd');
-                      const endOfWeek = format(new Date(), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: startOfWeek, endDate: endOfWeek });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const startOfWeek = format(new Date(now.setDate(now.getDate() - now.getDay() + 1)), 'yyyy-MM-dd'); const endOfWeek = format(new Date(), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: startOfWeek, endDate: endOfWeek }); }}>
                     {t("this_week")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const lastWeekStart = format(new Date(now.setDate(now.getDate() - now.getDay() - 6)), 'yyyy-MM-dd');
-                      const lastWeekEnd = format(new Date(now.setDate(now.getDate() + 6)), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: lastWeekStart, endDate: lastWeekEnd });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const lastWeekStart = format(new Date(now.setDate(now.getDate() - now.getDay() - 6)), 'yyyy-MM-dd'); const lastWeekEnd = format(new Date(now.setDate(now.getDate() + 6)), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: lastWeekStart, endDate: lastWeekEnd }); }}>
                     {t("last_week")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
-                      const endOfMonth = format(new Date(), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: startOfMonth, endDate: endOfMonth });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd'); const endOfMonth = format(new Date(), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: startOfMonth, endDate: endOfMonth }); }}>
                     {t("this_month")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const startOfLastMonth = format(new Date(now.getFullYear(), now.getMonth() - 1, 1), 'yyyy-MM-dd');
-                      const endOfLastMonth = format(new Date(now.getFullYear(), now.getMonth(), 0), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: startOfLastMonth, endDate: endOfLastMonth });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const startOfLastMonth = format(new Date(now.getFullYear(), now.getMonth() - 1, 1), 'yyyy-MM-dd'); const endOfLastMonth = format(new Date(now.getFullYear(), now.getMonth(), 0), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: startOfLastMonth, endDate: endOfLastMonth }); }}>
                     {t("last_month")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const startOfYear = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
-                      const endOfYear = format(new Date(), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: startOfYear, endDate: endOfYear });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const startOfYear = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd'); const endOfYear = format(new Date(), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: startOfYear, endDate: endOfYear }); }}>
                     {t("this_year")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const now = new Date();
-                      const startOfLastYear = format(new Date(now.getFullYear() - 1, 0, 1), 'yyyy-MM-dd');
-                      const endOfLastYear = format(new Date(now.getFullYear() - 1, 11, 31), 'yyyy-MM-dd');
-                      setMonthlyReportDates({ startDate: startOfLastYear, endDate: endOfLastYear });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className={isMobile ? 'text-xs h-8' : ''}
+                    onClick={() => { const now = new Date(); const startOfLastYear = format(new Date(now.getFullYear() - 1, 0, 1), 'yyyy-MM-dd'); const endOfLastYear = format(new Date(now.getFullYear() - 1, 11, 31), 'yyyy-MM-dd'); setMonthlyReportDates({ startDate: startOfLastYear, endDate: endOfLastYear }); }}>
                     {t("last_year")}
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="report-start-date">{t("start_date")}</Label>
-                <Input
-                  id="report-start-date"
-                  type="date"
-                  value={monthlyReportDates.startDate}
-                  onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, startDate: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="report-end-date">{t("end_date")}</Label>
-                <Input
-                  id="report-end-date"
-                  type="date"
-                  value={monthlyReportDates.endDate}
-                  onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, endDate: e.target.value }))}
-                />
+              <div className={isMobile ? 'grid grid-cols-2 gap-2' : 'space-y-2'}>
+                <div className="space-y-1">
+                  <Label htmlFor="report-start-date" className={isMobile ? 'text-xs' : ''}>{t("start_date")}</Label>
+                  <Input id="report-start-date" type="date" value={monthlyReportDates.startDate}
+                    onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, startDate: e.target.value }))}
+                    className={isMobile ? 'h-9 text-sm' : ''} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="report-end-date" className={isMobile ? 'text-xs' : ''}>{t("end_date")}</Label>
+                  <Input id="report-end-date" type="date" value={monthlyReportDates.endDate}
+                    onChange={(e) => setMonthlyReportDates(prev => ({ ...prev, endDate: e.target.value }))}
+                    className={isMobile ? 'h-9 text-sm' : ''} />
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowMonthlyReportDialog(false)}>
+                <Button variant="outline" size={isMobile ? 'sm' : 'default'} onClick={() => setShowMonthlyReportDialog(false)}>
                   {t("cancel")}
                 </Button>
-                <Button onClick={generateMonthlyReport}>
-                  <Download className="h-4 w-4 mr-2" />
+                <Button size={isMobile ? 'sm' : 'default'} onClick={generateMonthlyReport}>
+                  <Download className={`${isMobile ? 'h-3.5 w-3.5 mr-1.5' : 'h-4 w-4 mr-2'}`} />
                   {t("generate_report")}
                 </Button>
               </div>
@@ -1495,7 +1494,7 @@ const TimeRegistrations = () => {
         </Dialog>
 
         <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className={isMobile ? 'max-w-[calc(100vw-2rem)]' : ''}>
             <AlertDialogHeader>
               <AlertDialogTitle>{t("confirm_delete")}</AlertDialogTitle>
               <AlertDialogDescription>
