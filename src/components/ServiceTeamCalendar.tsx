@@ -738,9 +738,9 @@ const ServiceTeamCalendar: React.FC = () => {
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Schedule Service Visit</DialogTitle>
+            <DialogTitle>{t('svc_schedule_service_visit')}</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              Add a new service installation assignment
+              {t('svc_add_service_assignment')}
             </p>
           </DialogHeader>
           <div className="space-y-4 py-2">
