@@ -194,7 +194,7 @@ const TaskList: React.FC<TaskListProps> = ({
     if (!currentEmployee) {
       toast({
         title: t('error'),
-        description: 'Please log in to join a task',
+        description: t('tl_no_tasks_found'),
         variant: 'destructive'
       });
       return;
