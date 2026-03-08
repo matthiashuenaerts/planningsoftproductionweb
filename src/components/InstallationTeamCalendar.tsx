@@ -389,20 +389,25 @@ const DayCell = ({
   }).filter(Boolean);
   
   return <div ref={drop} className={cn(
-      "min-h-[120px] border border-gray-200 p-1",
-      !isCurrentMonthDay && "bg-gray-50 text-gray-400",
-      isWeekend && isCurrentMonthDay && "bg-blue-50",
+      isMobile ? "min-h-[60px] border border-border p-0.5" : "min-h-[120px] border border-border p-1",
+      !isCurrentMonthDay && "bg-muted/50 text-muted-foreground",
+      isWeekend && isCurrentMonthDay && "bg-accent/30",
       isToday && isCurrentMonthDay && "bg-yellow-100 border-yellow-400 border-2",
       isOver && isCurrentMonthDay ? "bg-green-50 border-green-300" : "",
-      isCurrentMonthDay ? "bg-white" : ""
+      isCurrentMonthDay ? "bg-background" : ""
     )} data-today={isToday ? "true" : undefined}>
-      <div className={cn("text-center text-sm font-medium mb-1", !isCurrentMonthDay && "text-gray-400", isToday && "text-yellow-800 font-bold")}>
-        <div className="text-xs">{format(date, 'EEE')}</div>
-        <div className="text-lg">{format(date, 'd')}</div>
-        {isToday && <div className="text-xs font-bold">{t('itc_today')}</div>}
+      <div className={cn(
+        "text-center font-medium mb-0.5",
+        isMobile ? "text-[10px]" : "text-sm",
+        !isCurrentMonthDay && "text-muted-foreground",
+        isToday && "text-yellow-800 font-bold"
+      )}>
+        {!isMobile && <div className="text-xs">{format(date, 'EEE')}</div>}
+        <div className={isMobile ? "text-xs" : "text-lg"}>{format(date, 'd')}</div>
+        {isToday && !isMobile && <div className="text-xs font-bold">{t('itc_today')}</div>}
       </div>
       
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {projectsForDay.map(({
         project,
         assignment,
