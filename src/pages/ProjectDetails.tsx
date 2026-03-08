@@ -1596,24 +1596,41 @@ const ProjectDetails = () => {
               </CardContent>
             </Card> : activeTab === 'accessories' ? <AccessoriesInlineView projectId={projectId!} /> : activeTab === 'costing' ? <ProjectCostingTab projectId={projectId!} /> : <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
               <Card className="lg:col-span-1 overflow-hidden">
-                <CardHeader className="py-[15px]">
-                  <CardTitle>{t('project_summary')}</CardTitle>
+                <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
+                  <CardTitle className="text-base sm:text-2xl">{t('project_summary')}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">{t('status')}</h4>
-                    <div>{project && getStatusBadge(project.status)}</div>
+                <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6">
+                  {/* Status + Progress inline on mobile */}
+                  <div className="flex items-center gap-3 sm:block sm:space-y-4">
+                    <div className="flex-shrink-0">
+                      <h4 className="text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{t('status')}</h4>
+                      <div>{project && getStatusBadge(project.status)}</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">{t('project_progress')}</h4>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs sm:text-sm">
+                          <span className="text-muted-foreground">{t('completion')}</span>
+                          <span className="font-medium">{project?.progress}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{
+                        width: `${project?.progress}%`
+                      }}></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium">{t('description') || 'Description'}</h4>
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                      <h4 className="text-xs sm:text-sm font-medium">{t('description') || 'Description'}</h4>
                       {!isEditingDescription && <Button variant="ghost" size="sm" onClick={handleEditDescription} className="h-6 w-6 p-0">
                           <Edit3 className="h-3 w-3" />
                         </Button>}
                     </div>
                     {isEditingDescription ? <div className="space-y-2">
-                        <Textarea value={editedDescription} onChange={e => setEditedDescription(e.target.value)} placeholder={t('enter_project_description') || 'Enter project description...'} className="min-h-[80px] resize-none" />
+                        <Textarea value={editedDescription} onChange={e => setEditedDescription(e.target.value)} placeholder={t('enter_project_description') || 'Enter project description...'} className="min-h-[80px] resize-none text-sm" />
                         <div className="flex gap-2">
                           <Button size="sm" onClick={handleSaveDescription} disabled={savingDescription}>
                             <Save className="h-3 w-3 mr-1" />
@@ -1624,90 +1641,75 @@ const ProjectDetails = () => {
                             {t('cancel') || 'Cancel'}
                           </Button>
                         </div>
-                      </div> : <div className="text-sm text-muted-foreground">
+                      </div> : <div className="text-xs sm:text-sm text-muted-foreground">
                         {project?.description || t('no_description') || 'No description added yet.'}
                       </div>}
                   </div>
 
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">{t('project_progress')}</h4>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{t('completion')}</span>
-                        <span className="font-medium">{project?.progress}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2.5">
-                        <div className="bg-primary h-2.5 rounded-full" style={{
-                      width: `${project?.progress}%`
-                    }}></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {projectEfficiency !== null && <div>
-                      <h4 className="text-sm font-medium mb-1">{t('project_efficiency') || 'Project Efficiency'}</h4>
-                      <div className="flex items-center gap-2">
-                        {projectEfficiency >= 0 ? <TrendingUp className="h-4 w-4 text-green-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
-                        <span className={`font-medium ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {projectEfficiency >= 0 ? t('efficiency_faster') || 'faster than planned' : t('efficiency_slower') || 'slower than planned'}
-                        </span>
-                      </div>
+                  {projectEfficiency !== null && <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                      {projectEfficiency >= 0 ? <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0" /> : <TrendingDown className="h-4 w-4 text-red-600 flex-shrink-0" />}
+                      <span className={`font-semibold text-sm ${projectEfficiency >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {projectEfficiency >= 0 ? '+' : ''}{projectEfficiency}%
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-muted-foreground">
+                        {projectEfficiency >= 0 ? t('efficiency_faster') || 'faster than planned' : t('efficiency_slower') || 'slower than planned'}
+                      </span>
                     </div>}
 
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('project_barcode')}</h4>
-                    <Button variant="outline" size="sm" onClick={() => setShowBarcodeDialog(true)} className="w-full">
-                      <Barcode className="mr-2 h-4 w-4" />
-                      {t('view_barcode')}
-                    </Button>
-                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowBarcodeDialog(true)} className="w-full h-8 text-xs sm:text-sm">
+                    <Barcode className="mr-2 h-3.5 w-3.5" />
+                    {t('view_barcode')}
+                  </Button>
 
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('orders_and_accessories')}</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-orange-50 p-2 rounded">
-                        <div className="font-medium text-orange-800">{openOrdersCount}</div>
-                        <div className="text-orange-600 text-xs">{t('open_orders')}</div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-medium mb-1.5">{t('orders_and_accessories')}</h4>
+                    <div className="grid grid-cols-4 sm:grid-cols-2 gap-1.5 sm:gap-2 text-center sm:text-left">
+                      <div className="bg-orange-50 dark:bg-orange-950/30 p-1.5 sm:p-2 rounded-lg">
+                        <div className="font-bold text-sm sm:text-base text-orange-800 dark:text-orange-300">{openOrdersCount}</div>
+                        <div className="text-orange-600 dark:text-orange-400 text-[10px] sm:text-xs leading-tight">{t('open_orders')}</div>
                       </div>
-                      <div className="bg-red-50 p-2 rounded">
-                        <div className="font-medium text-red-800">{unavailableAccessoriesCount}</div>
-                        <div className="text-red-600 text-xs">{t('to_order')}</div>
+                      <div className="bg-red-50 dark:bg-red-950/30 p-1.5 sm:p-2 rounded-lg">
+                        <div className="font-bold text-sm sm:text-base text-red-800 dark:text-red-300">{unavailableAccessoriesCount}</div>
+                        <div className="text-red-600 dark:text-red-400 text-[10px] sm:text-xs leading-tight">{t('to_order')}</div>
                       </div>
-                      <div className="bg-green-50 p-2 rounded">
-                        <div className="font-medium text-green-800">{inStockAccessoriesCount}</div>
-                        <div className="text-green-600 text-xs">{t('in_stock')}</div>
+                      <div className="bg-green-50 dark:bg-green-950/30 p-1.5 sm:p-2 rounded-lg">
+                        <div className="font-bold text-sm sm:text-base text-green-800 dark:text-green-300">{inStockAccessoriesCount}</div>
+                        <div className="text-green-600 dark:text-green-400 text-[10px] sm:text-xs leading-tight">{t('in_stock')}</div>
                       </div>
-                      <div className="bg-blue-50 p-2 rounded">
-                        <div className="font-medium text-blue-800">{deliveredAccessoriesCount}</div>
-                        <div className="text-blue-600 text-xs">{t('delivered')}</div>
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-1.5 sm:p-2 rounded-lg">
+                        <div className="font-bold text-sm sm:text-base text-blue-800 dark:text-blue-300">{deliveredAccessoriesCount}</div>
+                        <div className="text-blue-600 dark:text-blue-400 text-[10px] sm:text-xs leading-tight">{t('delivered')}</div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">{t('important_dates')}</h4>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{t('start_date_label')}:</span>
-                      <span>{project?.start_date && formatDate(project.start_date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{t('installation_date_label')}:</span>
-                      <span>{project?.installation_date && formatDate(project.installation_date)}</span>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-medium mb-1.5">{t('important_dates')}</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-1 gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('start_date_label')}</div>
+                          <div className="font-medium truncate text-xs sm:text-sm">{project?.start_date && formatDate(project.start_date)}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('installation_date_label')}</div>
+                          <div className="font-medium truncate text-xs sm:text-sm">{project?.installation_date && formatDate(project.installation_date)}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {semiFinishedOrders.length > 0 && <div className="space-y-2">
-                      <h4 className="text-sm font-medium">{t('semi_finished_deliveries')}</h4>
-                      <div className="space-y-1.5 text-sm">
-                        {semiFinishedOrders.map((order: any) => order.orderSteps && order.orderSteps.length > 0 && <div key={order.id} className="bg-gray-50 p-2 rounded">
-                              <p className="font-medium mb-1">{order.supplier}{t('main_order_suffix')}</p>
-                              <div className="pl-2 space-y-1">
-                                {order.orderSteps.filter((step: any) => step.supplier).map((step: any) => <div key={step.id} className="flex justify-between items-center">
+                  {semiFinishedOrders.length > 0 && <div className="space-y-1.5">
+                      <h4 className="text-xs sm:text-sm font-medium">{t('semi_finished_deliveries')}</h4>
+                      <div className="space-y-1.5 text-xs sm:text-sm">
+                        {semiFinishedOrders.map((order: any) => order.orderSteps && order.orderSteps.length > 0 && <div key={order.id} className="bg-muted/40 p-2 rounded-lg">
+                              <p className="font-medium mb-1 text-xs sm:text-sm">{order.supplier}{t('main_order_suffix')}</p>
+                              <div className="pl-2 space-y-0.5">
+                                {order.orderSteps.filter((step: any) => step.supplier).map((step: any) => <div key={step.id} className="flex justify-between items-center text-[11px] sm:text-sm">
                                       <span className="text-muted-foreground truncate" title={`${step.name} (${step.supplier})`}>
                                         {step.name} ({step.supplier})
                                       </span>
@@ -1722,20 +1724,20 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
               
-              <Card className="lg:col-span-2">
-                <CardHeader className="py-[15px]">
-                  <CardTitle>{t('project_tasks')}</CardTitle>
+              <Card className="lg:col-span-2 overflow-hidden">
+                <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
+                  <CardTitle className="text-base sm:text-2xl">{t('project_tasks')}</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-6">
                   <Tabs defaultValue="todo">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="todo">{t('open_tasks_tab', {
+                    <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto">
+                      <TabsTrigger value="todo" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('open_tasks_tab', {
                       count: openTasks.length.toString()
                     })}</TabsTrigger>
-                      <TabsTrigger value="in_progress">{t('in_progress_tab', {
+                      <TabsTrigger value="in_progress" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('in_progress_tab', {
                       count: inProgressTasks.length.toString()
                     })}</TabsTrigger>
-                      <TabsTrigger value="completed">{t('completed_tab', {
+                      <TabsTrigger value="completed" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('completed_tab', {
                       count: completedTasks.length.toString()
                     })}</TabsTrigger>
                     </TabsList>
