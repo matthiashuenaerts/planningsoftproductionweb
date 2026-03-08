@@ -330,8 +330,8 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                       <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-col sm:flex-row sm:items-start sm:justify-between gap-4'}`}>
                         <div className="flex-1 space-y-2 min-w-0">
                           <div>
-                            <h4 className={`font-semibold truncate ${isMobile ? 'text-xs' : 'text-base md:text-lg'}`}>{item.description}</h4>
-                            <p className={`text-muted-foreground truncate ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_article')}: {item.article_code}</p>
+                            <h4 className={`font-semibold ${isMobile ? 'text-xs break-words' : 'text-base md:text-lg truncate'}`}>{item.description}</h4>
+                            <p className={`text-muted-foreground ${isMobile ? 'text-[10px] break-all' : 'text-sm truncate'}`}>{t('ed_article')}: {item.article_code}</p>
                           </div>
 
                           <div className={`grid grid-cols-2 gap-1 ${isMobile ? 'text-[11px]' : 'text-sm'}`}>
