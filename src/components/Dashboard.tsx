@@ -1159,25 +1159,30 @@ const StatCard: React.FC<StatCardProps> = ({
   onClick,
   valueSubtext
 }) => {
-  return <Card className={cn("overflow-hidden", onClick ? "cursor-pointer hover:bg-accent/50 transition-colors active:scale-[0.98]" : "")} onClick={onClick}>
-      <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-        <CardTitle className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 sm:gap-2">
+  return (
+    <Card className={cn(
+      "overflow-hidden rounded-xl border-border/60 shadow-sm transition-all",
+      onClick ? "cursor-pointer hover:shadow-md hover:border-border active:scale-[0.98]" : ""
+    )} onClick={onClick}>
+      <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-5">
+        <CardTitle className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-1.5 sm:gap-2 uppercase tracking-wider font-medium">
           {icon}
           <span className="truncate">{title}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-        <div className="flex items-baseline gap-1 sm:gap-2">
-          <div className="text-xl sm:text-2xl font-bold">{value}</div>
+      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-5">
+        <div className="flex items-baseline gap-1.5 sm:gap-2">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight">{value}</div>
           {valueSubtext && <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{valueSubtext}</div>}
         </div>
-        <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 space-y-0.5 sm:space-y-1">
+        <div className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 space-y-0.5 sm:space-y-1">
           {footer.split('\n').map((line, index) => <p key={index} className="break-words leading-tight" dangerouslySetInnerHTML={{
           __html: DOMPurify.sanitize(line, { ALLOWED_TAGS: ['b', 'i', 'u', 'a', 'strong', 'em', 'span', 'br'], ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'style'] })
         }}></p>)}
         </div>
         {subtitle && <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 break-words font-medium">{subtitle}</p>}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
 export default Dashboard;
