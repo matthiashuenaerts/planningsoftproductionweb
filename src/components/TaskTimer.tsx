@@ -252,9 +252,20 @@ const TaskTimer = () => {
   const {
     data: taskDetails
   } = useQuery({
-    queryKey: ['taskDetails', activeRegistration?.task_id, activeRegistration?.workstation_task_id],
+    queryKey: ['taskDetails', activeRegistration?.task_id, activeRegistration?.workstation_task_id, (activeRegistration as any)?.service_assignment_id],
     queryFn: async () => {
       if (!activeRegistration) return null;
+
+      // Handle service assignments
+      if ((activeRegistration as any)?.service_assignment_id) {
+        return {
+          title: activeRegistration.project_name || 'Service Installation',
+          project_name: activeRegistration.project_name || 'Service',
+          duration: null,
+          is_workstation_task: false,
+          is_service_task: true,
+        };
+      }
 
       // Handle regular tasks
       if (activeRegistration.task_id) {
@@ -300,7 +311,7 @@ const TaskTimer = () => {
       }
       return null;
     },
-    enabled: !!activeRegistration && (!!activeRegistration.task_id || !!activeRegistration.workstation_task_id)
+    enabled: !!activeRegistration && (!!activeRegistration.task_id || !!activeRegistration.workstation_task_id || !!(activeRegistration as any)?.service_assignment_id)
   });
 
   // Start task mutation

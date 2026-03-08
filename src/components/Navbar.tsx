@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt, Wrench } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import UserMenu from './UserMenu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { HelpDialog } from '@/components/help/HelpDialog';
+import { supabase } from '@/integrations/supabase/client';
 const NavbarContent = ({
   onItemClick
 }: {
@@ -38,6 +39,27 @@ const NavbarContent = ({
   const canSeeTimeRegistrations = isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role));
   const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
+  // Check if employee is a member of any service team
+  const { data: isServiceMember } = useQuery({
+    queryKey: ['isServiceTeamMember', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee) return false;
+      const { data: memberships } = await supabase
+        .from('placement_team_members' as any)
+        .select('team_id')
+        .eq('employee_id', currentEmployee.id);
+      if (!memberships || memberships.length === 0) return false;
+      const teamIds = (memberships as any[]).map((m: any) => m.team_id);
+      const { data: serviceTeams } = await (supabase
+        .from('placement_teams')
+        .select('id') as any)
+        .eq('team_type', 'service')
+        .eq('is_active', true)
+        .in('id', teamIds);
+      return serviceTeams && serviceTeams.length > 0;
+    },
+    enabled: !!currentEmployee,
+  });
   // Query rush orders to get counts for pending orders and unread messages
   const {
     data: rushOrders,
@@ -139,6 +161,12 @@ const NavbarContent = ({
               <span className="ml-3">{t('Tasks_Notes')}</span>
             </NavLink>
           </li>
+          {(isDeveloper || isServiceMember) && <li>
+              <NavLink to={createLocalizedPath("/service-installation")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
+                <Wrench className="w-5 h-5 text-white group-hover:text-white" />
+                <span className="ml-3">Service Installation</span>
+              </NavLink>
+            </li>}
           {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/daily-tasks")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <ListChecks className="w-5 h-5 text-white group-hover:text-white" />

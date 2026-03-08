@@ -4073,6 +4073,7 @@ export type Database = {
           id: string
           project_id: string
           service_hours: number | null
+          service_notes: string | null
           service_order: number | null
           start_date: string
           team: string
@@ -4086,6 +4087,7 @@ export type Database = {
           id?: string
           project_id: string
           service_hours?: number | null
+          service_notes?: string | null
           service_order?: number | null
           start_date: string
           team: string
@@ -4099,6 +4101,7 @@ export type Database = {
           id?: string
           project_id?: string
           service_hours?: number | null
+          service_notes?: string | null
           service_order?: number | null
           start_date?: string
           team?: string
@@ -5411,6 +5414,7 @@ export type Database = {
           is_active: boolean
           project_name: string | null
           rush_order_id: string | null
+          service_assignment_id: string | null
           start_time: string
           task_id: string | null
           tenant_id: string
@@ -5426,6 +5430,7 @@ export type Database = {
           is_active?: boolean
           project_name?: string | null
           rush_order_id?: string | null
+          service_assignment_id?: string | null
           start_time: string
           task_id?: string | null
           tenant_id?: string
@@ -5441,6 +5446,7 @@ export type Database = {
           is_active?: boolean
           project_name?: string | null
           rush_order_id?: string | null
+          service_assignment_id?: string | null
           start_time?: string
           task_id?: string | null
           tenant_id?: string
@@ -5460,6 +5466,13 @@ export type Database = {
             columns: ["rush_order_id"]
             isOneToOne: false
             referencedRelation: "rush_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_registrations_service_assignment_id_fkey"
+            columns: ["service_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "project_team_assignments"
             referencedColumns: ["id"]
           },
           {

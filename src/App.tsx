@@ -39,6 +39,7 @@ import NotesAndTasks from "./pages/NotesAndTasks";
 import ControlPanel from "./pages/ControlPanel";
 import WorkstationControl from "./pages/WorkstationControl";
 import TruckLoadingView from "./pages/TruckLoadingView";
+import ServiceInstallation from "./pages/ServiceInstallation";
 import PDFEditorFullscreen from "./pages/PDFEditorFullscreen";
 import EditProject from "@/pages/EditProject";
 import ProjectCalculation from "@/pages/ProjectCalculation";
@@ -168,6 +169,7 @@ function App() {
                     <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
                     <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
+                    <Route path=":lang/service-installation" element={<P><ServiceInstallation /></P>} />
                   </Route>
                 </Routes>
                 <Toaster />
