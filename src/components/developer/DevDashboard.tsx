@@ -76,8 +76,8 @@ const DevDashboard: React.FC = () => {
       const { data } = await supabase
         .from("support_tickets")
         .select("id, title, status, priority, created_at, tenant_id")
-        .order("created_at", { ascending: false })
-        .limit(10);
+        .not("status", "in", '("resolved","closed")')
+        .order("created_at", { ascending: false });
       return data ?? [];
     },
   });
