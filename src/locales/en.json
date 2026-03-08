@@ -1095,5 +1095,6 @@
   "inv_status_sent": "Sent",
   "inv_status_paid": "Paid",
   "inv_status_overdue": "Overdue",
-  "inv_status_cancelled": "Cancelled"
+  "inv_status_cancelled": "Cancelled",
+  "service_installation": "Service Installation"
 }

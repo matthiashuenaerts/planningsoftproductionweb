@@ -164,7 +164,7 @@ const NavbarContent = ({
           {(isDeveloper || isServiceMember || (currentEmployee && ['admin', 'teamleader'].includes(currentEmployee.role))) && <li>
               <NavLink to={createLocalizedPath("/service-installation")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Wrench className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Service Installation</span>
+                <span className="ml-3">{t('service_installation')}</span>
               </NavLink>
             </li>}
           {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && <li>
@@ -223,7 +223,7 @@ const NavbarContent = ({
           {canSeeInvoices && <li>
               <NavLink to={createLocalizedPath("/invoices")} className="flex items-center p-2 rounded-lg hover:bg-sky-700 group" onClick={handleItemClick}>
                 <Receipt className="w-5 h-5 text-white group-hover:text-white" />
-                <span className="ml-3">Invoices</span>
+                <span className="ml-3">{t('inv_invoices')}</span>
               </NavLink>
             </li>}
           {(isDeveloper || (currentEmployee && ['admin', 'teamleader'].includes(currentEmployee.role))) && <li>

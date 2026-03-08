@@ -1573,5 +1573,6 @@
   "inv_status_sent": "Envoyée",
   "inv_status_paid": "Payée",
   "inv_status_overdue": "En retard",
-  "inv_status_cancelled": "Annulée"
+  "inv_status_cancelled": "Annulée",
+  "service_installation": "Service Installation"
 }
