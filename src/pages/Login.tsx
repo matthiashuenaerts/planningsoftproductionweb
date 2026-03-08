@@ -497,7 +497,7 @@ const Login: React.FC = () => {
                         : "Enter your employee name"
                     }
                     disabled={loading}
-                    className="pl-10 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200"
+                    className="pl-10 h-10 sm:h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200 text-sm sm:text-base"
                   />
                 </div>
               </div>
