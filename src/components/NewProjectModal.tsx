@@ -933,7 +933,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <FormItem>
                     <FormLabel>{t('npm_project_name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Kitchen Pro - Client XYZ" {...field} />
+                      <Input placeholder="Kitchen Pro - Client XYZ" className={cn(isMobile && "h-9 text-sm")} {...field} />
                     </FormControl>
                     <div className="text-sm text-muted-foreground">
                       {t('npm_full_name_will_be')} <span className="font-mono">{projectCode}_</span><span className="font-medium">{field.value || t('npm_project_name')}</span>
