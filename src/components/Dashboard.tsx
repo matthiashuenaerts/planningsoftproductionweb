@@ -1014,15 +1014,15 @@ const Dashboard: React.FC = () => {
         
         {/* Tasks by Status Pie Chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ListTodo className="h-5 w-5 text-blue-500" />
+          <CardHeader className="px-3 sm:px-6 pb-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               {t('dashboard_tasks_by_status')}
             </CardTitle>
-            <CardDescription>{t('dashboard_status_distribution')}</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">{t('dashboard_status_distribution')}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-80">
+          <CardContent className="px-2 sm:px-6">
+            <div className="h-48 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={100} dataKey="value" label={({
