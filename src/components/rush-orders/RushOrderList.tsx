@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { RushOrder } from '@/types/rushOrder';
