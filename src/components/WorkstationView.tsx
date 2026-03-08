@@ -224,17 +224,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
             .from('phases')
             .select('project_id, name')
             .eq('id', task.phase_id)
-            .single();
+            .maybeSingle();
           
-          if (phaseError) throw phaseError;
+          if (phaseError || !phaseData) throw phaseError || new Error('Phase not found');
           
           const { data: projectData, error: projectError } = await supabase
             .from('projects')
             .select('name')
             .eq('id', phaseData.project_id)
-            .single();
+            .maybeSingle();
           
-          if (projectError) throw projectError;
+          if (projectError || !projectData) throw projectError || new Error('Project not found');
           
           let assigneeName = null;
           if (task.status === 'IN_PROGRESS' && task.assignee_id) {
