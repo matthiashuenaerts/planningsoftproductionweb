@@ -33,6 +33,9 @@ interface RouteMapDialogProps {
   startPoint?: { lat: number; lng: number; address: string };
   totalDrivingMinutes?: number;
   unrecognizedAddresses?: string[];
+  departureTime?: string;    // HH:MM
+  workStartTime?: string;    // HH:MM
+  workEndTime?: string;      // HH:MM
 }
 
 const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
