@@ -500,7 +500,7 @@ const TruckLoadingCalendar = () => {
                               {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
                             </span>
                             <button
-                              onClick={() => adjustLoadingDate(assignment.project.id, 'right')}
+                              onClick={(e) => { e.stopPropagation(); adjustLoadingDate(assignment.project.id, 'right'); }}
                               className="text-sm text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               →
