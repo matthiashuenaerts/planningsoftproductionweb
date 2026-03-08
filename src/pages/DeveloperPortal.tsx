@@ -123,6 +123,9 @@ const DeveloperPortal: React.FC = () => {
             <TabsTrigger value="support" className="data-[state=active]:bg-white/20 text-white">
               <LifeBuoy className="h-4 w-4 mr-1" /> Support
             </TabsTrigger>
+            <TabsTrigger value="help" className="data-[state=active]:bg-white/20 text-white">
+              <HelpCircle className="h-4 w-4 mr-1" /> Help
+            </TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
