@@ -28,6 +28,7 @@ const Logistics = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [isStartingRegistration, setIsStartingRegistration] = useState(false);
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
