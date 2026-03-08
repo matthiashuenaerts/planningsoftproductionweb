@@ -265,7 +265,16 @@ const TruckLoadingCalendar = () => {
     }
   };
 
-  // Get project color for visual distinction
+  // Get team color styling using hex with translucent bg (45%) and border (99%)
+  const getTeamColorStyle = (teamColor?: string) => {
+    if (!teamColor) return {};
+    return {
+      backgroundColor: `${teamColor}45`,
+      borderColor: `${teamColor}99`,
+    };
+  };
+
+  // Get project color for visual distinction (fallback when no team color)
   const getProjectColor = (status: string) => {
     switch (status) {
       case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -273,6 +282,10 @@ const TruckLoadingCalendar = () => {
       case 'completed': return 'bg-gray-100 text-gray-800 border-gray-300';
       default: return 'bg-orange-100 text-orange-800 border-orange-300';
     }
+  };
+
+  const handleProjectClick = (projectId: string) => {
+    navigate(createLocalizedPath(`/projects/${projectId}`));
   };
 
   // Get priority styling for loading dates
