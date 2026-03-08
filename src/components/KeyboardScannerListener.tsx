@@ -5,10 +5,36 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2, Settings2, Keyboard, ArrowRight, RefreshCw } from 'lucide-react';
+import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2, Settings2, Keyboard, ArrowRight, RefreshCw, ExternalLink, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { qrCodeService } from '@/services/qrCodeService';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/context/TenantContext';
+import { useLanguage } from '@/context/LanguageContext';
+
+export interface ScannerConfig {
+  maxKeyInterval: number;
+  minCodeLength: number;
+  stripPrefix: boolean;
+  stripSuffix: boolean;
+  selectedBaudRate: number;
+  relayBaudRate: number;
+  terminator: 'enter' | 'tab' | 'both';
+  acceptAllInput: boolean;
+  relayEnabled: boolean;
+}
+
+const DEFAULT_CONFIG: ScannerConfig = {
+  maxKeyInterval: 150,
+  minCodeLength: 1,
+  stripPrefix: true,
+  stripSuffix: false,
+  selectedBaudRate: 9600,
+  relayBaudRate: 9600,
+  terminator: 'both',
+  acceptAllInput: true,
+  relayEnabled: false,
+};
 
 interface KeyboardScannerListenerProps {
   isOpen: boolean;
@@ -16,6 +42,8 @@ interface KeyboardScannerListenerProps {
   onCodeDetected: (code: string) => void;
   workstationName: string;
   workstationId?: string;
+  /** When true, renders as a full page instead of a dialog */
+  standalone?: boolean;
 }
 
 interface ScanResult {
@@ -36,14 +64,19 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   onCodeDetected,
   workstationName,
   workstationId,
+  standalone = false,
 }) => {
   const { toast } = useToast();
+  const tenantContext = useTenant();
+  const languageContext = useLanguage();
   const [listening, setListening] = useState(false);
   const [serialConnected, setSerialConnected] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [currentBuffer, setCurrentBuffer] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Relay/bypass state
   const [relayEnabled, setRelayEnabled] = useState(false);
@@ -69,6 +102,68 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const flushTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load scanner config from workstation
+  useEffect(() => {
+    if (!workstationId || configLoaded) return;
+    const loadConfig = async () => {
+      try {
+        const { data } = await supabase
+          .from('workstations')
+          .select('scanner_config')
+          .eq('id', workstationId)
+          .single();
+        if (data?.scanner_config) {
+          const cfg = data.scanner_config as unknown as ScannerConfig;
+          if (cfg.maxKeyInterval != null) setMaxKeyInterval(cfg.maxKeyInterval);
+          if (cfg.minCodeLength != null) setMinCodeLength(cfg.minCodeLength);
+          if (cfg.stripPrefix != null) setStripPrefix(cfg.stripPrefix);
+          if (cfg.stripSuffix != null) setStripSuffix(cfg.stripSuffix);
+          if (cfg.selectedBaudRate != null) setSelectedBaudRate(cfg.selectedBaudRate);
+          if (cfg.relayBaudRate != null) setRelayBaudRate(cfg.relayBaudRate);
+          if (cfg.terminator != null) setTerminator(cfg.terminator);
+          if (cfg.acceptAllInput != null) setAcceptAllInput(cfg.acceptAllInput);
+          if (cfg.relayEnabled != null) setRelayEnabled(cfg.relayEnabled);
+        }
+        setConfigLoaded(true);
+      } catch (err) {
+        console.error('Failed to load scanner config:', err);
+        setConfigLoaded(true);
+      }
+    };
+    loadConfig();
+  }, [workstationId, configLoaded]);
+
+  // Save scanner config to workstation
+  const saveConfig = useCallback(async () => {
+    if (!workstationId) return;
+    setSaving(true);
+    try {
+      const config: ScannerConfig = {
+        maxKeyInterval, minCodeLength, stripPrefix, stripSuffix,
+        selectedBaudRate, relayBaudRate, terminator, acceptAllInput, relayEnabled,
+      };
+      await supabase
+        .from('workstations')
+        .update({ scanner_config: config as any })
+        .eq('id', workstationId);
+      toast({ title: 'Instellingen opgeslagen', description: `Scanner configuratie voor ${workstationName} bewaard.` });
+    } catch (err) {
+      console.error('Failed to save scanner config:', err);
+      toast({ title: 'Opslaan mislukt', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  }, [workstationId, workstationName, maxKeyInterval, minCodeLength, stripPrefix, stripSuffix, selectedBaudRate, relayBaudRate, terminator, acceptAllInput, relayEnabled, toast]);
+
+  // Open scanner in a new tab
+  const openInNewTab = useCallback(() => {
+    if (!workstationId) return;
+    const tenantSlug = tenantContext?.tenantSlug || '';
+    const lang = languageContext?.language || 'nl';
+    const url = `/${tenantSlug}/${lang}/scanner/${workstationId}`;
+    window.open(url, `scanner-${workstationId}`, 'noopener');
+  }, [workstationId, tenantContext, languageContext]);
+
   // Write data to relay port
   const relayData = useCallback(async (data: string) => {
     if (!relayEnabled || !relayWriterRef.current) return;
@@ -87,16 +182,10 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
     if (processing) return;
 
     const originalCode = code;
-
-    // Relay/bypass: forward raw data to the relay COM port
     relayData(rawCode);
 
-    if (stripPrefix && code.length > 1) {
-      code = code.substring(1);
-    }
-    if (stripSuffix && code.length > 1) {
-      code = code.substring(0, code.length - 1);
-    }
+    if (stripPrefix && code.length > 1) code = code.substring(1);
+    if (stripSuffix && code.length > 1) code = code.substring(0, code.length - 1);
 
     setProcessing(true);
 
@@ -170,7 +259,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
   // Keyboard listener for HID scanners
   useEffect(() => {
-    if (!isOpen || !listening) return;
+    if (!(isOpen || standalone) || !listening) return;
 
     const isTerminator = (key: string) => {
       if (terminator === 'enter') return key === 'Enter';
@@ -189,9 +278,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        return;
-      }
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
       const now = Date.now();
       if (!acceptAllInput && now - lastKeyTimeRef.current > maxKeyInterval && bufferRef.current.length > 0) {
@@ -214,9 +301,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
         setCurrentBuffer(bufferRef.current);
         if (acceptAllInput) {
           flushTimerRef.current = setTimeout(() => {
-            if (bufferRef.current.length >= minCodeLength) {
-              flushBuffer();
-            }
+            if (bufferRef.current.length >= minCodeLength) flushBuffer();
           }, 500);
         }
       }
@@ -227,150 +312,83 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
     };
-  }, [isOpen, listening, processCode, maxKeyInterval, minCodeLength, terminator, acceptAllInput]);
+  }, [isOpen, standalone, listening, processCode, maxKeyInterval, minCodeLength, terminator, acceptAllInput]);
 
-  // Check if serial is truly available (not just present but also allowed by permissions policy)
   const checkSerialAccess = useCallback(async (): Promise<boolean> => {
     if (!('serial' in navigator)) {
-      toast({
-        title: 'WebSerial niet ondersteund',
-        description: 'Gebruik Chrome of Edge voor seriële poort verbinding.',
-        variant: 'destructive',
-      });
+      toast({ title: 'WebSerial niet ondersteund', description: 'Gebruik Chrome of Edge.', variant: 'destructive' });
       return false;
     }
-    // Test if permissions policy allows serial access
     try {
-      // getPorts() will throw if permissions policy blocks serial
       await (navigator as any).serial.getPorts();
       return true;
     } catch (e: any) {
       if (e.message?.includes('permissions policy') || e.message?.includes('disallowed')) {
         toast({
           title: 'COM poort geblokkeerd',
-          description: 'WebSerial is geblokkeerd in een iframe. Open de app in een apart tabblad (niet in preview) of gebruik de HID keyboard modus.',
+          description: 'WebSerial is geblokkeerd in een iframe. Open de scanner in een apart tabblad.',
           variant: 'destructive',
         });
         return false;
       }
-      // Other errors during getPorts are ok, requestPort may still work
       return true;
     }
   }, [toast]);
 
-  // Connect source COM port
   const connectSerialPort = async () => {
     const allowed = await checkSerialAccess();
     if (!allowed) return;
-
     try {
       const port = await (navigator as any).serial.requestPort({ filters: [] });
-      await port.open({
-        baudRate: selectedBaudRate,
-        dataBits: 8,
-        stopBits: 1,
-        parity: 'none',
-        flowControl: 'none',
-      });
+      await port.open({ baudRate: selectedBaudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
       serialPortRef.current = port;
       setSerialConnected(true);
       abortControllerRef.current = new AbortController();
       readSerialPort(port);
-
-      toast({
-        title: 'Bron COM poort verbonden',
-        description: `Scanner verbonden (${selectedBaudRate} baud). ${relayEnabled ? 'Relay actief.' : ''}`,
-      });
+      toast({ title: 'Bron COM poort verbonden', description: `Scanner verbonden (${selectedBaudRate} baud).` });
     } catch (error: any) {
       if (error.message?.includes('permissions policy') || error.message?.includes('disallowed')) {
-        toast({
-          title: 'COM poort geblokkeerd',
-          description: 'WebSerial is geblokkeerd in een iframe/preview. Open de app in een apart tabblad of gebruik HID keyboard modus.',
-          variant: 'destructive',
-        });
+        toast({ title: 'COM poort geblokkeerd', description: 'Open de scanner in een apart tabblad.', variant: 'destructive' });
       } else if (error.name === 'InvalidStateError' || error.message?.includes('already open') || error.message?.includes('access') || error.message?.includes('denied') || error.message?.includes('busy')) {
-        toast({
-          title: 'COM poort bezet',
-          description: 'Deze poort is al in gebruik. Gebruik de Relay/Bypass modus of HID keyboard modus.',
-          variant: 'destructive',
-        });
+        toast({ title: 'COM poort bezet', description: 'Gebruik Relay/Bypass of HID keyboard modus.', variant: 'destructive' });
       } else if (error.name !== 'NotFoundError') {
-        console.error('Serial port error:', error);
-        toast({
-          title: 'Verbindingsfout',
-          description: error.message || 'Kon geen verbinding maken.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Verbindingsfout', description: error.message || 'Kon geen verbinding maken.', variant: 'destructive' });
       }
     }
   };
 
-  // Connect relay/bypass COM port (output)
   const connectRelayPort = async () => {
     const allowed = await checkSerialAccess();
     if (!allowed) return;
-
     try {
-      toast({
-        title: 'Selecteer relay poort',
-        description: 'Kies de COM poort waarnaar gescande data doorgestuurd wordt (bv. COM6).',
-      });
-
       const port = await (navigator as any).serial.requestPort({ filters: [] });
-      await port.open({
-        baudRate: relayBaudRate,
-        dataBits: 8,
-        stopBits: 1,
-        parity: 'none',
-        flowControl: 'none',
-      });
+      await port.open({ baudRate: relayBaudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
       relayPortRef.current = port;
       const writer = port.writable.getWriter();
       relayWriterRef.current = writer;
       setRelayConnected(true);
-
-      toast({
-        title: 'Relay poort verbonden',
-        description: `Data wordt doorgestuurd naar relay poort (${relayBaudRate} baud).`,
-      });
+      toast({ title: 'Bypass poort verbonden', description: `Data wordt doorgestuurd (${relayBaudRate} baud).` });
     } catch (error: any) {
       if (error.name !== 'NotFoundError') {
-        console.error('Relay port error:', error);
-        toast({
-          title: 'Relay verbindingsfout',
-          description: error.message || 'Kon relay poort niet openen.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Bypass verbindingsfout', description: error.message || 'Kon bypass poort niet openen.', variant: 'destructive' });
       }
     }
   };
 
   const disconnectRelayPort = async () => {
     try {
-      if (relayWriterRef.current) {
-        try { relayWriterRef.current.releaseLock(); } catch {}
-        relayWriterRef.current = null;
-      }
-      if (relayPortRef.current) {
-        try { await relayPortRef.current.close(); } catch {}
-        relayPortRef.current = null;
-      }
+      if (relayWriterRef.current) { try { relayWriterRef.current.releaseLock(); } catch {} relayWriterRef.current = null; }
+      if (relayPortRef.current) { try { await relayPortRef.current.close(); } catch {} relayPortRef.current = null; }
       setRelayConnected(false);
-    } catch (error) {
-      console.error('Relay disconnect error:', error);
-    }
+    } catch (error) { console.error('Relay disconnect error:', error); }
   };
 
   const readSerialPort = async (port: any) => {
     const decoder = new TextDecoderStream();
-    port.readable.pipeTo(decoder.writable, {
-      signal: abortControllerRef.current?.signal,
-    }).catch(() => {});
-
+    port.readable.pipeTo(decoder.writable, { signal: abortControllerRef.current?.signal }).catch(() => {});
     const reader = decoder.readable.getReader();
     serialReaderRef.current = reader;
     let serialBuffer = '';
-
     try {
       while (true) {
         const { value, done } = await reader.read();
@@ -378,9 +396,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
         if (value) {
           for (const char of value) {
             if (char === '\n' || char === '\r' || char === '\t') {
-              if (serialBuffer.length >= minCodeLength) {
-                processCode(serialBuffer);
-              }
+              if (serialBuffer.length >= minCodeLength) processCode(serialBuffer);
               serialBuffer = '';
             } else {
               serialBuffer += char;
@@ -391,12 +407,7 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
       }
     } catch (error: any) {
       if (error.name !== 'AbortError') {
-        console.error('Serial read error:', error);
-        toast({
-          title: 'Leesfout',
-          description: 'Verbinding met seriële poort verloren.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Leesfout', description: 'Verbinding met seriële poort verloren.', variant: 'destructive' });
       }
     } finally {
       reader.releaseLock();
@@ -407,31 +418,14 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const disconnectSerialPort = async () => {
     try {
       abortControllerRef.current?.abort();
-      if (serialReaderRef.current) {
-        try { await serialReaderRef.current.cancel(); } catch {}
-        serialReaderRef.current = null;
-      }
-      if (serialPortRef.current) {
-        try { await serialPortRef.current.close(); } catch {}
-        serialPortRef.current = null;
-      }
+      if (serialReaderRef.current) { try { await serialReaderRef.current.cancel(); } catch {} serialReaderRef.current = null; }
+      if (serialPortRef.current) { try { await serialPortRef.current.close(); } catch {} serialPortRef.current = null; }
       setSerialConnected(false);
-    } catch (error) {
-      console.error('Disconnect error:', error);
-    }
+    } catch (error) { console.error('Disconnect error:', error); }
   };
 
-  const startListening = () => {
-    setListening(true);
-    bufferRef.current = '';
-    setCurrentBuffer('');
-  };
-
-  const stopListening = () => {
-    setListening(false);
-    bufferRef.current = '';
-    setCurrentBuffer('');
-  };
+  const startListening = () => { setListening(true); bufferRef.current = ''; setCurrentBuffer(''); };
+  const stopListening = () => { setListening(false); bufferRef.current = ''; setCurrentBuffer(''); };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -451,6 +445,280 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
   const supportsSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
 
+  const scannerContent = (
+    <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
+      {/* Controls */}
+      <div className="flex flex-wrap gap-2">
+        {!listening ? (
+          <Button onClick={startListening} className="gap-2">
+            <Keyboard className="h-4 w-4" />
+            Start Luisteren
+          </Button>
+        ) : (
+          <Button onClick={stopListening} variant="destructive" className="gap-2">
+            <X className="h-4 w-4" />
+            Stop Luisteren
+          </Button>
+        )}
+
+        {supportsSerial && !relayEnabled && (
+          !serialConnected ? (
+            <Button onClick={connectSerialPort} variant="outline" className="gap-2">
+              <Usb className="h-4 w-4" />
+              COM Poort
+            </Button>
+          ) : (
+            <Button onClick={disconnectSerialPort} variant="outline" className="gap-2 border-green-500 text-green-600">
+              <Usb className="h-4 w-4" />
+              COM ✓
+            </Button>
+          )
+        )}
+
+        <Button onClick={() => setShowSettings(!showSettings)} variant="ghost" size="icon" className={showSettings ? 'bg-muted' : ''}>
+          <Settings2 className="h-4 w-4" />
+        </Button>
+
+        {!standalone && workstationId && (
+          <Button onClick={openInNewTab} variant="ghost" size="icon" title="Open in apart tabblad">
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Relay/Bypass controls */}
+      {supportsSerial && (
+        <div className="p-3 rounded-lg border bg-muted/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Relay / Bypass Modus</Label>
+            </div>
+            <Switch checked={relayEnabled} onCheckedChange={setRelayEnabled} />
+          </div>
+          {relayEnabled && (
+            <div className="space-y-3 pt-1">
+              <p className="text-xs text-muted-foreground">
+                Selecteer de bron poort (scanner) en de bypass poort (doorsturen naar ander programma).
+              </p>
+
+              <div className="p-2 rounded border bg-background space-y-2">
+                <Label className="text-xs font-semibold flex items-center gap-1">
+                  <Usb className="h-3 w-3" /> Lees Poort (bron / scanner)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Baud rate" /></SelectTrigger>
+                      <SelectContent>
+                        {BAUD_RATES.map(rate => (<SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!serialConnected ? (
+                    <Button onClick={connectSerialPort} variant="outline" size="sm" className="gap-1">
+                      <Usb className="h-3 w-3" /> Selecteer Poort
+                    </Button>
+                  ) : (
+                    <Button onClick={disconnectSerialPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
+                      <CheckCircle2 className="h-3 w-3" /> Verbonden
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center">
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+
+              <div className="p-2 rounded border bg-background space-y-2">
+                <Label className="text-xs font-semibold flex items-center gap-1">
+                  <ArrowRight className="h-3 w-3" /> Bypass Poort (doorsturen)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select value={String(relayBaudRate)} onValueChange={v => setRelayBaudRate(parseInt(v))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Baud rate" /></SelectTrigger>
+                      <SelectContent>
+                        {BAUD_RATES.map(rate => (<SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!relayConnected ? (
+                    <Button onClick={connectRelayPort} variant="outline" size="sm" className="gap-1">
+                      <Usb className="h-3 w-3" /> Selecteer Poort
+                    </Button>
+                  ) : (
+                    <Button onClick={disconnectRelayPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
+                      <CheckCircle2 className="h-3 w-3" /> Verbonden
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {serialConnected && relayConnected && (
+                <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 justify-center">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Lees Poort → App → Bypass Poort actief
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Scanner Instellingen</h4>
+            <Button onClick={saveConfig} size="sm" variant="outline" className="gap-1 h-7" disabled={saving}>
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              Opslaan
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Max toets interval (ms)</Label>
+              <Input type="number" min={20} max={1000} value={maxKeyInterval}
+                onChange={e => setMaxKeyInterval(parseInt(e.target.value) || 150)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Min. code lengte</Label>
+              <Input type="number" min={1} max={50} value={minCodeLength}
+                onChange={e => setMinCodeLength(parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Terminator</Label>
+              <Select value={terminator} onValueChange={(v: any) => setTerminator(v)}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enter">Enter</SelectItem>
+                  <SelectItem value="tab">Tab</SelectItem>
+                  <SelectItem value="both">Enter + Tab</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Bron baud rate (COM)</Label>
+              <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BAUD_RATES.map(rate => (<SelectItem key={rate} value={String(rate)}>{rate}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Switch checked={stripPrefix} onCheckedChange={setStripPrefix} id="strip-prefix" />
+              <Label htmlFor="strip-prefix" className="text-xs">Eerste karakter verwijderen</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={stripSuffix} onCheckedChange={setStripSuffix} id="strip-suffix" />
+              <Label htmlFor="strip-suffix" className="text-xs">Laatste karakter verwijderen</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={acceptAllInput} onCheckedChange={setAcceptAllInput} id="accept-all" />
+              <Label htmlFor="accept-all" className="text-xs">Alle input accepteren (ook traag)</Label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status indicator */}
+      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+        listening || serialConnected ? 'border-green-300 bg-green-50 dark:bg-green-950/20' : 'border-border bg-muted/30'
+      }`}>
+        <div className={`h-3 w-3 rounded-full flex-shrink-0 ${
+          listening || serialConnected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'
+        }`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">
+            {listening && serialConnected ? 'Luistert via keyboard + COM poort...'
+              : listening ? 'Luistert naar keyboard input...'
+              : serialConnected ? 'Luistert via COM poort...'
+              : 'Niet actief'}
+          </p>
+          {(listening || serialConnected) && currentBuffer && (
+            <p className="text-xs text-muted-foreground font-mono mt-1 truncate">Buffer: {currentBuffer}</p>
+          )}
+          {processing && (
+            <div className="flex items-center gap-1 mt-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <p className="text-xs text-muted-foreground">Verwerken...</p>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1 flex-shrink-0">
+          {listening && (
+            <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1.5 py-0.5 rounded">HID</span>
+          )}
+          {serialConnected && (
+            <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">COM</span>
+          )}
+          {relayConnected && (
+            <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 px-1.5 py-0.5 rounded">RELAY</span>
+          )}
+        </div>
+      </div>
+
+      {/* Manual input */}
+      <form onSubmit={handleManualSubmit} className="flex gap-2">
+        <Input value={manualInput} onChange={e => setManualInput(e.target.value)}
+          placeholder="Handmatig code invoeren..." className="h-9 text-sm" />
+        <Button type="submit" size="sm" variant="outline" disabled={manualInput.trim().length < minCodeLength || processing}>
+          Verwerk
+        </Button>
+      </form>
+
+      {/* Scan history */}
+      {scanHistory.length > 0 && (
+        <div className="flex-1 min-h-0">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium">Geschiedenis ({scanHistory.length})</h4>
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setScanHistory([])}>Wissen</Button>
+          </div>
+          <div className="space-y-1 max-h-[200px] overflow-y-auto">
+            {scanHistory.map((result) => (
+              <div key={`${result.code}-${result.timestamp}`}
+                className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                  result.status === 'success' ? 'bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300'
+                    : result.status === 'not_found' ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-800 dark:text-orange-300'
+                    : 'bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300'
+                }`}>
+                {result.status === 'success' ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" /> : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+                <span className="font-mono truncate flex-1">{result.message}</span>
+                {result.partsCompleted != null && result.partsCompleted > 0 && (
+                  <span className="text-xs opacity-70">{result.partsCompleted} tracking</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Standalone mode: full page
+  if (standalone) {
+    return (
+      <div className="min-h-screen bg-background p-4 max-w-lg mx-auto flex flex-col">
+        <div className="mb-4">
+          <h1 className="text-lg font-semibold flex items-center gap-2">
+            <Radio className="h-5 w-5" />
+            Scanner - {workstationName}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Luister naar USB scanner, COM poort, relay/bypass, of handmatige invoer
+          </p>
+        </div>
+        {scannerContent}
+      </div>
+    );
+  }
+
+  // Dialog mode
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
@@ -463,320 +731,10 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
             Luister naar USB scanner, COM poort, relay/bypass, of handmatige invoer
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
-          {/* Controls */}
-          <div className="flex flex-wrap gap-2">
-            {!listening ? (
-              <Button onClick={startListening} className="gap-2">
-                <Keyboard className="h-4 w-4" />
-                Start Luisteren
-              </Button>
-            ) : (
-              <Button onClick={stopListening} variant="destructive" className="gap-2">
-                <X className="h-4 w-4" />
-                Stop Luisteren
-              </Button>
-            )}
-
-            {supportsSerial && !relayEnabled && (
-              !serialConnected ? (
-                <Button onClick={connectSerialPort} variant="outline" className="gap-2">
-                  <Usb className="h-4 w-4" />
-                  COM Poort
-                </Button>
-              ) : (
-                <Button onClick={disconnectSerialPort} variant="outline" className="gap-2 border-green-500 text-green-600">
-                  <Usb className="h-4 w-4" />
-                  COM ✓
-                </Button>
-              )
-            )}
-
-            <Button
-              onClick={() => setShowSettings(!showSettings)}
-              variant="ghost"
-              size="icon"
-              className={showSettings ? 'bg-muted' : ''}
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Relay/Bypass controls */}
-          {supportsSerial && (
-            <div className="p-3 rounded-lg border bg-muted/10 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-sm font-medium">Relay / Bypass Modus</Label>
-                </div>
-                <Switch checked={relayEnabled} onCheckedChange={setRelayEnabled} />
-              </div>
-              {relayEnabled && (
-                <div className="space-y-3 pt-1">
-                  <p className="text-xs text-muted-foreground">
-                    Selecteer de bron poort (scanner) en de bypass poort (doorsturen naar ander programma).
-                  </p>
-
-                  {/* Read / Source port */}
-                  <div className="p-2 rounded border bg-background space-y-2">
-                    <Label className="text-xs font-semibold flex items-center gap-1">
-                      <Usb className="h-3 w-3" /> Lees Poort (bron / scanner)
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Baud rate" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BAUD_RATES.map(rate => (
-                              <SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {!serialConnected ? (
-                        <Button onClick={connectSerialPort} variant="outline" size="sm" className="gap-1">
-                          <Usb className="h-3 w-3" />
-                          Selecteer Poort
-                        </Button>
-                      ) : (
-                        <Button onClick={disconnectSerialPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Verbonden
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Relay / Bypass port */}
-                  <div className="flex items-center justify-center">
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-
-                  <div className="p-2 rounded border bg-background space-y-2">
-                    <Label className="text-xs font-semibold flex items-center gap-1">
-                      <ArrowRight className="h-3 w-3" /> Bypass Poort (doorsturen)
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Select value={String(relayBaudRate)} onValueChange={v => setRelayBaudRate(parseInt(v))}>
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Baud rate" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BAUD_RATES.map(rate => (
-                              <SelectItem key={rate} value={String(rate)}>{rate} baud</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {!relayConnected ? (
-                        <Button onClick={connectRelayPort} variant="outline" size="sm" className="gap-1">
-                          <Usb className="h-3 w-3" />
-                          Selecteer Poort
-                        </Button>
-                      ) : (
-                        <Button onClick={disconnectRelayPort} variant="outline" size="sm" className="gap-1 border-green-500 text-green-600">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Verbonden
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status */}
-                  {serialConnected && relayConnected && (
-                    <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 justify-center">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Lees Poort → App → Bypass Poort actief
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Settings panel */}
-          {showSettings && (
-            <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-              <h4 className="text-sm font-medium">Scanner Instellingen</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Max toets interval (ms)</Label>
-                  <Input
-                    type="number"
-                    min={20}
-                    max={1000}
-                    value={maxKeyInterval}
-                    onChange={e => setMaxKeyInterval(parseInt(e.target.value) || 150)}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Min. code lengte</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={minCodeLength}
-                    onChange={e => setMinCodeLength(parseInt(e.target.value) || 1)}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Terminator</Label>
-                  <Select value={terminator} onValueChange={(v: any) => setTerminator(v)}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="enter">Enter</SelectItem>
-                      <SelectItem value="tab">Tab</SelectItem>
-                      <SelectItem value="both">Enter + Tab</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Bron baud rate (COM)</Label>
-                  <Select value={String(selectedBaudRate)} onValueChange={v => setSelectedBaudRate(parseInt(v))}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BAUD_RATES.map(rate => (
-                        <SelectItem key={rate} value={String(rate)}>{rate}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2">
-                  <Switch checked={stripPrefix} onCheckedChange={setStripPrefix} id="strip-prefix" />
-                  <Label htmlFor="strip-prefix" className="text-xs">Eerste karakter verwijderen</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={stripSuffix} onCheckedChange={setStripSuffix} id="strip-suffix" />
-                  <Label htmlFor="strip-suffix" className="text-xs">Laatste karakter verwijderen</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={acceptAllInput} onCheckedChange={setAcceptAllInput} id="accept-all" />
-                  <Label htmlFor="accept-all" className="text-xs">Alle input accepteren (ook traag)</Label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Status indicator */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-            listening || serialConnected ? 'border-green-300 bg-green-50 dark:bg-green-950/20' : 'border-border bg-muted/30'
-          }`}>
-            <div className={`h-3 w-3 rounded-full flex-shrink-0 ${
-              listening || serialConnected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'
-            }`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">
-                {listening && serialConnected
-                  ? 'Luistert via keyboard + COM poort...'
-                  : listening
-                  ? 'Luistert naar keyboard input...'
-                  : serialConnected
-                  ? 'Luistert via COM poort...'
-                  : 'Niet actief'}
-              </p>
-              {(listening || serialConnected) && currentBuffer && (
-                <p className="text-xs text-muted-foreground font-mono mt-1 truncate">
-                  Buffer: {currentBuffer}
-                </p>
-              )}
-              {processing && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <p className="text-xs text-muted-foreground">Verwerken...</p>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              {listening && (
-                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-1.5 py-0.5 rounded">
-                  HID
-                </span>
-              )}
-              {serialConnected && (
-                <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-1.5 py-0.5 rounded">
-                  COM
-                </span>
-              )}
-              {relayConnected && (
-                <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 px-1.5 py-0.5 rounded">
-                  RELAY
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Manual input */}
-          <form onSubmit={handleManualSubmit} className="flex gap-2">
-            <Input
-              value={manualInput}
-              onChange={e => setManualInput(e.target.value)}
-              placeholder="Handmatig code invoeren..."
-              className="h-9 text-sm"
-            />
-            <Button type="submit" size="sm" variant="outline" disabled={manualInput.trim().length < minCodeLength || processing}>
-              Verwerk
-            </Button>
-          </form>
-
-          {/* Scan history */}
-          {scanHistory.length > 0 && (
-            <div className="flex-1 min-h-0">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium">Geschiedenis ({scanHistory.length})</h4>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs"
-                  onClick={() => setScanHistory([])}
-                >
-                  Wissen
-                </Button>
-              </div>
-              <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                {scanHistory.map((result) => (
-                  <div
-                    key={`${result.code}-${result.timestamp}`}
-                    className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
-                      result.status === 'success'
-                        ? 'bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300'
-                        : result.status === 'not_found'
-                        ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-800 dark:text-orange-300'
-                        : 'bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300'
-                    }`}
-                  >
-                    {result.status === 'success' ? (
-                      <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    )}
-                    <span className="font-mono truncate flex-1">{result.message}</span>
-                    {result.partsCompleted != null && result.partsCompleted > 0 && (
-                      <span className="text-xs opacity-70">{result.partsCompleted} tracking</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
+        {scannerContent}
         <div className="flex justify-end pt-2">
           <Button variant="outline" onClick={handleClose}>
-            <X className="h-4 w-4 mr-1" />
-            Sluiten
+            <X className="h-4 w-4 mr-1" /> Sluiten
           </Button>
         </div>
       </DialogContent>
