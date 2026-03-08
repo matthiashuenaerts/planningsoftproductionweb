@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Users, ClipboardList, CheckCircle2, User } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Search, Users, ClipboardList, CheckCircle2, User, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Employee {
