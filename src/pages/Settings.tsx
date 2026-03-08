@@ -113,7 +113,7 @@ const Settings: React.FC = () => {
       case 'materials': return <MaterialSettings />;
       case 'installation-teams': return <InstallationTeamsSettings />;
       case 'external-database': return <ExternalDatabaseSettings />;
-      case 'supabase': return <SupabaseConnectionSettings />;
+      
       case 'mail': return <MailSettings />;
       case 'help': return <HelpManagement />;
       case 'csv-import': return <CsvImportConfigSettings />;
