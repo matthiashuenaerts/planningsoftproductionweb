@@ -418,14 +418,14 @@ const ServiceInstallation: React.FC = () => {
       )}
       {isMobile && <Navbar />}
       <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="p-4 md:p-6 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
+        <div className={`${isMobile ? 'px-3 py-3' : 'p-6'} max-w-7xl mx-auto`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-1' : 'items-center justify-between'} mb-4`}>
             <div>
-              <h1 className="text-2xl font-bold">{t('si_title')}</h1>
-              <p className="text-muted-foreground text-sm">
+              <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-foreground`}>{t('si_title')}</h1>
+              <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
                 {teamName && (
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: teamColor }} />
+                    <span className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} rounded-full inline-block`} style={{ backgroundColor: teamColor }} />
                     {teamName}
                   </span>
                 )}
