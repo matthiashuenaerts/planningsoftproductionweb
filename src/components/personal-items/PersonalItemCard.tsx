@@ -116,9 +116,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
   const handleDownloadAttachment = async (attachment: any) => {
     setIsDownloading(attachment.id);
     try {
+      const storagePath = extractStoragePath('personal-attachments', attachment.file_path);
+      if (!storagePath) throw new Error('Invalid file path');
       const { data, error } = await supabase.storage
         .from('personal-attachments')
-        .download(attachment.file_path);
+        .download(storagePath);
 
       if (error) throw error;
 
