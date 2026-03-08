@@ -40,6 +40,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
   onConfirmed
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [currentStep, setCurrentStep] = useState<DeliveryStep>('confirm');
   const [itemDeliveries, setItemDeliveries] = useState<ItemDelivery[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
