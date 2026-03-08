@@ -25,6 +25,7 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTenant } from '@/context/TenantContext';
 import { partTrackingService } from '@/services/partTrackingService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -107,6 +108,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     createLocalizedPath
   } = useLanguage();
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
   
   // Query active time registration for current employee
   const { data: activeRegistration } = useQuery({
@@ -209,7 +211,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     error: queryError,
     refetch: loadTasks
   } = useQuery<ExtendedTask[], Error>({
-    queryKey: ['workstationTasks', actualWorkstationName],
+    queryKey: ['workstationTasks', actualWorkstationName, tenant?.id],
     queryFn: async () => {
       if (!actualWorkstationName) return [];
       
@@ -222,17 +224,17 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
             .from('phases')
             .select('project_id, name')
             .eq('id', task.phase_id)
-            .single();
+            .maybeSingle();
           
-          if (phaseError) throw phaseError;
+          if (phaseError || !phaseData) throw phaseError || new Error('Phase not found');
           
           const { data: projectData, error: projectError } = await supabase
             .from('projects')
             .select('name')
             .eq('id', phaseData.project_id)
-            .single();
+            .maybeSingle();
           
-          if (projectError) throw projectError;
+          if (projectError || !projectData) throw projectError || new Error('Project not found');
           
           let assigneeName = null;
           if (task.status === 'IN_PROGRESS' && task.assignee_id) {
@@ -282,14 +284,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
       
       let workstationDbId = workstationId;
       if (!workstationDbId && actualWorkstationName) {
-        const { data: workstationData, error: workstationError } = await supabase
+        let query = supabase
           .from('workstations')
           .select('id')
-          .eq('name', actualWorkstationName)
-          .single();
+          .eq('name', actualWorkstationName);
+        if (tenant?.id) {
+          query = query.eq('tenant_id', tenant.id);
+        }
+        const { data: workstationData, error: workstationError } = await query.maybeSingle();
         
         if (workstationError) throw workstationError;
-        workstationDbId = workstationData.id;
+        if (workstationData) {
+          workstationDbId = workstationData.id;
+        }
       }
       
       let allTasks = [...tasksWithProjectInfo];
@@ -306,16 +313,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                       .from('tasks')
                       .select('*')
                       .eq('id', taskLink.standard_task_id)
-                      .single();
+                      .maybeSingle();
                     
-                    if (taskError) throw taskError;
+                    if (taskError || !task) return null;
                     
                     const { data: rushOrderInfo, error: rushOrderError } = await supabase
                       .from('rush_orders')
                       .select('title')
                       .eq('id', taskLink.rush_order_id)
                       .neq('status', 'completed')
-                      .single();
+                      .maybeSingle();
                     
                     if (rushOrderError) {
                       return null;
