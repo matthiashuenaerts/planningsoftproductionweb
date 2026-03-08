@@ -277,18 +277,30 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
             <>
               <div className="space-y-1">
                 <Label htmlFor="project" className={isMobile ? 'text-xs' : ''}>{t("project")}</Label>
-                <Select value={formData.project_id} onValueChange={(value) => setFormData(prev => ({ ...prev, project_id: value, task_id: '' }))}>
-                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
-                    <SelectValue placeholder={t("select_project")} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border shadow-lg z-50">
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", isMobile && "h-9 text-sm", !formData.project_id && "text-muted-foreground")}>
+                      <span className="truncate">{formData.project_id ? projects.find(p => p.id === formData.project_id)?.name || t("select_project") : t("select_project")}</span>
+                      <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder={t("select_project")} className={isMobile ? 'text-sm' : ''} />
+                      <CommandList>
+                        <CommandEmpty className="py-3 text-center text-sm text-muted-foreground">No results</CommandEmpty>
+                        <CommandGroup>
+                          {projects.map((project) => (
+                            <CommandItem key={project.id} value={project.name} onSelect={() => setFormData(prev => ({ ...prev, project_id: project.id, task_id: '' }))}>
+                              <Check className={cn("mr-2 h-3.5 w-3.5", formData.project_id === project.id ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{project.name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-1">
