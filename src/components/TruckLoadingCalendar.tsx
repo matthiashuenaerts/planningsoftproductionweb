@@ -428,7 +428,7 @@ const TruckLoadingCalendar = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Upcoming Loading ({upcomingAssignments.length})
+            {t('truck_upcoming_loading')} ({upcomingAssignments.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
