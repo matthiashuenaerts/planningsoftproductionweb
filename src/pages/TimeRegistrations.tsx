@@ -807,14 +807,14 @@ const TimeRegistrations = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-background flex">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
