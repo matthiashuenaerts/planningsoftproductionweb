@@ -244,10 +244,15 @@ const { data, error } = await supabase.functions.invoke(
     // ✅ Use fixed redirect URI
     const redirectUri = `${window.location.origin}/onedrive-callback`;
 
+    // ✅ Store client ID for callback page
+    if (tenantClientId) {
+      sessionStorage.setItem('onedrive_client_id', tenantClientId);
+    }
+
     const { data, error } = await supabase.functions.invoke(
       'onedrive-auth?action=get-auth-url',
       {
-        body: { redirectUri, state, codeChallenge },
+        body: { redirectUri, state, codeChallenge, clientId: tenantClientId },
       }
     );
 
