@@ -323,7 +323,10 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
                       <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                     )}
                     <div className="space-y-0.5">
-                      <p className="text-sm text-white">
+                      <p className="text-sm text-white flex items-center gap-1.5">
+                        <Badge className={`text-[10px] ${syncType === 'order' ? 'bg-purple-600/40 text-purple-300' : 'bg-cyan-600/40 text-cyan-300'}`}>
+                          {syncType === 'order' ? 'Orders' : 'Projects'}
+                        </Badge>
                         {log.synced_count ?? 0} synced · {log.error_count ?? 0} errors
                         {details?.total_projects != null && <span className="text-slate-400"> / {details.total_projects} total</span>}
                       </p>
@@ -332,7 +335,9 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
                           {updatedProjects.map((d: any, i: number) => (
                             <Badge key={i} className="text-[10px] bg-blue-600/30 text-blue-300 font-normal">
                               {d.project_name || d.project_link_id}
-                              {d.changes && ` (${(d.changes as string[]).join(', ')})`}
+                              {syncType === 'order' && d.orders_updated > 0 && ` (${d.orders_updated} orders)`}
+                              {syncType === 'order' && d.orders_added > 0 && ` (+${d.orders_added} new)`}
+                              {syncType !== 'order' && d.changes && ` (${(d.changes as string[]).join(', ')})`}
                             </Badge>
                           ))}
                         </div>
