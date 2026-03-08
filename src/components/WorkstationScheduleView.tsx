@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, Settings, Zap } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WorkstationScheduleViewProps {
@@ -53,10 +55,11 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
   const [loading, setLoading] = useState(true);
   const [generatingSchedule, setGeneratingSchedule] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const TIMELINE_START_HOUR = 7;
   const TIMELINE_END_HOUR = 16;
-  const MINUTE_TO_PIXEL_SCALE = 2;
+  const MINUTE_TO_PIXEL_SCALE = isMobile ? 1.4 : 2;
 
   const getMinutesFromTimelineStart = (time: string | Date): number => {
     const date = new Date(time);
@@ -85,7 +88,6 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
     }
   };
 
-  // Function to detect and resolve overlapping schedules
   const resolveOverlaps = (schedules: WorkstationSchedule[]): PositionedSchedule[] => {
     const sortedSchedules = schedules.sort((a, b) => 
       new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
@@ -97,53 +99,31 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
       const startTime = new Date(schedule.start_time).getTime();
       const endTime = new Date(schedule.end_time).getTime();
       
-      // Find all overlapping schedules that are already positioned
       const overlapping = positionedSchedules.filter(positioned => {
         const posStartTime = new Date(positioned.start_time).getTime();
         const posEndTime = new Date(positioned.end_time).getTime();
-        
-        // Check if there's any time overlap
         return (startTime < posEndTime && endTime > posStartTime);
       });
 
       if (overlapping.length === 0) {
-        // No overlap, place in column 0
-        positionedSchedules.push({
-          ...schedule,
-          column: 0,
-          totalColumns: 1
-        });
+        positionedSchedules.push({ ...schedule, column: 0, totalColumns: 1 });
       } else {
-        // Find the first available column
         const usedColumns = overlapping.map(o => o.column);
         let column = 0;
-        while (usedColumns.includes(column)) {
-          column++;
-        }
+        while (usedColumns.includes(column)) column++;
         
-        // Calculate total columns needed for this group
         const maxColumn = Math.max(...usedColumns, column);
         const totalColumns = maxColumn + 1;
         
-        // Update totalColumns for all overlapping schedules
-        overlapping.forEach(positioned => {
-          positioned.totalColumns = totalColumns;
-        });
-        
-        positionedSchedules.push({
-          ...schedule,
-          column,
-          totalColumns
-        });
+        overlapping.forEach(positioned => { positioned.totalColumns = totalColumns; });
+        positionedSchedules.push({ ...schedule, column, totalColumns });
       }
     }
     
     return positionedSchedules;
   };
 
-  useEffect(() => {
-    fetchWorkstationSchedules();
-  }, [selectedDate]);
+  useEffect(() => { fetchWorkstationSchedules(); }, [selectedDate]);
 
   const fetchWorkstationSchedules = async () => {
     try {
@@ -158,15 +138,9 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
           *,
           workstation:workstations(id, name, description),
           task:tasks(
-            id, 
-            title, 
-            description, 
-            priority, 
-            status,
+            id, title, description, priority, status,
             assignee:employees!tasks_assignee_id_fkey(id, name),
-            phase:phases(
-              project:projects(id, name)
-            )
+            phase:phases(project:projects(id, name))
           )
         `)
         .gte('start_time', startOfDay)
@@ -174,16 +148,10 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
         .order('start_time');
 
       if (error) throw error;
-
-      console.log('Workstation schedules data:', data);
       setWorkstationSchedules(data || []);
     } catch (error: any) {
       console.error('Error fetching workstation schedules:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load workstation schedules",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load workstation schedules", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -191,206 +159,132 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
 
   const generateWorkstationSchedules = async () => {
     if (!selectedDate) return;
-
     try {
       setGeneratingSchedule(true);
-      console.log('Generating workstation schedules from worker schedules...');
-
-      // Get all worker schedules for the selected date with their task-workstation links
       const { data: workerSchedulesData, error: schedulesError } = await supabase
         .from('schedules')
         .select(`
-          *,
-          employee:employees(id, name, role, workstation),
-          task:tasks(
-            id,
-            title,
-            description,
-            priority,
-            task_workstation_links(
-              workstation:workstations(
-                id,
-                name
-              )
-            )
-          )
+          *, employee:employees(id, name, role, workstation),
+          task:tasks(id, title, description, priority, task_workstation_links(workstation:workstations(id, name)))
         `)
         .gte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T00:00:00')
         .lte('start_time', format(selectedDate, 'yyyy-MM-dd') + 'T23:59:59')
-        .not('task_id', 'is', null); // Only get schedules that have actual tasks
+        .not('task_id', 'is', null);
 
       if (schedulesError) throw schedulesError;
 
-      console.log('Worker schedules found:', workerSchedulesData?.length || 0);
-
-      // Delete existing workstation schedules for the selected date
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const { error: deleteError } = await supabase
-        .from('workstation_schedules')
-        .delete()
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lte('start_time', `${dateStr}T23:59:59`);
-
-      if (deleteError) {
-        console.error('Error deleting existing workstation schedules:', deleteError);
-      }
+      await supabase.from('workstation_schedules').delete()
+        .gte('start_time', `${dateStr}T00:00:00`).lte('start_time', `${dateStr}T23:59:59`);
 
       const workstationSchedulesToCreate = [];
-
-      // Process each worker schedule and create corresponding workstation schedules
       for (const schedule of workerSchedulesData || []) {
         const taskWorkstationLinks = schedule.task?.task_workstation_links || [];
         const userName = schedule.employee?.name || 'Unknown User';
         const startTime = new Date(schedule.start_time);
         const endTime = new Date(schedule.end_time);
         
-        console.log(`Processing schedule for ${userName}: ${schedule.title}`);
-        console.log(`Task workstation links:`, taskWorkstationLinks);
-        
-        // Only create workstation schedules for tasks that have workstation links
         if (taskWorkstationLinks && taskWorkstationLinks.length > 0) {
-          // Create a workstation schedule for each linked workstation
           for (const link of taskWorkstationLinks) {
             const workstation = link.workstation;
             if (workstation) {
-              console.log(`Creating workstation schedule for workstation: ${workstation.name}`);
-              
               workstationSchedulesToCreate.push({
-                workstation_id: workstation.id,
-                task_id: schedule.task_id,
-                task_title: schedule.title,
-                user_name: userName,
-                start_time: startTime.toISOString(),
-                end_time: endTime.toISOString()
+                workstation_id: workstation.id, task_id: schedule.task_id,
+                task_title: schedule.title, user_name: userName,
+                start_time: startTime.toISOString(), end_time: endTime.toISOString()
               });
             }
           }
-        } else {
-          console.log(`No workstation links found for task: ${schedule.title}`);
         }
       }
 
-      console.log(`Creating ${workstationSchedulesToCreate.length} workstation schedules`);
-
-      // Insert workstation schedules
       if (workstationSchedulesToCreate.length > 0) {
-        const { error: insertError } = await supabase
-          .from('workstation_schedules')
-          .insert(workstationSchedulesToCreate);
-
-        if (insertError) {
-          console.error('Error creating workstation schedules:', insertError);
-          throw insertError;
-        }
+        const { error: insertError } = await supabase.from('workstation_schedules').insert(workstationSchedulesToCreate);
+        if (insertError) throw insertError;
       }
 
-      console.log(`Successfully created ${workstationSchedulesToCreate.length} workstation schedule assignments`);
-      
-      // Refresh the data to show updated schedules
       await fetchWorkstationSchedules();
-      
-      toast({
-        title: "Workstation Schedules Generated",
-        description: `Generated ${workstationSchedulesToCreate.length} workstation schedules based on worker schedules`,
-      });
-
+      toast({ title: "Workstation Schedules Generated", description: `Generated ${workstationSchedulesToCreate.length} workstation schedules` });
     } catch (error: any) {
       console.error('Error generating workstation schedules:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate workstation schedules: ${error.message}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed to generate workstation schedules: ${error.message}`, variant: "destructive" });
     } finally {
       setGeneratingSchedule(false);
     }
   };
 
-  // Group schedules by workstation and resolve overlaps
   const groupedSchedules = workstationSchedules.reduce((acc, schedule) => {
     const workstationId = schedule.workstation_id;
-    if (!acc[workstationId]) {
-      acc[workstationId] = {
-        workstation: schedule.workstation,
-        schedules: []
-      };
-    }
+    if (!acc[workstationId]) acc[workstationId] = { workstation: schedule.workstation, schedules: [] };
     acc[workstationId].schedules.push(schedule);
     return acc;
   }, {} as Record<string, { workstation: any; schedules: WorkstationSchedule[] }>);
 
-  // Resolve overlaps for each workstation
   const resolvedGroupedSchedules = Object.keys(groupedSchedules).reduce((acc, workstationId) => {
     const group = groupedSchedules[workstationId];
-    acc[workstationId] = {
-      workstation: group.workstation,
-      schedules: resolveOverlaps(group.schedules)
-    };
+    acc[workstationId] = { workstation: group.workstation, schedules: resolveOverlaps(group.schedules) };
     return acc;
   }, {} as Record<string, { workstation: any; schedules: PositionedSchedule[] }>);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-4", !isMobile && "space-y-6")}>
       {/* Generate Button */}
       <div className="flex justify-end">
         <Button
           onClick={generateWorkstationSchedules}
           disabled={generatingSchedule}
-          className="flex items-center gap-2"
+          className={cn("flex items-center gap-2", isMobile && "h-9 text-xs w-full")}
         >
-          <Zap className="h-4 w-4" />
-          {generatingSchedule ? 'Generating...' : 'Generate Workstation Schedules'}
+          <Zap className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          {generatingSchedule ? 'Generating...' : isMobile ? 'Generate Schedules' : 'Generate Workstation Schedules'}
         </Button>
       </div>
 
       {Object.keys(resolvedGroupedSchedules).length === 0 ? (
         <Card>
-          <CardContent className="py-8">
-            <div className="text-center text-gray-500">
-              <Settings className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-              <p>No workstation schedules found for this date</p>
-              <p className="text-xs mt-1">Generate workstation schedules from worker schedules using the button above</p>
+          <CardContent className={cn(isMobile ? "py-6" : "py-8")}>
+            <div className="text-center text-muted-foreground">
+              <Settings className={cn("mx-auto mb-2", isMobile ? "h-6 w-6" : "h-8 w-8")} />
+              <p className={cn(isMobile && "text-sm")}>No workstation schedules found for this date</p>
+              <p className={cn("mt-1", isMobile ? "text-[10px]" : "text-xs")}>Generate workstation schedules from worker schedules using the button above</p>
             </div>
           </CardContent>
         </Card>
       ) : (
         Object.entries(resolvedGroupedSchedules).map(([workstationId, { workstation, schedules }]) => (
           <Card key={workstationId}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Settings className="h-5 w-5 mr-2" />
-                  {workstation?.name || 'Unknown Workstation'}
+            <CardHeader className={cn(isMobile && "px-3 py-2")}>
+              <CardTitle className={cn("flex items-center justify-between", isMobile && "text-sm")}>
+                <div className="flex items-center min-w-0">
+                  <Settings className={cn(isMobile ? "h-3.5 w-3.5 mr-1.5 shrink-0" : "h-5 w-5 mr-2")} />
+                  <span className="truncate">{workstation?.name || 'Unknown Workstation'}</span>
                 </div>
-                <Badge variant="outline">
+                <Badge variant="outline" className={cn(isMobile && "text-[10px] px-1.5 py-0")}>
                   {schedules.length} task{schedules.length !== 1 ? 's' : ''}
                 </Badge>
               </CardTitle>
-              {workstation?.description && (
-                <p className="text-sm text-gray-600">{workstation.description}</p>
-              )}
             </CardHeader>
-            <CardContent>
-              <div className="flex">
+            <CardContent className={cn(isMobile && "px-2 pb-3")}>
+              <div className="flex overflow-x-auto">
                 {/* Timeline Axis */}
-                <div className="w-16 text-right pr-4 flex-shrink-0">
+                <div className={cn("text-right flex-shrink-0", isMobile ? "w-10 pr-1" : "w-16 pr-4")}>
                   {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1 }).map((_, i) => {
                     const hour = TIMELINE_START_HOUR + i;
                     return (
                       <div
                         key={hour}
                         style={{ height: `${60 * MINUTE_TO_PIXEL_SCALE}px` }}
-                        className="relative border-t border-gray-200 first:border-t-0 -mr-4"
+                        className={cn("relative border-t border-muted first:border-t-0", isMobile ? "-mr-1" : "-mr-4")}
                       >
-                        <p className="text-xs text-gray-500 absolute -top-2 right-2">
+                        <p className={cn("absolute -top-2 text-muted-foreground", isMobile ? "text-[9px] right-0.5" : "text-xs right-2")}>
                           {`${hour.toString().padStart(2, '0')}:00`}
                         </p>
                       </div>
@@ -399,12 +293,12 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                 </div>
 
                 {/* Schedule container */}
-                <div className="relative flex-1 border-l border-gray-200">
+                <div className="relative flex-1 border-l border-muted min-w-0">
                   {/* Hour lines */}
                   {Array.from({ length: TIMELINE_END_HOUR - TIMELINE_START_HOUR }).map((_, i) => (
                     <div
                       key={`line-${i}`}
-                      className="absolute w-full h-px bg-gray-200"
+                      className="absolute w-full h-px bg-muted"
                       style={{ top: `${(i + 1) * 60 * MINUTE_TO_PIXEL_SCALE}px` }}
                     />
                   ))}
@@ -416,12 +310,8 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                     );
                     const top = getMinutesFromTimelineStart(schedule.start_time) * MINUTE_TO_PIXEL_SCALE;
                     const height = duration * MINUTE_TO_PIXEL_SCALE;
-
-                    // Calculate position and width based on overlap resolution
                     const widthPercentage = 100 / schedule.totalColumns;
-                    const leftPercentage = (schedule.column * widthPercentage);
-
-                    // Get the assigned user name - prioritize task assignee, fall back to user_name
+                    const leftPercentage = schedule.column * widthPercentage;
                     const assignedUserName = schedule.task?.assignee?.name || schedule.user_name;
                     const projectName = schedule.task?.phase?.project?.name;
 
@@ -433,44 +323,48 @@ const WorkstationScheduleView: React.FC<WorkstationScheduleViewProps> = ({ selec
                           top: `${top}px`,
                           height: `${height}px`,
                           left: `${leftPercentage}%`,
-                          width: `${widthPercentage - 1}%`, // Subtract 1% for small gap between overlapping items
-                          marginLeft: '2px',
-                          marginRight: '2px'
+                          width: `${widthPercentage - 1}%`,
+                          marginLeft: '1px',
+                          marginRight: '1px'
                         }}
                       >
-                        <div className={`relative h-full overflow-hidden rounded border p-2 ${
+                        <div className={cn(
+                          "relative h-full overflow-hidden rounded border",
+                          isMobile ? "p-1" : "p-2",
                           schedule.task?.priority ? getPriorityColor(schedule.task.priority) : 'bg-blue-100 text-blue-800 border-blue-300'
-                        }`}>
-                          <div className="flex justify-between h-full">
-                            <div className="flex-1 overflow-hidden">
-                              <h5 className="font-medium text-sm truncate" title={schedule.task_title}>
-                                {schedule.task_title}
-                              </h5>
-                              {projectName && (
-                                <p className="text-xs text-gray-600 truncate font-medium" title={projectName}>
-                                  📋 {projectName}
-                                </p>
-                              )}
-                              <p className="text-xs text-gray-600 truncate font-medium" title={assignedUserName}>
+                        )}>
+                          <div className="flex-1 overflow-hidden">
+                            <h5 className={cn("font-medium truncate", isMobile ? "text-[10px] leading-tight" : "text-sm")} title={schedule.task_title}>
+                              {schedule.task_title}
+                            </h5>
+                            {projectName && (
+                              <p className={cn("truncate font-medium text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")} title={projectName}>
+                                📋 {projectName}
+                              </p>
+                            )}
+                            {(!isMobile || height > 40) && (
+                              <p className={cn("truncate font-medium text-muted-foreground", isMobile ? "text-[9px]" : "text-xs")} title={assignedUserName}>
                                 👤 {assignedUserName}
                               </p>
-                              <div className="mt-1 flex items-center gap-2 text-xs">
+                            )}
+                            {(!isMobile || height > 55) && (
+                              <div className={cn("mt-0.5 flex items-center gap-1 flex-wrap", isMobile ? "text-[9px]" : "text-xs")}>
                                 <span className="flex items-center">
-                                  <Clock className="mr-1 h-3 w-3" />
+                                  <Clock className={cn(isMobile ? "mr-0.5 h-2.5 w-2.5" : "mr-1 h-3 w-3")} />
                                   {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)} ({duration}m)
                                 </span>
-                                {schedule.task?.priority && (
+                                {!isMobile && schedule.task?.priority && (
                                   <Badge variant="outline" className="py-0 px-1 text-[10px]">
                                     {schedule.task.priority}
                                   </Badge>
                                 )}
                               </div>
-                              {schedule.task?.description && height > 100 && (
-                                <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={schedule.task.description}>
-                                  {schedule.task.description}
-                                </p>
-                              )}
-                            </div>
+                            )}
+                            {!isMobile && schedule.task?.description && height > 100 && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={schedule.task.description}>
+                                {schedule.task.description}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
