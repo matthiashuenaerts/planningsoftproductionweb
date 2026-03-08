@@ -116,7 +116,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
         L.marker([wp.lat, wp.lng], { icon: markerIcon })
           .addTo(map)
           .bindPopup(
-            `<strong>#${wp.order} — ${wp.name}</strong><br/>${wp.client}<br/>${wp.address}${wp.serviceHours ? `<br/><em>${wp.serviceHours}h service</em>` : ''}`
+            `<strong>#${wp.order} — ${wp.name}</strong><br/>${wp.client}<br/>${wp.address}${wp.serviceHours ? `<br/><em>${wp.serviceHours}h service</em>` : ''}${wp.estimatedArrival ? `<br/>🕐 Arrive: ${wp.estimatedArrival}` : ''}${wp.estimatedDeparture ? ` — Leave: ${wp.estimatedDeparture}` : ''}`
           );
         allPoints.push([wp.lat, wp.lng]);
       });
