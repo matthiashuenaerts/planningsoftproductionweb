@@ -280,12 +280,12 @@ const Workstations: React.FC = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-14'}`}>
         <ScrollArea className="h-screen">
-          <div className="p-6">
+          <div className={isMobile ? 'p-3' : 'p-6'}>
             <div className="max-w-7xl mx-auto">
               {selectedWorkstation ? <div>
-                  <Button variant="outline" className="mb-4" onClick={() => setSelectedWorkstation(null)}>
+                  <Button variant="outline" className="mb-4" size={isMobile ? 'sm' : 'default'} onClick={() => setSelectedWorkstation(null)}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> {t('back_to_workstations')}
                   </Button>
                   <WorkstationView workstationId={selectedWorkstation} onBack={() => setSelectedWorkstation(null)} />
@@ -304,15 +304,16 @@ const Workstations: React.FC = () => {
                   
                   return (
                   <div>
-                    <div className="flex items-center justify-between mb-6">
-                      <h1 className="text-2xl font-bold">{t('workstations_title')}</h1>
+                    <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-6'}`}>
+                      <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('workstations_title')}</h1>
                       <Button 
                         variant="outline" 
+                        size={isMobile ? 'sm' : 'default'}
                         onClick={() => navigate(createLocalizedPath('/floorplan'))}
                         className="flex items-center gap-2"
                       >
                         <Map className="h-4 w-4" />
-                        Floorplan
+                        {!isMobile && 'Floorplan'}
                       </Button>
                     </div>
                     
