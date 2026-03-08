@@ -417,11 +417,11 @@ const ServiceTeamCalendar: React.FC = () => {
         : ` ${t('svc_return_by', { time: returnTimeStr })}`;
 
       const warningMsg = unrecognizedAddresses.length > 0 
-        ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
+        ? ` (${t('svc_addresses_not_recognized', { count: unrecognizedAddresses.length })})` 
         : '';
       toast({ 
-        title: 'Route Optimized', 
-        description: `Depart ${departureTimeStr}, ${orderedProjects.length} stops.${overtimeMsg}${warningMsg}`,
+        title: t('svc_route_optimized'), 
+        description: `${t('svc_depart_stops', { time: departureTimeStr, count: orderedProjects.length })}${overtimeMsg}${warningMsg}`,
         variant: overtime ? 'destructive' : 'default',
       });
       loadData();
