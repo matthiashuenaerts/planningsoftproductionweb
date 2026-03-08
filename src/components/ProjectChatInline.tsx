@@ -487,12 +487,12 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
                 ? `Message to ${selectedUsers.length} user(s)...` 
                 : "Type your message..."
               }
-              className="flex-1"
+              className="flex-1 h-8 sm:h-9 text-xs sm:text-sm"
               disabled={isSending}
             />
             
-            <Button type="submit" disabled={isSending || (!newMessage.trim() && !selectedFile)}>
-              <Send className="w-4 h-4" />
+            <Button type="submit" disabled={isSending || (!newMessage.trim() && !selectedFile)} size="icon" className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0">
+              <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
           </form>
         </div>
