@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { ArrowRight, Mail, Sparkles, Phone, MapPin, Clock } from "lucide-react";
 import contactBg from "@/assets/marketing/contact-bg.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
 
 const MarketingContact: React.FC = () => {
   const { t } = useMarketingLang();

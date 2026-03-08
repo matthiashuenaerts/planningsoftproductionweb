@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
+import SEOHead from "@/components/marketing/SEOHead";
 import thononLogo from "@/assets/thonon-logo.png";
 import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
 import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";

@@ -2,6 +2,7 @@ import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { CheckCircle2 } from "lucide-react";
 import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
 
 interface FeatureBlock {
   titleKey: string;

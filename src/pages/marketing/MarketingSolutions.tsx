@@ -2,6 +2,7 @@ import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { TrendingUp, Truck, RefreshCw, MessageCircle } from "lucide-react";
 import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
 
 const solutions = [
   { titleKey: "sol_efficiency_title", problemKey: "sol_efficiency_problem", solutionKey: "sol_efficiency_solution", Icon: TrendingUp },

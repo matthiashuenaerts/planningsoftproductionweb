@@ -3,6 +3,7 @@ import { useMarketingLang } from "@/components/marketing/useMarketingLang";
 import { RefreshCw, Download, CheckCircle, Plug, Code } from "lucide-react";
 import integrationNetwork from "@/assets/marketing/integration-network.jpg";
 import heroDashboard from "@/assets/marketing/hero-dashboard.jpg";
+import SEOHead from "@/components/marketing/SEOHead";
 
 const MarketingIntegration: React.FC = () => {
   const { t } = useMarketingLang();
