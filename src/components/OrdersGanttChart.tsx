@@ -588,11 +588,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   useLayoutEffect(() => {
     const update = () => {
       const el = timelineRef.current;
+      const sideColPx = isMobile ? 128 : 256;
       if (el) {
         const total = el.getBoundingClientRect().width;
-        setContainerWidth(Math.max(0, total - 256));
+        setContainerWidth(Math.max(0, total - sideColPx));
       } else {
-        setContainerWidth(Math.max(0, window.innerWidth - 1040));
+        setContainerWidth(Math.max(0, window.innerWidth - sideColPx - 256));
       }
     };
     update();
