@@ -1023,10 +1023,10 @@ const Dashboard: React.FC = () => {
         </Card>
         
         {/* Tasks by Status Pie Chart */}
-        <Card>
+        <Card className="rounded-xl border-border/60 shadow-sm">
           <CardHeader className="px-3 sm:px-6 pb-2">
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
               {t('dashboard_tasks_by_status')}
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">{t('dashboard_status_distribution')}</CardDescription>
