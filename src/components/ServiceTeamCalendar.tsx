@@ -200,7 +200,7 @@ const ServiceTeamCalendar: React.FC = () => {
         }
       }
 
-      toast({ title: 'Success', description: `Service scheduled for "${project?.name || 'project'}" on ${format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy')}` });
+      toast({ title: t('svc_success'), description: t('svc_service_scheduled', { project: project?.name || 'project', date: format(new Date(selectedDate + 'T12:00:00'), 'dd/MM/yyyy') }) });
       setIsAssignDialogOpen(false);
       setAssignDescription('');
       setAssignTodos(['']);
