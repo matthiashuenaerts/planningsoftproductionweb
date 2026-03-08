@@ -39,6 +39,27 @@ const NavbarContent = ({
   const canSeeTimeRegistrations = isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role));
   const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
+  // Check if employee is a member of any service team
+  const { data: isServiceMember } = useQuery({
+    queryKey: ['isServiceTeamMember', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee) return false;
+      const { data: memberships } = await supabase
+        .from('placement_team_members' as any)
+        .select('team_id')
+        .eq('employee_id', currentEmployee.id);
+      if (!memberships || memberships.length === 0) return false;
+      const teamIds = (memberships as any[]).map((m: any) => m.team_id);
+      const { data: serviceTeams } = await (supabase
+        .from('placement_teams')
+        .select('id') as any)
+        .eq('team_type', 'service')
+        .eq('is_active', true)
+        .in('id', teamIds);
+      return serviceTeams && serviceTeams.length > 0;
+    },
+    enabled: !!currentEmployee,
+  });
   // Query rush orders to get counts for pending orders and unread messages
   const {
     data: rushOrders,
