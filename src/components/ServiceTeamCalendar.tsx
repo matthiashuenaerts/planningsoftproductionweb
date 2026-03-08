@@ -296,7 +296,7 @@ const ServiceTeamCalendar: React.FC = () => {
       const osrmData = await osrmResp.json();
 
       if (osrmData.code !== 'Ok' || !osrmData.trips || osrmData.trips.length === 0) {
-        toast({ title: 'Warning', description: 'Route optimization service unavailable. Using postal code fallback.' });
+        toast({ title: t('svc_warning'), description: t('svc_route_unavailable') });
         await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
         return;
       }
