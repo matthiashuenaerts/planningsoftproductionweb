@@ -94,24 +94,33 @@ const TruckLoadingCalendar = () => {
         });
         setManualOverrides(overridesMap);
         
-        // Fetch all projects with installation dates
+        // Fetch all projects with installation dates and team assignments
         let projectsQuery = supabase
           .from('projects')
-          .select('id, name, client, status, installation_date')
+          .select('id, name, client, status, installation_date, project_team_assignments(team_id)')
           .not('installation_date', 'is', null)
           .order('installation_date');
         projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
         const { data: projectsData, error: projectsError } = await projectsQuery;
           
         if (projectsError) throw projectsError;
+
+        // Fetch all placement teams for colors
+        let teamsQuery = supabase.from('placement_teams').select('id, color');
+        teamsQuery = applyTenantFilter(teamsQuery, tenant?.id);
+        const { data: teamsData } = await teamsQuery;
+        const teamColorMap: Record<string, string> = {};
+        (teamsData || []).forEach((team: any) => { teamColorMap[team.id] = team.color; });
         
         // Calculate loading dates for each project
-        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map(project => {
+        const loadingAssignments: LoadingAssignment[] = (projectsData || []).map((project: any) => {
           const installationDate = new Date(project.installation_date);
           const loadingDate = getPreviousWorkday(installationDate, holidaysData);
+          const firstAssignment = project.project_team_assignments?.[0];
+          const teamColor = firstAssignment ? teamColorMap[firstAssignment.team_id] : undefined;
           
           return {
-            project,
+            project: { ...project, team_color: teamColor },
             loading_date: format(loadingDate, 'yyyy-MM-dd'),
           };
         });
