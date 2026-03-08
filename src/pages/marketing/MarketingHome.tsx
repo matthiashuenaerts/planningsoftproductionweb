@@ -35,8 +35,15 @@ import {
   Rocket,
 } from "lucide-react";
 
+const seoMeta: Record<string, { title: string; desc: string }> = {
+  nl: { title: "AutoMattiOn Compass | Productieplanning Software voor Meubelfabrikanten", desc: "Het alles-in-één productieplanningsplatform voor meubelfabrikanten. Beheer werkstations, bestellingen, logistiek en teams vanuit één plek." },
+  en: { title: "AutoMattiOn Compass | Production Planning Software for Furniture Manufacturers", desc: "The all-in-one production planning platform for furniture manufacturers. Manage workstations, orders, logistics, and teams from one place." },
+  fr: { title: "AutoMattiOn Compass | Logiciel de Planification de Production pour Fabricants de Meubles", desc: "La plateforme de planification de production tout-en-un pour les fabricants de meubles. Gérez postes de travail, commandes, logistique et équipes." },
+};
+
 const MarketingHome: React.FC = () => {
   const { lang, t } = useMarketingLang();
+  const seo = seoMeta[lang] || seoMeta.nl;
 
   const painKeys = [
     "pain_1", "pain_2", "pain_3", "pain_4", "pain_5", "pain_6", "pain_7",
