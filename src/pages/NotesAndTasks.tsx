@@ -262,30 +262,30 @@ const NotesAndTasks = () => {
       )}
       {isMobile && <Navbar />}
       <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">{t('nt_title')}</h1>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+        <div className={`${isMobile ? 'px-3 py-4' : 'container mx-auto px-4 py-6'}`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'} mb-4 sm:mb-6`}>
+            <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold`}>{t('nt_title')}</h1>
+            <Button onClick={() => setIsCreateDialogOpen(true)} size={isMobile ? 'sm' : 'default'} className={isMobile ? 'w-full text-xs' : ''}>
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
               {t('nt_create_new')}
             </Button>
           </div>
 
           {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="flex flex-col gap-2 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-2.5 sm:top-3 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
               <Input
                 placeholder={t('nt_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-9 sm:pl-10 h-9 sm:h-10 text-sm"
               />
             </div>
             <div className="flex gap-2">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[150px]">
-                  <Filter className="h-4 w-4 mr-2" />
+                <SelectTrigger className={`${isMobile ? 'flex-1 h-8 text-xs' : 'w-[150px]'}`}>
+                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                   <SelectValue placeholder={t('nt_status')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -296,7 +296,7 @@ const NotesAndTasks = () => {
                 </SelectContent>
               </Select>
               <Select value={filterPriority} onValueChange={setFilterPriority}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className={`${isMobile ? 'flex-1 h-8 text-xs' : 'w-[150px]'}`}>
                   <SelectValue placeholder={t('nt_priority')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -310,15 +310,15 @@ const NotesAndTasks = () => {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="all">{t('nt_all')}</TabsTrigger>
-              <TabsTrigger value="note">{t('nt_notes')}</TabsTrigger>
-              <TabsTrigger value="task">{t('nt_tasks')}</TabsTrigger>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4 sm:mb-6">
+            <TabsList className={isMobile ? 'w-full' : ''}>
+              <TabsTrigger value="all" className={isMobile ? 'flex-1 text-xs' : ''}>{t('nt_all')}</TabsTrigger>
+              <TabsTrigger value="note" className={isMobile ? 'flex-1 text-xs' : ''}>{t('nt_notes')}</TabsTrigger>
+              <TabsTrigger value="task" className={isMobile ? 'flex-1 text-xs' : ''}>{t('nt_tasks')}</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="all" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <TabsContent value="all" className="mt-4 sm:mt-6">
+              <div className={`grid gap-3 sm:gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
@@ -333,8 +333,8 @@ const NotesAndTasks = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="note" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <TabsContent value="note" className="mt-4 sm:mt-6">
+              <div className={`grid gap-3 sm:gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
@@ -349,8 +349,8 @@ const NotesAndTasks = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="task" className="mt-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <TabsContent value="task" className="mt-4 sm:mt-6">
+              <div className={`grid gap-3 sm:gap-4 ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2 lg:grid-cols-3'}`}>
                 {filteredItems.map((item) => (
                   <PersonalItemCard
                     key={item.id}
@@ -367,8 +367,8 @@ const NotesAndTasks = () => {
           </Tabs>
 
           {filteredItems.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">{t('nt_no_items')}</p>
+            <div className="text-center py-8 sm:py-12">
+              <p className="text-sm sm:text-base text-muted-foreground">{t('nt_no_items')}</p>
             </div>
           )}
 
