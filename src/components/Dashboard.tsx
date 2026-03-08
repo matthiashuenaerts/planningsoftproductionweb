@@ -1025,7 +1025,7 @@ const Dashboard: React.FC = () => {
             <div className="h-48 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={100} dataKey="value" label={({
+                  <Pie data={tasksByStatus} cx="50%" cy="50%" labelLine={false} outerRadius={typeof window !== 'undefined' && window.innerWidth < 640 ? 60 : 100} dataKey="value" label={({
                   name,
                   percent
                 }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
