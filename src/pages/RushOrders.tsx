@@ -65,10 +65,10 @@ const RushOrders = () => {
                   {!isMobile && t('new_rush_order')}
                 </Button>
               </DialogTrigger>
-              <DialogContent className={`max-h-[90vh] overflow-auto ${isMobile ? 'max-w-[calc(100vw-2rem)] w-[calc(100vw-2rem)] p-4' : 'max-w-4xl'}`}>
-                <DialogHeader>
-                  <DialogTitle>{t('create_new_rush_order')}</DialogTitle>
-                  <DialogDescription>
+              <DialogContent className={`max-h-[90vh] overflow-auto overflow-x-hidden ${isMobile ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-3' : 'max-w-4xl'}`}>
+                <DialogHeader className={isMobile ? 'space-y-1' : ''}>
+                  <DialogTitle className={isMobile ? 'text-base' : ''}>{t('create_new_rush_order')}</DialogTitle>
+                  <DialogDescription className={isMobile ? 'text-xs' : ''}>
                     {t('create_new_rush_order_desc')}
                   </DialogDescription>
                 </DialogHeader>

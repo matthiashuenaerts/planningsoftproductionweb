@@ -362,33 +362,33 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   }
   
   return (
-    <form onSubmit={formHandleSubmit(onSubmit)} className={`${isMobile ? 'space-y-4' : 'space-y-6'}`}>
-      <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-4 md:gap-6'}`}>
-        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
-          <div className="space-y-1.5">
-            <label htmlFor="title" className="block text-sm font-medium">{t('ro_title')}</label>
+    <form onSubmit={formHandleSubmit(onSubmit)} className={`${isMobile ? 'space-y-3' : 'space-y-6'}`}>
+      <div className={`grid grid-cols-1 ${isMobile ? 'gap-3' : 'md:grid-cols-2 gap-4 md:gap-6'}`}>
+        <div className={`${isMobile ? 'space-y-2.5' : 'space-y-4 md:space-y-6'} min-w-0`}>
+          <div className="space-y-1">
+            <label htmlFor="title" className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_title')}</label>
             <Input
               id="title"
               placeholder={t('ro_title_placeholder')}
               {...register("title", { required: t('ro_title_required') })}
-              className="w-full"
+              className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}
             />
-            {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
+            {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
           </div>
           
-          <div className="space-y-2">
-            <label htmlFor="description" className="block text-sm font-medium">{t('ro_description')}</label>
+          <div className="space-y-1">
+            <label htmlFor="description" className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_description')}</label>
             <Textarea
               id="description"
               placeholder={t('ro_description_placeholder')}
               {...register("description", { required: t('ro_description_required') })}
-              className="w-full min-h-[100px]"
+              className={`w-full ${isMobile ? 'min-h-[70px] text-sm' : 'min-h-[100px]'}`}
             />
-            {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+            {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
           </div>
           
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_deadline')}</label>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_deadline')}</label>
             <div className="flex flex-col sm:flex-row gap-2">
               <Popover>
                 <PopoverTrigger asChild>
@@ -396,10 +396,11 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
                     variant="outline"
                     className={cn(
                       "flex-1 justify-start text-left font-normal",
+                      isMobile && "h-9 text-sm",
                       !date && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className={`mr-2 ${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                     {date ? format(date, "PPP") : <span>{t('ro_pick_date')}</span>}
                   </Button>
                 </PopoverTrigger>
@@ -418,15 +419,15 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
                 type="time"
                 value={deadlineTime}
                 onChange={(e) => setDeadlineTime(e.target.value)}
-                className="w-full sm:w-28"
+                className={`${isMobile ? 'h-9 text-sm w-full' : 'w-full sm:w-28'}`}
               />
             </div>
           </div>
           
-          <div className="space-y-2">
-            <label htmlFor="projectId" className="block text-sm font-medium">{t('ro_project_optional')}</label>
+          <div className="space-y-1">
+            <label htmlFor="projectId" className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_project_optional')}</label>
             <Select value={watchData.projectId || 'none'} onValueChange={(value) => setValue('projectId', value === 'none' ? '' : value)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}>
                 <SelectValue placeholder={t('ro_select_project')} />
               </SelectTrigger>
               <SelectContent>
@@ -444,40 +445,40 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_attachment')}</label>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_attachment')}</label>
             {filePreview ? (
-              <div className="relative w-full text-center border-2 border-dashed border-border rounded-lg p-4 md:p-6">
+              <div className={`relative w-full text-center border-2 border-dashed border-border rounded-lg ${isMobile ? 'p-3' : 'p-4 md:p-6'}`}>
                 {filePreview.url ? (
-                  <img src={filePreview.url} alt="Preview" className="w-full h-auto rounded-md max-h-64 object-contain" />
+                  <img src={filePreview.url} alt="Preview" className={`w-full h-auto rounded-md object-contain ${isMobile ? 'max-h-40' : 'max-h-64'}`} />
                 ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <FileIcon className="h-12 w-12 text-muted-foreground" />
-                    <p className="font-medium text-sm break-all">{filePreview.name}</p>
+                  <div className="flex flex-col items-center gap-1.5">
+                    <FileIcon className={`text-muted-foreground ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} />
+                    <p className="font-medium text-xs break-all">{filePreview.name}</p>
                   </div>
                 )}
                 <Button type="button" variant="destructive" size="sm"
-                  className="absolute top-2 right-2" onClick={clearImage}>
+                  className="absolute top-1.5 right-1.5" onClick={clearImage}>
                   {t('ro_remove')}
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={startCamera} className="flex items-center gap-2" size="sm">
-                    <Camera className="h-4 w-4" />
-                    {t('ro_take_photo')}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap gap-1.5">
+                  <Button type="button" variant="outline" onClick={startCamera} className="flex items-center gap-1.5" size="sm">
+                    <Camera className="h-3.5 w-3.5" />
+                    <span className={isMobile ? 'text-xs' : ''}>{t('ro_take_photo')}</span>
                   </Button>
-                  <Button type="button" variant="outline" onClick={triggerFileInput} className="flex items-center gap-2" size="sm">
-                    <Image className="h-4 w-4" />
-                    {t('ro_choose_file')}
+                  <Button type="button" variant="outline" onClick={triggerFileInput} className="flex items-center gap-1.5" size="sm">
+                    <Image className="h-3.5 w-3.5" />
+                    <span className={isMobile ? 'text-xs' : ''}>{t('ro_choose_file')}</span>
                   </Button>
                 </div>
-                <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg p-4 md:p-6 cursor-pointer" onClick={triggerFileInput}>
+                <div className={`flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg cursor-pointer ${isMobile ? 'p-3' : 'p-4 md:p-6'}`} onClick={triggerFileInput}>
                   <div className="text-center">
-                    <FileIcon className="mx-auto h-12 w-12 text-muted-foreground/60" />
-                    <p className="mt-2 text-sm text-muted-foreground">{t('ro_click_upload')}</p>
-                    <p className="text-xs text-muted-foreground/60">{t('ro_file_types')}</p>
+                    <FileIcon className={`mx-auto text-muted-foreground/60 ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} />
+                    <p className={`mt-1.5 text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_click_upload')}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{t('ro_file_types')}</p>
                   </div>
                 </div>
               </div>
@@ -493,19 +494,19 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           </div>
         </div>
         
-        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_select_tasks')}</label>
+        <div className={`${isMobile ? 'space-y-2.5' : 'space-y-4 md:space-y-6'} min-w-0`}>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_select_tasks')}</label>
             <Card>
-              <CardHeader className="p-3 md:p-4">
-                <CardTitle className="text-sm md:text-base">{t('ro_standard_tasks')}</CardTitle>
+              <CardHeader className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+                <CardTitle className={isMobile ? 'text-xs' : 'text-sm md:text-base'}>{t('ro_standard_tasks')}</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 md:p-4 pt-0">
+              <CardContent className={`${isMobile ? 'p-2.5' : 'p-3 md:p-4'} pt-0`}>
                 {loadingTasks ? (
-                  <div className="flex justify-center p-4 text-sm text-muted-foreground">{t('ro_loading_tasks')}</div>
+                  <div className="flex justify-center p-3 text-xs text-muted-foreground">{t('ro_loading_tasks')}</div>
                 ) : (
-                  <ScrollArea className="h-[200px]">
-                    <div className="grid grid-cols-1 gap-2">
+                  <ScrollArea className={isMobile ? 'h-[150px]' : 'h-[200px]'}>
+                    <div className="grid grid-cols-1 gap-1.5">
                       {standardTasks?.map((task: StandardTask) => (
                         <CheckboxCard
                           key={task.id}
@@ -522,22 +523,22 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
               </CardContent>
             </Card>
             {errors.selectedTasks && selectedTaskIds.length === 0 && (
-              <p className="text-sm text-destructive">{t('ro_select_task_required')}</p>
+              <p className="text-xs text-destructive">{t('ro_select_task_required')}</p>
             )}
           </div>
           
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">{t('ro_assign_users')}</label>
+          <div className="space-y-1">
+            <label className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_assign_users')}</label>
             <Card>
-              <CardHeader className="p-3 md:p-4">
-                <CardTitle className="text-sm md:text-base">{t('ro_team_members')}</CardTitle>
+              <CardHeader className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+                <CardTitle className={isMobile ? 'text-xs' : 'text-sm md:text-base'}>{t('ro_team_members')}</CardTitle>
               </CardHeader>
-              <CardContent className="p-3 md:p-4 pt-0">
+              <CardContent className={`${isMobile ? 'p-2.5' : 'p-3 md:p-4'} pt-0`}>
                 {loadingEmployees ? (
-                  <div className="flex justify-center p-4 text-sm text-muted-foreground">{t('ro_loading_users')}</div>
+                  <div className="flex justify-center p-3 text-xs text-muted-foreground">{t('ro_loading_users')}</div>
                 ) : (
-                  <ScrollArea className="h-[200px]">
-                    <div className="grid grid-cols-1 gap-2">
+                  <ScrollArea className={isMobile ? 'h-[150px]' : 'h-[200px]'}>
+                    <div className="grid grid-cols-1 gap-1.5">
                       {employees?.map((employee) => (
                         <CheckboxCard
                           key={employee.id}
@@ -554,14 +555,14 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
               </CardContent>
             </Card>
             {errors.assignedUsers && selectedUserIds.length === 0 && (
-              <p className="text-sm text-destructive">{t('ro_assign_user_required')}</p>
+              <p className="text-xs text-destructive">{t('ro_assign_user_required')}</p>
             )}
           </div>
         </div>
       </div>
       
-      <div className={`flex ${isMobile ? 'pt-2' : ''} justify-end`}>
-        <Button type="submit" disabled={isSubmitting} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
+      <div className={`flex ${isMobile ? 'pt-1' : ''} justify-end`}>
+        <Button type="submit" disabled={isSubmitting} size={isMobile ? 'sm' : 'default'} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
           {isSubmitting ? t('ro_creating') : t('ro_create_rush_order')}
         </Button>
       </div>
