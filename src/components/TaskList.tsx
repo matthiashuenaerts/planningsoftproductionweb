@@ -485,7 +485,7 @@ const TaskList: React.FC<TaskListProps> = ({
             <CardContent>
               {!compact && (
                 <p className="text-muted-foreground mb-4">
-                  {task.estimated_duration && t('tl_duration_label', { duration: task.estimated_duration })}
+                  {task.estimated_duration && t('tl_duration_label', { duration: String(task.estimated_duration) })}
                   {task.estimated_duration && task.description && '\n'}
                   {task.description}
                 </p>
