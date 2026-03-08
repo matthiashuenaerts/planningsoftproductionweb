@@ -38,7 +38,7 @@ const Login: React.FC = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isAuthenticated, isDeveloper } = useAuth();
+  const { login, isAuthenticated, isDeveloper, refetchEmployee } = useAuth();
   const location = useLocation();
   const { tenant } = useParams<{ tenant: string }>();
 
@@ -192,6 +192,8 @@ const Login: React.FC = () => {
         await supabase.rpc("set_developer_active_tenant", {
           p_tenant_id: row.tenant_id,
         });
+        // Re-fetch employee data so AuthContext picks up the effective tenant_id
+        await refetchEmployee();
       }
 
       logLoginAttempt({
