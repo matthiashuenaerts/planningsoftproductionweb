@@ -846,26 +846,28 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
                       lanes.map((lane) => (
                         <div
                           key={lane.laneIndex}
-                          className="px-3 py-1 text-xs flex items-center"
+                          className={cn("flex items-center", isMobile ? "px-1.5 py-0.5 text-[9px]" : "px-3 py-1 text-xs")}
                           style={{ 
                             height: rowHeight,
                             borderTop: lane.laneIndex > 0 ? '1px dashed hsl(var(--border) / 0.3)' : undefined
                           }}
                         >
-                          <span className="text-muted-foreground">
-                            Werker {lane.laneIndex + 1}: 
-                          </span>
-                          <span className="ml-1 font-medium truncate">
-                            {lane.employeeName}
-                          </span>
+                          {isMobile ? (
+                            <span className="font-medium truncate">{lane.employeeName.split(' ')[0]}</span>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground">Werker {lane.laneIndex + 1}: </span>
+                              <span className="ml-1 font-medium truncate">{lane.employeeName}</span>
+                            </>
+                          )}
                         </div>
                       ))
                     ) : (
                       <div
-                        className="px-3 py-1 text-xs flex items-center"
+                        className={cn("flex items-center", isMobile ? "px-1.5 py-0.5 text-[9px]" : "px-3 py-1 text-xs")}
                         style={{ height: rowHeight }}
                       >
-                        <span className="text-muted-foreground">Geen taken gepland</span>
+                        <span className="text-muted-foreground">{isMobile ? '—' : 'Geen taken gepland'}</span>
                       </div>
                     )
                   )}
