@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Truck, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ const DailyTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
   const { toast } = useToast();
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
 
@@ -90,22 +92,22 @@ const DailyTasks: React.FC = () => {
       <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Installation Calendar</h1>
+            <h1 className="text-2xl font-bold">{t('dt_installation_calendar')}</h1>
             
             <div className="flex mt-4 md:mt-0 space-x-2">
               <Button variant={displayMode === 'gantt' ? 'default' : 'outline'} onClick={() => setDisplayMode('gantt')}>
-                Gantt Chart
+                {t('dt_gantt_chart')}
               </Button>
               <Button variant={displayMode === 'teams' ? 'default' : 'outline'} onClick={() => setDisplayMode('teams')}>
-                Team Planner
+                {t('dt_team_planner')}
               </Button>
               <Button variant={displayMode === 'trucks' ? 'default' : 'outline'} onClick={() => setDisplayMode('trucks')}>
                 <Truck className="h-4 w-4 mr-2" />
-                Truck Loading
+                {t('dt_truck_loading')}
               </Button>
               <Button variant={displayMode === 'service' ? 'default' : 'outline'} onClick={() => setDisplayMode('service')}>
                 <Wrench className="h-4 w-4 mr-2" />
-                Service Teams
+                {t('dt_service_teams')}
               </Button>
             </div>
           </div>

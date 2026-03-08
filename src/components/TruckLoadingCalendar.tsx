@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { ChevronLeft, ChevronRight, Truck, Calendar, AlertTriangle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,7 @@ interface LoadingAssignment {
 
 const TruckLoadingCalendar = () => {
   const { tenant } = useTenant();
+  const { t } = useLanguage();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
     return startOfWeek(today, { weekStartsOn: 1 });
@@ -287,7 +289,7 @@ const TruckLoadingCalendar = () => {
         <CardHeader className="bg-red-500 text-white">
           <CardTitle className="text-2xl flex items-center gap-3">
             <Truck className="h-8 w-8" />
-            TODAY'S LOADING SCHEDULE
+            {t('truck_todays_schedule')}
             <Badge className="bg-white text-red-500 text-lg px-3 py-1">
               {format(new Date(), 'EEEE, MMMM d')}
             </Badge>
@@ -309,13 +311,13 @@ const TruckLoadingCalendar = () => {
                       {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                     <div className="text-sm text-gray-600">
-                      Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                      {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
                   <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
                   <p className="text-gray-600 mb-2">{assignment.project.client}</p>
                   <div className="text-sm text-gray-500">
-                    Loading scheduled for today, installation starts tomorrow
+                    {t('truck_loading_today')}
                   </div>
                 </div>
               ))}
@@ -323,8 +325,8 @@ const TruckLoadingCalendar = () => {
           ) : (
             <div className="text-center py-8">
               <Truck className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <h3 className="text-xl font-medium text-gray-600 mb-2">No Loading Scheduled Today</h3>
-              <p className="text-gray-500">All trucks are ready for tomorrow's installations</p>
+              <h3 className="text-xl font-medium text-gray-600 mb-2">{t('truck_no_loading_today')}</h3>
+              <p className="text-gray-500">{t('truck_all_ready')}</p>
             </div>
           )}
         </CardContent>
@@ -336,7 +338,7 @@ const TruckLoadingCalendar = () => {
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Weekly Loading Schedule
+              {t('truck_weekly_schedule')}
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="icon" onClick={prevWeek}>
@@ -391,7 +393,7 @@ const TruckLoadingCalendar = () => {
                             {assignment.project.name}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Install: {format(new Date(assignment.project.installation_date), 'MMM d')}
+                            {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                           </div>
                           <div className="flex items-center justify-between mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
@@ -426,7 +428,7 @@ const TruckLoadingCalendar = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Upcoming Loading ({upcomingAssignments.length})
+            {t('truck_upcoming_loading')} ({upcomingAssignments.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -459,7 +461,7 @@ const TruckLoadingCalendar = () => {
                               ←
                             </button>
                             <span className="text-sm text-gray-600">
-                              Load: {format(new Date(effectiveLoadingDate), 'MMM d')}
+                              {t('truck_load')}: {format(new Date(effectiveLoadingDate), 'MMM d')}
                               {isManuallyAdjusted && <span className="text-orange-600 ml-1">*</span>}
                             </span>
                             <button
@@ -474,7 +476,7 @@ const TruckLoadingCalendar = () => {
                         <p className="text-sm text-gray-600">{assignment.project.client}</p>
                       </div>
                       <div className="text-xs text-gray-500 text-right">
-                        <div>Install:</div>
+                        <div>{t('truck_install')}:</div>
                         <div>{format(new Date(assignment.project.installation_date), 'MMM d')}</div>
                       </div>
                     </div>
@@ -484,14 +486,14 @@ const TruckLoadingCalendar = () => {
               
               {upcomingAssignments.length > 10 && (
                 <div className="text-center py-2 text-sm text-gray-500">
-                  +{upcomingAssignments.length - 10} more assignments
+                  +{t('truck_more_assignments', { count: String(upcomingAssignments.length - 10) })}
                 </div>
               )}
             </div>
           ) : (
             <div className="text-center py-6 text-gray-500">
               <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-              <p>No upcoming loading scheduled</p>
+              <p>{t('truck_no_upcoming')}</p>
             </div>
           )}
         </CardContent>
