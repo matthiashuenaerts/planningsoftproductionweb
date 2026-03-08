@@ -416,13 +416,13 @@ const { data, error } = await supabase.functions.invoke(
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Folder className="h-4 w-4 sm:h-5 sm:w-5" />
             OneDrive Integratie
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           <div className="flex justify-center items-center py-4">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
@@ -434,46 +434,46 @@ const { data, error } = await supabase.functions.invoke(
   return (
     <>
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="px-3 sm:px-6 py-2.5 sm:py-4 pb-1.5 sm:pb-2">
           <CardTitle className="flex items-center gap-2 justify-between">
-            <div className="flex items-center gap-2">
-              <Folder className="h-5 w-5" />
+            <div className="flex items-center gap-2 text-sm sm:text-lg">
+              <Folder className="h-4 w-4 sm:h-5 sm:w-5" />
               OneDrive
             </div>
             <div className="flex items-center gap-1">
               {isAuthenticated && config && (
-                <Button variant="ghost" size="sm" onClick={() => loadFiles()}>
-                  <RefreshCw className="h-4 w-4" />
+                <Button variant="ghost" size="sm" onClick={() => loadFiles()} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                  <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               )}
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6 pb-3 sm:pb-6">
           {!isAuthenticated ? (
             <div className="space-y-4">
-              <div className="p-4 border rounded-lg bg-muted/30 text-center">
-                <LogIn className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
+              <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 text-center">
+                <LogIn className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                   Log in met je Microsoft account om OneDrive bestanden te bekijken.
                 </p>
-                <Button onClick={handleAuthenticate}>
-                  <LogIn className="h-4 w-4 mr-2" />
+                <Button onClick={handleAuthenticate} className="h-8 sm:h-9 text-xs sm:text-sm">
+                  <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                   Inloggen met Microsoft
                 </Button>
               </div>
               
               <Collapsible open={helpOpen} onOpenChange={setHelpOpen}>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground">
-                    <HelpCircle className="h-4 w-4 mr-2" />
+                  <Button variant="ghost" size="sm" className="text-muted-foreground h-7 sm:h-8 text-xs sm:text-sm">
+                    <HelpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                     Setup instructies
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                  <div className="bg-muted p-4 rounded-lg text-sm space-y-2">
+                   <div className="bg-muted p-3 sm:p-4 rounded-lg text-xs sm:text-sm space-y-2">
                     <p className="font-medium">Om OneDrive te gebruiken:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] sm:text-sm">
                       <li>Registreer een Azure AD app (gratis)</li>
                       <li>Configureer MICROSOFT_CLIENT_ID en MICROSOFT_CLIENT_SECRET</li>
                       <li>Log in met je Microsoft account</li>
@@ -486,85 +486,87 @@ const { data, error } = await supabase.functions.invoke(
           ) : config ? (
             <div className="space-y-4">
               {/* Folder header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                   {folderStack.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={navigateBack}>
-                      <ArrowLeft className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" onClick={navigateBack} className="h-7 w-7 sm:h-8 sm:w-8 p-0 flex-shrink-0">
+                      <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                   )}
-                  <span className="font-medium">
+                  <span className="font-medium text-xs sm:text-base truncate">
                     {folderStack.length > 0 
                       ? folderStack[folderStack.length - 1].name 
                       : config.folder_name}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => window.open(config.folder_url, '_blank')}
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                   >
-                    <ExternalLink className="h-4 w-4" />
+                    <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={handleDisconnect}
-                    className="text-destructive hover:text-destructive"
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                   >
-                    <Unlink className="h-4 w-4" />
+                    <Unlink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Files list */}
-              <ScrollArea className="h-[300px] border rounded-lg">
+              <ScrollArea className="h-[250px] sm:h-[300px] border rounded-lg">
                 {filesLoading ? (
                   <div className="flex justify-center items-center h-full">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
                 ) : files.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
-                    <Folder className="h-12 w-12 mb-2 opacity-50" />
-                    <p>Geen bestanden gevonden</p>
+                    <Folder className="h-10 w-10 sm:h-12 sm:w-12 mb-2 opacity-50" />
+                    <p className="text-xs sm:text-sm">Geen bestanden gevonden</p>
                   </div>
                 ) : (
                   <div className="divide-y">
                     {files.map((file) => (
                       <div
                         key={file.id}
-                        className={`flex items-center justify-between p-3 hover:bg-muted/50 ${
+                        className={`flex items-center justify-between p-2.5 sm:p-3 hover:bg-muted/50 active:bg-muted/70 ${
                           file.isFolder ? 'cursor-pointer' : ''
                         }`}
                         onClick={() => file.isFolder && navigateToFolder(file)}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                           {getFileIcon(file)}
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-medium text-xs sm:text-sm truncate">{file.name}</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">
                               {file.isFolder 
                                 ? `${file.childCount || 0} items` 
                                 : formatFileSize(file.size)}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                           {!file.isFolder && (
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 window.open(file.webUrl, '_blank');
                               }}
                             >
-                              <ExternalLink className="h-4 w-4" />
+                              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           )}
                           {file.isFolder && (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                           )}
                         </div>
                       </div>
@@ -575,10 +577,10 @@ const { data, error } = await supabase.functions.invoke(
 
               {/* Status */}
               <div className="flex items-center justify-between pt-2 border-t">
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-[10px] sm:text-xs">
                   Verbonden
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs">
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-[10px] sm:text-xs h-7 sm:h-8">
                   Uitloggen
                 </Button>
               </div>
