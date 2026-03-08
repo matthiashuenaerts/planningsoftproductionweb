@@ -477,7 +477,7 @@ const TaskList: React.FC<TaskListProps> = ({
                     className={`${getStatusColor(task.status)} text-white flex items-center gap-1`}
                   >
                     {getStatusIcon(task.status)}
-                    {task.status === 'HOLD' ? 'On Hold' : task.status.replace('_', ' ')}
+                    {task.status === 'HOLD' ? t('tl_on_hold_status') : task.status.replace('_', ' ')}
                   </Badge>
                 </div>
               </div>
