@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         .select(`
           id, title, duration, status, standard_task_id, phase_id,
           phases!inner (project_id, projects!inner (id, name, installation_date)),
-          standard_tasks (task_number),
+          standard_tasks (task_number, multi_user_task),
           task_workstation_links (workstation_id)
         `)
         .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
