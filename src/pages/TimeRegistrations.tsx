@@ -823,17 +823,17 @@ const TimeRegistrations = () => {
 
   if (!canViewAllRegistrations) {
     return (
-      <div className="min-h-screen bg-gray-50 flex">
+      <div className="min-h-screen bg-background flex">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">{t("my_time_registrations")}</h1>
-            <p className="text-gray-600 mt-2">{t("my_time_registrations_description")}</p>
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+          <div className={isMobile ? 'mb-4' : 'mb-8'}>
+            <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("my_time_registrations")}</h1>
+            {!isMobile && <p className="text-muted-foreground mt-2">{t("my_time_registrations_description")}</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
