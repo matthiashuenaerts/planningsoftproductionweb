@@ -80,6 +80,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+
+  // Default to 1 week on mobile once hook resolves
+  useEffect(() => {
+    if (isMobile) setWeeksToShow(1);
+  }, [isMobile]);
   const [loading, setLoading] = useState(true);
   const [draggedProject, setDraggedProject] = useState<{ project: Project; teamId: string } | null>(null);
   const [resizingProject, setResizingProject] = useState<{
