@@ -160,10 +160,10 @@ const ProjectFilesPopup: React.FC<ProjectFilesPopupProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[80vh] overflow-y-auto p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Project Files - {projectName}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-sm sm:text-lg leading-tight break-words">Project Files - {projectName}</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Browse and manage files for this project
             </DialogDescription>
           </DialogHeader>
@@ -173,44 +173,47 @@ const ProjectFilesPopup: React.FC<ProjectFilesPopupProps> = ({
               <Loader2 className="animate-spin h-8 w-8" />
             </div>
           ) : files.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {files.map((file) => (
                 <Card key={file.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <File className="h-5 w-5 text-blue-500" />
-                        <div>
-                          <p className="font-medium">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">
+                  <CardContent className="p-2.5 sm:p-4">
+                    <div className="flex items-start sm:items-center justify-between gap-2">
+                      <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 min-w-0">
+                        <File className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 shrink-0 mt-0.5 sm:mt-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-xs sm:text-sm break-all leading-tight">{file.name}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">
                             {formatFileSize(file.size)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1 sm:space-x-2 shrink-0">
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => setPreviewFileName(file.name)}
                           title="Preview"
+                          className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => openFile(file.name)}
                           title="Open"
+                          className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => downloadFile(file.name)}
                           title="Download"
+                          className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
                     </div>
