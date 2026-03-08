@@ -1194,15 +1194,15 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Order Materials */}
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
               {t('costing_order_materials')}
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Marge:</span>
-              <div className="relative w-20">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Marge:</span>
+              <div className="relative w-16 sm:w-20">
                 <Input
                   type="number"
                   min="0"
@@ -1210,14 +1210,14 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                   step="1"
                   value={margins.orderMaterials}
                   onChange={(e) => setMargins(prev => ({ ...prev, orderMaterials: parseFloat(e.target.value) || 0 }))}
-                  className="h-8 pr-6 text-right text-sm"
+                  className="h-7 sm:h-8 pr-5 sm:pr-6 text-right text-xs sm:text-sm"
                 />
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                <span className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm">%</span>
               </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           {costingSummary.orderItems.length > 0 ? (
             <Table>
               <TableHeader>
