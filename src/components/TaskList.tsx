@@ -423,7 +423,7 @@ const TaskList: React.FC<TaskListProps> = ({
                     <div className={`mt-2 flex items-center gap-2 text-sm font-mono ${task.isOvertime ? 'text-red-600' : 'text-blue-600'}`}>
                       <Timer className="h-4 w-4" />
                       <span className={task.isOvertime ? 'font-bold' : ''}>
-                        {task.isOvertime ? 'OVERTIME: ' : 'Time remaining: '}
+                        {task.isOvertime ? t('tl_overtime') : t('tl_time_remaining')}
                         {task.timeRemaining}
                       </span>
                     </div>
