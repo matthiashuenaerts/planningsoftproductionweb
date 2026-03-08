@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
 import { RushOrder } from '@/types/rushOrder';
@@ -50,6 +50,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   const [selectedOrder, setSelectedOrder] = useState<RushOrder | null>(null);
   
   const isAdmin = currentEmployee?.role === 'admin';
+  const isMobile = useIsMobile();
   
   const { data: rushOrders, isLoading, error, refetch } = useQuery({
     queryKey: ['rushOrders', statusFilter, tenant?.id],
@@ -150,21 +151,21 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
   }
   
   return (
-    <div className="space-y-4">
+    <div className={`space-y-3 ${isMobile ? 'space-y-3' : 'space-y-4'}`}>
       {filteredOrders.map((order: RushOrder) => (
-        <Card key={order.id} className="shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="pb-4">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center">
-                <CardTitle>{order.title}</CardTitle>
+        <Card key={order.id} className="shadow-sm transition-shadow hover:shadow-md overflow-hidden">
+          <CardHeader className={isMobile ? 'p-3 pb-2' : 'pb-4'}>
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <CardTitle className={`${isMobile ? 'text-base' : ''} truncate`}>{order.title}</CardTitle>
                 {(order.unread_messages_count && order.unread_messages_count > 0) && (
-                  <Badge className="ml-2 bg-red-500 text-white border-0">
+                  <Badge className="shrink-0 bg-red-500 text-white border-0">
                     <MessageCircle className="h-3 w-3 mr-1" />
                     {order.unread_messages_count}
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {getStatusBadge(order.status)}
                 {isAdmin && (
                    <DropdownMenu>
@@ -188,49 +189,49 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
                 )}
               </div>
             </div>
-            <CardDescription className="flex justify-between">
+            <CardDescription className={`flex ${isMobile ? 'flex-col gap-0.5 text-xs' : 'justify-between'}`}>
               <span>{t('created')}: {format(parseISO(order.created_at), 'MMM d, yyyy')}</span>
               <span className="font-medium text-red-600">
                 {t('deadline')}: {format(new Date(order.deadline), 'MMM d, yyyy HH:mm')}
               </span>
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-700 line-clamp-2">{order.description}</p>
+          <CardContent className={isMobile ? 'px-3 pb-2' : ''}>
+            <p className={`text-muted-foreground line-clamp-2 ${isMobile ? 'text-sm' : 'text-sm'}`}>{order.description}</p>
             
             {order.image_url && (
-              <div className="mt-4">
+              <div className="mt-3">
                 {isImage(order.image_url) ? (
                   <SignedStorageImage
                     bucket="attachments"
                     path={order.image_url}
                     alt={order.title}
-                    className="h-40 w-full object-cover rounded-md"
+                    className={`w-full object-cover rounded-md ${isMobile ? 'h-32' : 'h-40'}`}
                   />
                 ) : (
-                  <div className="h-40 w-full rounded-md bg-gray-100 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                        <FileIcon className="mx-auto h-12 w-12" />
-                        <p className="text-sm mt-2">Document Attached</p>
+                  <div className={`w-full rounded-md bg-muted flex items-center justify-center ${isMobile ? 'h-24' : 'h-40'}`}>
+                    <div className="text-center text-muted-foreground">
+                        <FileIcon className={`mx-auto ${isMobile ? 'h-8 w-8' : 'h-12 w-12'}`} />
+                        <p className="text-sm mt-1">Document Attached</p>
                     </div>
                   </div>
                 )}
               </div>
             )}
             
-            <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className={`mt-3 grid grid-cols-2 gap-3`}>
               <div>
-                <p className="text-xs text-gray-500">{t('tasks')}</p>
+                <p className="text-xs text-muted-foreground">{t('tasks')}</p>
                 <p className="text-sm font-medium">{t('tasks_assigned', { count: (order.tasks?.length || 0).toString() })}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">{t('assigned_to')}</p>
+                <p className="text-xs text-muted-foreground">{t('assigned_to')}</p>
                 <p className="text-sm font-medium">{t('team_members_assigned', { count: (order.assignments?.length || 0).toString() })}</p>
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <div className="w-full flex justify-between">
+          <CardFooter className={isMobile ? 'px-3 pb-3 pt-1' : ''}>
+            <div className="w-full flex justify-between items-center">
               <Badge variant="outline" className={`
                 ${order.priority === 'critical' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-orange-100 text-orange-800 border-orange-300'}
               `}>
@@ -238,6 +239,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
               </Badge>
               <Button 
                 variant="outline"
+                size={isMobile ? "sm" : "default"}
                 onClick={() => navigate(createLocalizedPath(`/rush-orders/${order.id}`))}
               >
                 {t('view_details')}
@@ -250,7 +252,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
       {/* Edit Dialog */}
       {selectedOrder && (
         <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) setSelectedOrder(null); setIsEditDialogOpen(open); }}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogContent className={`max-h-[90vh] overflow-auto ${isMobile ? 'max-w-[calc(100vw-2rem)] w-[calc(100vw-2rem)] p-4' : 'max-w-4xl'}`}>
             <DialogHeader>
               <DialogTitle>{t('edit_rush_order')}</DialogTitle>
               <DialogDescription>
