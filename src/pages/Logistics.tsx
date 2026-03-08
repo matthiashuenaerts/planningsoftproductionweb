@@ -234,101 +234,98 @@ const Logistics = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t("logistics_title")}</h1>
-          <p className="text-gray-600 mt-2">{t("logistics_description")}</p>
+      <div className={`flex-1 max-w-none ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+        <div className={isMobile ? 'mb-4' : 'mb-8'}>
+          <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("logistics_title")}</h1>
+          {!isMobile && <p className="text-muted-foreground mt-2">{t("logistics_description")}</p>}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("todays_deliveries")}</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
+        <div className={`grid grid-cols-3 ${isMobile ? 'gap-2 mb-4' : 'gap-6 mb-8'}`}>
+          <Card className={isMobile ? 'shadow-sm' : ''}>
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'px-3 pt-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-[10px] leading-tight' : 'text-sm'}`}>{t("todays_deliveries")}</CardTitle>
+              <Truck className={`text-muted-foreground shrink-0 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{todaysDeliveries.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {t("orders_expected_today")}
-              </p>
+            <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{todaysDeliveries.length}</div>
+              {!isMobile && <p className="text-xs text-muted-foreground">{t("orders_expected_today")}</p>}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("upcoming_deliveries")}</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Card className={isMobile ? 'shadow-sm' : ''}>
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'px-3 pt-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-[10px] leading-tight' : 'text-sm'}`}>{t("upcoming_deliveries")}</CardTitle>
+              <Calendar className={`text-muted-foreground shrink-0 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{upcomingDeliveries.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {t("future_deliveries")}
-              </p>
+            <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{upcomingDeliveries.length}</div>
+              {!isMobile && <p className="text-xs text-muted-foreground">{t("future_deliveries")}</p>}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{t("backorder_deliveries")}</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          <Card className={isMobile ? 'shadow-sm' : ''}>
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 ${isMobile ? 'px-3 pt-3 pb-1' : 'pb-2'}`}>
+              <CardTitle className={`font-medium ${isMobile ? 'text-[10px] leading-tight' : 'text-sm'}`}>{t("backorder_deliveries")}</CardTitle>
+              <AlertTriangle className={`text-muted-foreground shrink-0 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{backorderDeliveries.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {t("overdue_deliveries")}
-              </p>
+            <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
+              <div className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{backorderDeliveries.length}</div>
+              {!isMobile && <p className="text-xs text-muted-foreground">{t("overdue_deliveries")}</p>}
             </CardContent>
           </Card>
         </div>
 
-        <div className="mb-6">
-          <div className="flex flex-wrap gap-2 mb-6">
-            <div className="relative flex-1 min-w-[200px]">
+        <div className={isMobile ? 'mb-3' : 'mb-6'}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2 mb-3' : 'flex-wrap gap-2 mb-6'}`}>
+            <div className={`relative ${isMobile ? 'w-full' : 'flex-1 min-w-[200px]'}`}>
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
-                placeholder="Search by project, supplier, article code, EAN..."
+                placeholder="Search by project, supplier, EAN..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className={`pl-10 ${isMobile ? 'h-9 text-sm' : ''}`}
               />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-2 whitespace-nowrap"
-            >
-              <Scan className="h-4 w-4" />
-              {t('br_scan_barcode')}
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setIsBatchOpen(true)}
-              className="flex items-center gap-2 whitespace-nowrap"
-            >
-              <PackageCheck className="h-4 w-4" />
-              {t('br_batch_receipts')}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleStartTimeRegistration}
-              disabled={isStartingRegistration}
-              className="flex items-center gap-2 whitespace-nowrap"
-            >
-              <Clock className="h-4 w-4" />
-              {t("start_time_registration")}
-            </Button>
+            <div className={`flex gap-2 ${isMobile ? 'w-full' : ''}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsScannerOpen(true)}
+                className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 h-9 text-xs justify-center' : 'whitespace-nowrap'}`}
+              >
+                <Scan className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                {isMobile ? 'Scan' : t('br_scan_barcode')}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setIsBatchOpen(true)}
+                className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 h-9 text-xs justify-center' : 'whitespace-nowrap'}`}
+              >
+                <PackageCheck className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                {isMobile ? 'Batch' : t('br_batch_receipts')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartTimeRegistration}
+                disabled={isStartingRegistration}
+                className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 h-9 text-xs justify-center' : 'whitespace-nowrap'}`}
+              >
+                <Clock className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                {isMobile ? <span className="sr-only">{t("start_time_registration")}</span> : t("start_time_registration")}
+                {isMobile && 'Time'}
+              </Button>
+            </div>
           </div>
         </div>
 
-        <Tabs defaultValue="today" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="today">{t("todays_deliveries")}</TabsTrigger>
-            <TabsTrigger value="upcoming">{t("upcoming_deliveries")}</TabsTrigger>
-            <TabsTrigger value="backorders">{t("backorder_deliveries")}</TabsTrigger>
+        <Tabs defaultValue="today" className={isMobile ? 'space-y-2' : 'space-y-4'}>
+          <TabsList className={isMobile ? 'w-full grid grid-cols-3 h-9' : ''}>
+            <TabsTrigger value="today" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("todays_deliveries") : t("todays_deliveries")}</TabsTrigger>
+            <TabsTrigger value="upcoming" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("upcoming_deliveries") : t("upcoming_deliveries")}</TabsTrigger>
+            <TabsTrigger value="backorders" className={isMobile ? 'text-[11px] px-1' : ''}>{isMobile ? t("backorder_deliveries") : t("backorder_deliveries")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="today" className="space-y-4">
