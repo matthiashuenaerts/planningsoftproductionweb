@@ -317,7 +317,7 @@ const TruckLoadingCalendar = () => {
                   <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
                   <p className="text-gray-600 mb-2">{assignment.project.client}</p>
                   <div className="text-sm text-gray-500">
-                    Loading scheduled for today, installation starts tomorrow
+                    {t('truck_loading_today')}
                   </div>
                 </div>
               ))}
