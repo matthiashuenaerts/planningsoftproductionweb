@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import RouteMapDialog, { type RouteWaypoint } from '@/components/service/RouteMapDialog';
+import { workingHoursService, type WorkingHours } from '@/services/workingHoursService';
 
 interface ServiceTeam {
   id: string;
