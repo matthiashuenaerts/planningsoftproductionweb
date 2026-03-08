@@ -41,7 +41,7 @@ const tabConfig = [
   { value: 'materials', labelKey: 'set_materials' },
   { value: 'installation-teams', labelKey: 'set_installation_teams' },
   { value: 'external-database', labelKey: 'set_external_database' },
-  { value: 'supabase', labelKey: 'set_supabase_connection' },
+  
   { value: 'mail', labelKey: 'set_mail' },
   { value: 'help', labelKey: 'set_help_management' },
   { value: 'csv-import', labelKey: 'set_csv_import' },
