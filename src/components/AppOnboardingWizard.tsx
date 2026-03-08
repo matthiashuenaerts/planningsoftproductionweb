@@ -180,12 +180,14 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
   const [createdTaskNames, setCreatedTaskNames] = useState<string[]>([]);
   const [createdUserNames, setCreatedUserNames] = useState<string[]>([]);
 
-  // Role-filtered tour steps
-  const tourSteps = ALL_TOUR_STEPS.filter((step) => {
+  // Role-filtered tour steps (language-aware)
+  const allTourSteps = buildTourSteps(lang);
+  const tourSteps = allTourSteps.filter((step) => {
     if (isDeveloper) return true;
     if (!currentEmployee) return false;
     return step.visibleForRoles.includes(currentEmployee.role);
   });
+  const ui = TOUR_UI[lang] || TOUR_UI.en;
 
   useEffect(() => {
     checkOnboardingStatus();
