@@ -841,7 +841,7 @@ const ServiceTeamCalendar: React.FC = () => {
           </div>
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{t('svc_cancel')}</Button>
             </DialogClose>
             <Button onClick={handleAssignProject} disabled={!assignProjectId}>
               Schedule Service
