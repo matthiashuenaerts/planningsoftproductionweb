@@ -238,8 +238,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       onClick={() => handleGroupSelect(group)}
     >
       {group.image_path ? (
-        <img
-          src={getImageUrl(group.image_path) || ''}
+        <SignedStorageImage
+          bucket="product-images"
+          path={group.image_path}
           alt={group.name}
           className="h-12 w-12 object-cover rounded-lg flex-shrink-0"
         />
