@@ -1051,14 +1051,14 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Workstation Stats Section */}
-      <div className="mt-6 sm:mt-8">
+      <div>
         <h2 className="text-lg sm:text-2xl font-bold mb-3 sm:mb-4 flex items-center gap-2">
-          <Factory className="h-5 w-5 sm:h-6 sm:w-6" />
+          <Factory className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           {t('dashboard_workstation_overview')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {workstationStats.map(ws => (
-            <Card key={ws.id} className="hover:shadow-lg transition-shadow">
+            <Card key={ws.id} className="rounded-xl border-border/60 shadow-sm hover:shadow-md transition-all hover:border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Package className="h-5 w-5 text-primary" />
