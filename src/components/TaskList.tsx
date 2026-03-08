@@ -625,7 +625,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         }}
                         className="bg-blue-500 hover:bg-blue-600"
                       >
-                        Start Task
+                        {t('tl_start_task')}
                       </Button>
                     </div>
                   )}
