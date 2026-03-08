@@ -6,14 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { LifeBuoy, ChevronRight, ArrowLeft } from "lucide-react";
+import { LifeBuoy, ChevronRight, ArrowLeft, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import SupportTicketChat from "@/components/support/SupportTicketChat";
+import { useToast } from "@/hooks/use-toast";
 
 const DevSupportManagement: React.FC = () => {
   const qc = useQueryClient();
   const { currentEmployee } = useAuth();
+  const { toast } = useToast();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["dev", "all-support-tickets"],
@@ -30,6 +33,27 @@ const DevSupportManagement: React.FC = () => {
   const updateStatus = async (ticketId: string, status: string) => {
     const { error } = await supabase.from("support_tickets").update({ status } as any).eq("id", ticketId);
     if (!error) qc.invalidateQueries({ queryKey: ["dev", "all-support-tickets"] });
+  };
+
+  const handleDelete = async (e: React.MouseEvent, ticketId: string) => {
+    e.stopPropagation();
+    if (!confirm("Delete this ticket? The user will be notified that it's resolved.")) return;
+    setDeleting(ticketId);
+    try {
+      // Send resolved notification email first
+      await supabase.functions.invoke("send-support-notification", {
+        body: { ticketId, type: "ticket_resolved" },
+      });
+      // Delete messages then ticket
+      await supabase.from("support_messages").delete().eq("ticket_id", ticketId);
+      await supabase.from("support_tickets").delete().eq("id", ticketId);
+      qc.invalidateQueries({ queryKey: ["dev", "all-support-tickets"] });
+      toast({ title: "Ticket deleted", description: "The user has been notified via email." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message ?? "Failed to delete ticket", variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const statusColors: Record<string, string> = {
@@ -99,6 +123,16 @@ const DevSupportManagement: React.FC = () => {
                         {['open', 'in_progress', 'resolved', 'closed'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-400"
+                      title="Delete ticket"
+                      disabled={deleting === ticket.id}
+                      onClick={(e) => handleDelete(e, ticket.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </div>
                 </div>

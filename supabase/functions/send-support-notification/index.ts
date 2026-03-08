@@ -103,6 +103,33 @@ serve(async (req) => {
         message: `Support ticket "${ticket.subject}" has a new response`,
         link: null,
       });
+    } else if (type === "ticket_resolved") {
+      // Send resolved email to user
+      const userEmail = ticket.creator?.email;
+      if (userEmail) {
+        await resend.emails.send({
+          from: "Support <noreply@automattion-compass.com>",
+          to: [userEmail],
+          subject: `[Support] Resolved: ${ticket.subject}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; padding: 20px;">
+              <h1 style="color: #16a34a;">✅ Support Ticket Resolved</h1>
+              <p>Your support ticket "<strong>${ticket.subject}</strong>" has been resolved and closed.</p>
+              <div style="background: #f0fdf4; padding: 15px; border-left: 4px solid #16a34a; border-radius: 4px; margin: 15px 0;">
+                <p style="margin: 0;">If you still experience issues, please open a new support ticket via the app.</p>
+              </div>
+              <p style="color: #64748b; font-size: 12px; margin-top: 20px;">— AutoMattiOn Compass Support Team</p>
+            </div>
+          `,
+        });
+      }
+
+      // Create in-app notification
+      await supabase.from("notifications").insert({
+        user_id: ticket.created_by,
+        message: `Support ticket "${ticket.subject}" has been resolved`,
+        link: null,
+      });
     }
 
     return new Response(JSON.stringify({ success: true }), {
