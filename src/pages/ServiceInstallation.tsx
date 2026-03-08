@@ -489,7 +489,7 @@ const ServiceInstallation: React.FC = () => {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Route className="h-4 w-4" />
-                      Optimized Route
+                      {t('si_optimized_route')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 pb-0">
