@@ -425,17 +425,17 @@ const LogisticsOut: React.FC = () => {
         </div>
 
         {/* Upcoming Events */}
-        <div className="mt-6">
+        <div className={isMobile ? 'mt-3' : 'mt-6'}>
           <Card>
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <Clock className="h-5 w-5 shrink-0" />
+            <CardHeader className={isMobile ? 'px-3 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <Clock className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 {t("upcoming_external_processing_events", { count: upcomingEvents.length.toString() })}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 md:px-6">
+            <CardContent className={isMobile ? 'px-3 pb-3' : 'px-3 md:px-6'}>
               {upcomingEvents.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <div className={`grid gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 md:gap-4'}`}>
                   {upcomingEvents.map((event, index) => (
                     <div
                       key={`${event.order.id}-${index}`}
