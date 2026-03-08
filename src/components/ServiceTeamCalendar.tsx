@@ -235,7 +235,7 @@ const ServiceTeamCalendar: React.FC = () => {
       const dayProjects = getProjectsForTeamAndDate(teamId, dateStr);
       
       if (dayProjects.length < 2) {
-        toast({ title: 'Info', description: 'Need at least 2 projects to optimize route' });
+        toast({ title: t('svc_info'), description: t('svc_need_min_2') });
         setOptimizing(false);
         return;
       }
