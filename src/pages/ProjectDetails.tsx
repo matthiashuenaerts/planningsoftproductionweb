@@ -1131,7 +1131,7 @@ const ProjectDetails = () => {
                 <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
               </div>
               
-              <div className="flex gap-1 sm:gap-1.5 overflow-x-auto pb-1.5 -mx-1 px-1 scrollbar-hide md:overflow-visible md:flex-wrap snap-x snap-mandatory">
+              <div className="flex flex-wrap gap-1 sm:gap-1.5 pb-1.5">
                 <Button size="sm" variant={activeTab === 'home' ? 'default' : 'ghost'} onClick={() => setActiveTab('home')} className={cn("flex-shrink-0 snap-start h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'home' && 'text-muted-foreground hover:text-foreground')}>
                   <Home className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('home')}
                 </Button>
