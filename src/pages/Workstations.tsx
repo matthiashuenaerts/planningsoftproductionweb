@@ -463,7 +463,15 @@ const Workstations: React.FC = () => {
         workstationId={showQRScanner || undefined}
       />
 
-      {/* Create Error Dialog */}
+      {/* Keyboard/COM Scanner Listener */}
+      <KeyboardScannerListener
+        isOpen={!!showKeyboardScanner}
+        onClose={() => setShowKeyboardScanner(null)}
+        onCodeDetected={handleQRCodeDetected}
+        workstationName={workstations.find(ws => ws.id === showKeyboardScanner)?.name || ''}
+        workstationId={showKeyboardScanner || undefined}
+      />
+
       <Dialog open={!!showErrorDialog} onOpenChange={() => setShowErrorDialog(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
