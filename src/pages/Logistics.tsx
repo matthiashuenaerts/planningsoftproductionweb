@@ -227,14 +227,14 @@ const Logistics = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background flex">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 max-w-none ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+      <div className={`flex-1 max-w-none overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
         <div className={isMobile ? 'mb-4' : 'mb-8'}>
           <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("logistics_title")}</h1>
           {!isMobile && <p className="text-muted-foreground mt-2">{t("logistics_description")}</p>}
