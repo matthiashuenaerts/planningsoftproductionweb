@@ -243,6 +243,9 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="bg-white/10 border border-white/10">
           <TabsTrigger value="overview" className="data-[state=active]:bg-white/20 text-white">Overview</TabsTrigger>
+          <TabsTrigger value="logins" className="data-[state=active]:bg-white/20 text-white">
+            <LogIn className="h-3.5 w-3.5 mr-1" /> Logins
+          </TabsTrigger>
           <TabsTrigger value="billing" className="data-[state=active]:bg-white/20 text-white">Billing</TabsTrigger>
           <TabsTrigger value="support" className="data-[state=active]:bg-white/20 text-white">Support</TabsTrigger>
           <TabsTrigger value="settings" className="data-[state=active]:bg-white/20 text-white">Settings</TabsTrigger>
