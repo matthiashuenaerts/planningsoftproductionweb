@@ -25,6 +25,7 @@ import { ProjectBarcodeDialog } from '@/components/ProjectBarcodeDialog';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTenant } from '@/context/TenantContext';
 import { partTrackingService } from '@/services/partTrackingService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
