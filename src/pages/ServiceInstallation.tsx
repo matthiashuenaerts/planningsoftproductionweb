@@ -483,12 +483,12 @@ const ServiceInstallation: React.FC = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 lg:grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
                 {/* Map */}
                 <Card className="order-1">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Route className="h-4 w-4" />
+                  <CardHeader className={`${isMobile ? 'px-3 py-2' : 'pb-2'}`}>
+                    <CardTitle className={`${isMobile ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
+                      <Route className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                       {t('si_optimized_route')}
                     </CardTitle>
                   </CardHeader>
@@ -496,7 +496,7 @@ const ServiceInstallation: React.FC = () => {
                     <div
                       ref={mapRef}
                       className="w-full rounded-b-lg"
-                      style={{ height: isMobile ? '300px' : '500px', zIndex: 0 }}
+                      style={{ height: isMobile ? '250px' : '500px', zIndex: 0 }}
                     />
                   </CardContent>
                 </Card>
