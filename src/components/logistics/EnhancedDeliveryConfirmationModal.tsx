@@ -269,7 +269,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`max-h-[90vh] overflow-y-auto ${isMobile ? 'max-w-[95vw] p-3' : 'max-w-4xl'}`}>
+      <DialogContent className={`max-h-[90vh] overflow-y-auto overflow-x-hidden ${isMobile ? 'max-w-[calc(100vw-1rem)] w-[calc(100vw-1rem)] p-3' : 'max-w-4xl'}`}>
         <DialogHeader>
           <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
             <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
