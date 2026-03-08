@@ -931,5 +931,26 @@
   "bo_ordered": "Ordered",
   "bo_delivered": "Delivered",
   "bo_article_code": "Article Code",
-  "bo_ean": "EAN"
+  "bo_ean": "EAN",
+
+  "br_batch_receipts": "Batch Receipts",
+  "br_scan_articles": "Scan articles to receive",
+  "br_scan_instruction": "Point camera at barcode or QR code to scan articles",
+  "br_scanned_articles": "Scanned Articles",
+  "br_no_scans_yet": "No articles scanned yet. Use the scanner above.",
+  "br_not_found": "Not found in open orders",
+  "br_received": "Received",
+  "br_select_order": "Select Order",
+  "br_choose_order": "Multiple orders contain this article. Select which order to receive:",
+  "br_supplier": "Supplier",
+  "br_project": "Project",
+  "br_expected": "Expected",
+  "br_remaining": "{{remaining}} of {{total}} remaining",
+  "br_most_urgent": "Most urgent",
+  "br_confirm_all": "Confirm All Receipts",
+  "br_confirmed_count": "{{count}} article(s) confirmed",
+  "br_no_pending": "No pending receipts to confirm",
+  "br_article_received": "Article received for order from {{supplier}}",
+  "br_scan_barcode": "Scan Barcode",
+  "br_pending": "Pending"
 }

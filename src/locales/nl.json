@@ -1409,5 +1409,26 @@
   "bo_ordered": "Besteld",
   "bo_delivered": "Geleverd",
   "bo_article_code": "Artikelcode",
-  "bo_ean": "EAN"
+  "bo_ean": "EAN",
+
+  "br_batch_receipts": "Batch Ontvangsten",
+  "br_scan_articles": "Scan artikelen om te ontvangen",
+  "br_scan_instruction": "Richt de camera op een barcode of QR-code om artikelen te scannen",
+  "br_scanned_articles": "Gescande Artikelen",
+  "br_no_scans_yet": "Nog geen artikelen gescand. Gebruik de scanner hierboven.",
+  "br_not_found": "Niet gevonden in openstaande bestellingen",
+  "br_received": "Ontvangen",
+  "br_select_order": "Selecteer Bestelling",
+  "br_choose_order": "Meerdere bestellingen bevatten dit artikel. Selecteer voor welke bestelling:",
+  "br_supplier": "Leverancier",
+  "br_project": "Project",
+  "br_expected": "Verwacht",
+  "br_remaining": "{{remaining}} van {{total}} resterend",
+  "br_most_urgent": "Meest urgent",
+  "br_confirm_all": "Bevestig Alle Ontvangsten",
+  "br_confirmed_count": "{{count}} artikel(en) bevestigd",
+  "br_no_pending": "Geen openstaande ontvangsten om te bevestigen",
+  "br_article_received": "Artikel ontvangen voor bestelling van {{supplier}}",
+  "br_scan_barcode": "Scan Barcode",
+  "br_pending": "In afwachting"
 }

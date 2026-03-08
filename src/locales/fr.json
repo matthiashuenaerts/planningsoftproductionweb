@@ -1409,5 +1409,26 @@
   "bo_ordered": "Commandé",
   "bo_delivered": "Livré",
   "bo_article_code": "Code article",
-  "bo_ean": "EAN"
+  "bo_ean": "EAN",
+
+  "br_batch_receipts": "Réceptions en lot",
+  "br_scan_articles": "Scanner les articles à recevoir",
+  "br_scan_instruction": "Pointez la caméra vers un code-barres ou QR code pour scanner les articles",
+  "br_scanned_articles": "Articles Scannés",
+  "br_no_scans_yet": "Aucun article scanné. Utilisez le scanner ci-dessus.",
+  "br_not_found": "Non trouvé dans les commandes ouvertes",
+  "br_received": "Reçu",
+  "br_select_order": "Sélectionner la Commande",
+  "br_choose_order": "Plusieurs commandes contiennent cet article. Sélectionnez pour quelle commande :",
+  "br_supplier": "Fournisseur",
+  "br_project": "Projet",
+  "br_expected": "Prévu",
+  "br_remaining": "{{remaining}} sur {{total}} restant",
+  "br_most_urgent": "Plus urgent",
+  "br_confirm_all": "Confirmer Toutes les Réceptions",
+  "br_confirmed_count": "{{count}} article(s) confirmé(s)",
+  "br_no_pending": "Aucune réception en attente à confirmer",
+  "br_article_received": "Article reçu pour la commande de {{supplier}}",
+  "br_scan_barcode": "Scanner le code-barres",
+  "br_pending": "En attente"
 }
