@@ -6,21 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Camera, Check, X, RotateCcw, Image } from 'lucide-react';
+import { Camera, Check, X, RotateCcw, Image, ChevronsUpDown } from 'lucide-react';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useLanguage } from '@/context/LanguageContext';
+import { cn } from '@/lib/utils';
 
 const BrokenPartForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenant } = useTenant();
   const { currentEmployee } = useAuth();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -29,6 +31,8 @@ const BrokenPartForm = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [workstationOpen, setWorkstationOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     project_id: '',
@@ -94,8 +98,8 @@ const BrokenPartForm = () => {
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast({
-        title: "Camera Error",
-        description: "Unable to access camera. Please check permissions.",
+        title: t('bp_camera_error'),
+        description: t('bp_camera_error_msg'),
         variant: "destructive"
       });
     }
@@ -124,7 +128,6 @@ const BrokenPartForm = () => {
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(imageDataUrl);
     
-    // Convert to file for upload
     canvas.toBlob((blob) => {
       if (blob) {
         const file = new File([blob], `broken-part-${Date.now()}.jpg`, {
@@ -188,8 +191,8 @@ const BrokenPartForm = () => {
     e.preventDefault();
     if (!currentEmployee) {
       toast({
-        title: "Error",
-        description: "You must be logged in to report a broken part",
+        title: t('bp_error'),
+        description: t('bp_must_login'),
         variant: "destructive",
       });
       return;
@@ -198,7 +201,6 @@ const BrokenPartForm = () => {
     try {
       setIsSubmitting(true);
       
-      // Upload image if selected
       let imagePath = null;
       if (selectedImage) {
         const fileExt = selectedImage.name.split('.').pop();
@@ -213,7 +215,6 @@ const BrokenPartForm = () => {
         imagePath = filePath;
       }
 
-      // Insert broken part record
       const { error } = await supabase
         .from('broken_parts')
         .insert({
@@ -227,16 +228,16 @@ const BrokenPartForm = () => {
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Broken part reported successfully",
+        title: t('bp_success'),
+        description: t('bp_success_msg'),
       });
       
       navigate(createLocalizedPath('/broken-parts'));
     } catch (error) {
       console.error('Error reporting broken part:', error);
       toast({
-        title: "Error",
-        description: "Failed to report broken part",
+        title: t('bp_error'),
+        description: t('bp_error_msg'),
         variant: "destructive",
       });
     } finally {
@@ -247,10 +248,10 @@ const BrokenPartForm = () => {
   if (cameraMode === 'camera') {
     return (
       <Card className="w-full">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
+        <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Take Photo</h3>
+              <h3 className="text-base sm:text-lg font-medium">{t('bp_take_photo')}</h3>
               <Button variant="ghost" size="icon" onClick={cancelCamera}>
                 <X className="h-4 w-4" />
               </Button>
@@ -276,9 +277,9 @@ const BrokenPartForm = () => {
                 <Button
                   size="lg"
                   onClick={captureImage}
-                  className="bg-white text-black hover:bg-gray-100 rounded-full w-16 h-16"
+                  className="bg-white text-black hover:bg-muted rounded-full w-14 h-14 sm:w-16 sm:h-16"
                 >
-                  <Camera className="h-6 w-6" />
+                  <Camera className="h-5 w-5 sm:h-6 sm:w-6" />
                 </Button>
                 <Button
                   variant="outline"
@@ -300,31 +301,31 @@ const BrokenPartForm = () => {
   if (cameraMode === 'preview' && capturedImage) {
     return (
       <Card className="w-full">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
+        <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+          <div className="space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Photo Preview</h3>
+              <h3 className="text-base sm:text-lg font-medium">{t('bp_photo_preview')}</h3>
             </div>
             
             <div className="relative">
               <img
                 src={capturedImage}
-                alt="Captured broken part"
-                className="w-full rounded-lg max-h-96 object-contain bg-gray-100"
+                alt={t('bp_photo_preview')}
+                className="w-full rounded-lg max-h-96 object-contain bg-muted"
               />
             </div>
             
-            <p className="text-sm text-gray-600">
-              Photo captured successfully. Confirm to use this image or retake.
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {t('bp_photo_captured_msg')}
             </p>
             
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={retakePhoto}>
-                Retake Photo
+              <Button variant="outline" size="sm" onClick={retakePhoto} className="text-xs sm:text-sm">
+                {t('bp_retake_photo')}
               </Button>
-              <Button onClick={confirmPhoto} className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
-                <Check className="h-4 w-4" />
-                Use Photo
+              <Button onClick={confirmPhoto} size="sm" className="flex items-center gap-1.5 text-xs sm:text-sm bg-green-600 hover:bg-green-700">
+                <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {t('bp_use_photo')}
               </Button>
             </div>
           </div>
@@ -333,53 +334,117 @@ const BrokenPartForm = () => {
     );
   }
 
+  const selectedProject = projects.find((p: any) => p.id === formData.project_id);
+  const selectedWorkstation = workstations.find((w: any) => w.id === formData.workstation_id);
+
   return (
     <Card className="w-full">
       <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+          {/* Project - Searchable */}
           <div className="space-y-1.5">
-            <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
-            <Select
-              value={formData.project_id}
-              onValueChange={(value) => setFormData({...formData, project_id: value})}
-            >
-              <SelectTrigger id="project">
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project: any) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs sm:text-sm">{t('bp_project')}</Label>
+            <Popover open={projectOpen} onOpenChange={setProjectOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={projectOpen}
+                  className="w-full justify-between text-sm font-normal h-9 sm:h-10"
+                >
+                  <span className="truncate">
+                    {selectedProject ? selectedProject.name : t('bp_select_project')}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t('bp_search_placeholder')} className="text-sm" />
+                  <CommandList className="max-h-[250px]">
+                    <CommandEmpty className="text-xs py-4 text-center">{t('bp_no_results')}</CommandEmpty>
+                    <CommandGroup>
+                      {projects.map((project: any) => (
+                        <CommandItem
+                          key={project.id}
+                          value={project.name}
+                          onSelect={() => {
+                            setFormData({ ...formData, project_id: project.id });
+                            setProjectOpen(false);
+                          }}
+                          className="text-sm"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-3.5 w-3.5",
+                              formData.project_id === project.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">{project.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
+          {/* Workstation - Searchable */}
           <div className="space-y-1.5">
-            <Label htmlFor="workstation" className="text-xs sm:text-sm">Workstation</Label>
-            <Select
-              value={formData.workstation_id}
-              onValueChange={(value) => setFormData({...formData, workstation_id: value})}
-            >
-              <SelectTrigger id="workstation">
-                <SelectValue placeholder="Select a workstation" />
-              </SelectTrigger>
-              <SelectContent>
-                {workstations.map((workstation: any) => (
-                  <SelectItem key={workstation.id} value={workstation.id}>
-                    {workstation.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs sm:text-sm">{t('bp_workstation')}</Label>
+            <Popover open={workstationOpen} onOpenChange={setWorkstationOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={workstationOpen}
+                  className="w-full justify-between text-sm font-normal h-9 sm:h-10"
+                >
+                  <span className="truncate">
+                    {selectedWorkstation ? selectedWorkstation.name : t('bp_select_workstation')}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t('bp_search_placeholder')} className="text-sm" />
+                  <CommandList className="max-h-[250px]">
+                    <CommandEmpty className="text-xs py-4 text-center">{t('bp_no_results')}</CommandEmpty>
+                    <CommandGroup>
+                      {workstations.map((ws: any) => (
+                        <CommandItem
+                          key={ws.id}
+                          value={ws.name}
+                          onSelect={() => {
+                            setFormData({ ...formData, workstation_id: ws.id });
+                            setWorkstationOpen(false);
+                          }}
+                          className="text-sm"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-3.5 w-3.5",
+                              formData.workstation_id === ws.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">{ws.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
+          {/* Description */}
           <div className="space-y-1.5">
-            <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
+            <Label htmlFor="description" className="text-xs sm:text-sm">{t('bp_description')}</Label>
             <Textarea
               id="description"
-              placeholder="Describe the broken part"
+              placeholder={t('bp_describe_broken')}
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
@@ -387,8 +452,9 @@ const BrokenPartForm = () => {
             />
           </div>
 
+          {/* Image */}
           <div className="space-y-1.5">
-            <Label className="text-xs sm:text-sm">Image</Label>
+            <Label className="text-xs sm:text-sm">{t('bp_image')}</Label>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -398,7 +464,7 @@ const BrokenPartForm = () => {
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
                 <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Take Photo
+                {t('bp_take_photo')}
               </Button>
               <Button
                 type="button"
@@ -408,7 +474,7 @@ const BrokenPartForm = () => {
                 className="flex items-center gap-1.5 text-xs sm:text-sm"
               >
                 <Image className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Choose File
+                {t('bp_choose_file')}
               </Button>
               {(imagePreview || selectedImage) && (
                 <Button
@@ -419,7 +485,7 @@ const BrokenPartForm = () => {
                   className="flex items-center gap-1.5 text-xs sm:text-sm"
                 >
                   <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Clear
+                  {t('bp_clear_image')}
                 </Button>
               )}
             </div>
@@ -436,7 +502,7 @@ const BrokenPartForm = () => {
               <div className="mt-2">
                 <img
                   src={imagePreview}
-                  alt="Preview"
+                  alt={t('bp_photo_preview')}
                   className="max-h-40 rounded-md"
                 />
               </div>
@@ -444,7 +510,7 @@ const BrokenPartForm = () => {
           </div>
 
           <Button type="submit" className="w-full text-sm" size="sm" disabled={isSubmitting}>
-            {isSubmitting ? "Submitting..." : "Report Broken Part"}
+            {isSubmitting ? t('bp_submitting') : t('bp_submit')}
           </Button>
         </form>
       </CardContent>
