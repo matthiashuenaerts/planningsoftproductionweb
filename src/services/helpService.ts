@@ -6,6 +6,7 @@ export interface HelpCategory {
   description: string;
   display_order: number;
   is_active: boolean;
+  is_global: boolean;
   created_at: string;
   updated_at: string;
 }
