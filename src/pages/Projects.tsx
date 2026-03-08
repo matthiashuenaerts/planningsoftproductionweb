@@ -522,6 +522,14 @@ const Projects = () => {
                             {t('installation_date')}: {new Date(project.installation_date).toLocaleDateString()}
                           </span>
                         </div>
+                        {serviceDates[project.id] && serviceDates[project.id].length > 0 && (
+                          <div className="flex items-center">
+                            <Wrench className="mr-1 h-4 w-4 text-orange-500" />
+                            <span>
+                              Service: {serviceDates[project.id].map(d => new Date(d).toLocaleDateString()).join(', ')}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Status Expand Button */}
