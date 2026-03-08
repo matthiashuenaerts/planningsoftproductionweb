@@ -29,6 +29,7 @@ interface LoadingAssignment {
 
 const TruckLoadingCalendar = () => {
   const { tenant } = useTenant();
+  const { t } = useLanguage();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
     return startOfWeek(today, { weekStartsOn: 1 });
