@@ -358,11 +358,15 @@ const Planning = () => {
         // Get worker's schedule for the selected date
         const schedule = await planningService.getSchedulesByEmployeeAndDate(worker.id, selectedDate);
 
-        // Enhance schedule items with task data
+        // Enhance schedule items with task data - prefer todoTasks (richer data), fallback to schedule's own task join
         const enhancedSchedule = await Promise.all(schedule.map(async (scheduleItem) => {
           if (scheduleItem.task_id) {
             const taskData = todoTasks.find(t => t.id === scheduleItem.task_id);
-            return { ...scheduleItem, task: taskData };
+            if (taskData) {
+              return { ...scheduleItem, task: taskData };
+            }
+            // Task not in todoTasks (e.g. IN_PROGRESS status) - use the joined data from the schedule query
+            return scheduleItem;
           }
           return scheduleItem;
         }));
