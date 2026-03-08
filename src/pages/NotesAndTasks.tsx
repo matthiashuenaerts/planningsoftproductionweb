@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import PersonalItemCard from '@/components/personal-items/PersonalItemCard';
 import CreatePersonalItemDialog from '@/components/personal-items/CreatePersonalItemDialog';
 import EditPersonalItemDialog from '@/components/personal-items/EditPersonalItemDialog';
@@ -46,6 +47,7 @@ export interface PersonalItem {
 const NotesAndTasks = () => {
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -262,10 +264,10 @@ const NotesAndTasks = () => {
       <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">Notes & Tasks</h1>
+            <h1 className="text-3xl font-bold">{t('nt_title')}</h1>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Create New
+              {t('nt_create_new')}
             </Button>
           </div>
 
@@ -274,7 +276,7 @@ const NotesAndTasks = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search notes and tasks..."
+                placeholder={t('nt_search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -284,24 +286,24 @@ const NotesAndTasks = () => {
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-[150px]">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t('nt_status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="all">{t('nt_all_status')}</SelectItem>
+                  <SelectItem value="active">{t('nt_active')}</SelectItem>
+                  <SelectItem value="completed">{t('nt_completed')}</SelectItem>
+                  <SelectItem value="archived">{t('nt_archived')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterPriority} onValueChange={setFilterPriority}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Priority" />
+                  <SelectValue placeholder={t('nt_priority')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="all">{t('nt_all_priority')}</SelectItem>
+                  <SelectItem value="high">{t('nt_high')}</SelectItem>
+                  <SelectItem value="medium">{t('nt_medium')}</SelectItem>
+                  <SelectItem value="low">{t('nt_low')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -310,9 +312,9 @@ const NotesAndTasks = () => {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="note">Notes</TabsTrigger>
-              <TabsTrigger value="task">Tasks</TabsTrigger>
+              <TabsTrigger value="all">{t('nt_all')}</TabsTrigger>
+              <TabsTrigger value="note">{t('nt_notes')}</TabsTrigger>
+              <TabsTrigger value="task">{t('nt_tasks')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
@@ -366,7 +368,7 @@ const NotesAndTasks = () => {
 
           {filteredItems.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500">No items found. Create your first note or task!</p>
+              <p className="text-gray-500">{t('nt_no_items')}</p>
             </div>
           )}
 
