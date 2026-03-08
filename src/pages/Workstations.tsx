@@ -22,6 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeScanner } from '@/components/QRCodeScanner';
+import { KeyboardScannerListener } from '@/components/KeyboardScannerListener';
 import { qrCodeService } from '@/services/qrCodeService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
