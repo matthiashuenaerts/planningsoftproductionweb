@@ -531,8 +531,8 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <div className="space-y-4 min-w-0 w-full overflow-hidden">
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Accessories</CardTitle>
