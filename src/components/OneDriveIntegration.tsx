@@ -452,13 +452,13 @@ const { data, error } = await supabase.functions.invoke(
         <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6 pb-3 sm:pb-6">
           {!isAuthenticated ? (
             <div className="space-y-4">
-              <div className="p-4 border rounded-lg bg-muted/30 text-center">
-                <LogIn className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
+              <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 text-center">
+                <LogIn className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                   Log in met je Microsoft account om OneDrive bestanden te bekijken.
                 </p>
-                <Button onClick={handleAuthenticate}>
-                  <LogIn className="h-4 w-4 mr-2" />
+                <Button onClick={handleAuthenticate} className="h-8 sm:h-9 text-xs sm:text-sm">
+                  <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                   Inloggen met Microsoft
                 </Button>
               </div>
