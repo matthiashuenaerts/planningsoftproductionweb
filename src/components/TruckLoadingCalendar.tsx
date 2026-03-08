@@ -338,7 +338,7 @@ const TruckLoadingCalendar = () => {
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Weekly Loading Schedule
+              {t('truck_weekly_schedule')}
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="icon" onClick={prevWeek}>
