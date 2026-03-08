@@ -810,6 +810,12 @@ const Dashboard: React.FC = () => {
     });
   };
 
+  // Get service assignments for a specific date
+  const getServiceAssignmentsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return serviceAssignments.filter(sa => sa.start_date === dateStr);
+  };
+
   // Get project color for visual distinction
   const getProjectColor = (status: string) => {
     switch (status) {
