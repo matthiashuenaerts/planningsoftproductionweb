@@ -191,7 +191,7 @@ const RushOrderList: React.FC<RushOrderListProps> = ({ statusFilter = "all" }) =
             <CardDescription className="flex justify-between">
               <span>{t('created')}: {format(parseISO(order.created_at), 'MMM d, yyyy')}</span>
               <span className="font-medium text-red-600">
-                {t('deadline')}: {format(parseISO(order.deadline), 'MMM d, yyyy')}
+                {t('deadline')}: {format(new Date(order.deadline), 'MMM d, yyyy HH:mm')}
               </span>
             </CardDescription>
           </CardHeader>
