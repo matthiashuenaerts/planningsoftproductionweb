@@ -991,15 +991,18 @@ const ProjectDetails = () => {
     }
   };
   if (loading) {
-    return <div className="flex min-h-screen">
+    return <div className="flex min-h-screen bg-background">
         {!isMobile && (
           <div className="w-64 bg-sidebar fixed top-0 bottom-0">
             <Navbar />
           </div>
         )}
         {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className={`w-full flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+            <p className="text-sm text-muted-foreground">{t('loading') || 'Loading...'}</p>
+          </div>
         </div>
       </div>;
   }
