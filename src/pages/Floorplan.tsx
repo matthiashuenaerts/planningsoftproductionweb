@@ -276,10 +276,18 @@ const Floorplan: React.FC = () => {
   const handleWorkstationPositionChange = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateWorkstationPosition(workstationId, x, y);
-      toast.success('Workstation position updated');
     } catch (error) {
       console.error('Error updating workstation position:', error);
       toast.error('Failed to update workstation position');
+    }
+  };
+
+  const handleBufferPositionChange = async (workstationId: string, x: number, y: number) => {
+    try {
+      await floorplanService.updateBufferPosition(workstationId, x, y);
+    } catch (error) {
+      console.error('Error updating buffer position:', error);
+      toast.error('Failed to update buffer position');
     }
   };
 
