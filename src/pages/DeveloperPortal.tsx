@@ -233,6 +233,11 @@ const DeveloperPortal: React.FC = () => {
           <TabsContent value="support">
             <DevSupportManagement />
           </TabsContent>
+
+          {/* Help Tab */}
+          <TabsContent value="help">
+            <DevHelpManagement />
+          </TabsContent>
         </Tabs>
       </div>
 
