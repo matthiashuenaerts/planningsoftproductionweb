@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
   ChevronDown, ChevronRight, LogOut, Shield, Rocket, UserPlus,
-  FileText, LifeBuoy, Activity, Upload, HelpCircle,
+  FileText, LifeBuoy, Activity, Upload, HelpCircle, Megaphone,
 } from "lucide-react";
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 import DevTenantDetail from "@/components/developer/DevTenantDetail";
@@ -21,6 +21,7 @@ import DevDeveloperManagement from "@/components/developer/DevDeveloperManagemen
 import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
 import DevHelpManagement from "@/components/developer/DevHelpManagement";
+import DevGeneralMessages from "@/components/developer/DevGeneralMessages";
 
 type TenantRow = {
   id: string;
@@ -125,6 +126,9 @@ const DeveloperPortal: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="help" className="data-[state=active]:bg-white/20 text-white">
               <HelpCircle className="h-4 w-4 mr-1" /> Help
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white">
+              <Megaphone className="h-4 w-4 mr-1" /> Messages
             </TabsTrigger>
           </TabsList>
 
@@ -237,6 +241,10 @@ const DeveloperPortal: React.FC = () => {
           {/* Help Tab */}
           <TabsContent value="help">
             <DevHelpManagement />
+          </TabsContent>
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            <DevGeneralMessages />
           </TabsContent>
         </Tabs>
       </div>
