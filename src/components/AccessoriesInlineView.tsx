@@ -863,11 +863,11 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                         disabled={accessory.status !== 'to_order' || !!accessory.order_id}
                       />
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{accessory.article_name}</div>
+                    <TableCell className="max-w-0">
+                      <div className="truncate">
+                        <div className="font-medium truncate">{accessory.article_name}</div>
                         {accessory.article_description && (
-                          <div className="text-sm text-muted-foreground">{accessory.article_description}</div>
+                          <div className="text-sm text-muted-foreground truncate">{accessory.article_description}</div>
                         )}
                       </div>
                     </TableCell>
