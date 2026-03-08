@@ -215,13 +215,13 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg w-[95vw] p-3 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg leading-tight">
+            <Camera className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
             QR Scanner - {workstationName}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Scan onderdelen om ze te registreren op dit werkstation
           </DialogDescription>
         </DialogHeader>
