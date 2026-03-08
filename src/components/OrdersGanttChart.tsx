@@ -967,7 +967,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       {/* Project bars - positioned in calendar grid only */}
                       <div className="absolute left-64 right-0 top-0 z-10 py-2 pointer-events-none">
                           {teamProjects.map((project, idx) => {
-                            const position = getProjectPosition(project, team.name);
+                            const position = getProjectPosition(project, team.name, team.id);
                             
                             // For unassigned projects, show a placeholder indicator
                             if (!position) {
