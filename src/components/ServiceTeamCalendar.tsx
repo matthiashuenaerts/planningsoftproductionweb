@@ -702,7 +702,7 @@ const ServiceTeamCalendar: React.FC = () => {
                               onClick={() => handleOptimizeRoute(team.id, dateStr)}
                             >
                               {optimizing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Route className="h-3 w-3 mr-1" />}
-                              Optimize Route
+                              {t('svc_optimize_route')}
                             </Button>
                             {optimizedRoutes[`${team.id}_${dateStr}`] && (
                               <Button
