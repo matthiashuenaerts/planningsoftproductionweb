@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2, Settings2, Keyboard, ArrowRight, RefreshCw, ExternalLink, Save } from 'lucide-react';
+import { X, Radio, Usb, CheckCircle2, AlertCircle, Loader2, Settings2, Keyboard, ArrowRight, RefreshCw, ExternalLink, Save, Wifi } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { qrCodeService } from '@/services/qrCodeService';
 import { supabase } from '@/integrations/supabase/client';
