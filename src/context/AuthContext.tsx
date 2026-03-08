@@ -247,6 +247,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!session && (!!currentEmployee || isDeveloper),
         login,
         logout,
+        refetchEmployee,
       }}
     >
       {children}
