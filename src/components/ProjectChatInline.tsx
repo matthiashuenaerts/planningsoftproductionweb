@@ -250,18 +250,18 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
     return (
       <div
         key={message.id}
-        className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''} mb-4 ${isOptimistic ? 'opacity-70' : ''}`}
+        className={`flex gap-2 sm:gap-3 ${isOwn ? 'flex-row-reverse' : ''} mb-3 sm:mb-4 ${isOptimistic ? 'opacity-70' : ''}`}
       >
-        <Avatar className="w-8 h-8 flex-shrink-0">
-          <AvatarFallback className="text-xs">
+        <Avatar className="w-7 h-7 sm:w-8 sm:h-8 flex-shrink-0">
+          <AvatarFallback className="text-[10px] sm:text-xs">
             {getInitials(message.employee_name || 'Unknown')}
           </AvatarFallback>
         </Avatar>
         
-        <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%]`}>
+        <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[80%] sm:max-w-[70%]`}>
           {/* Reply indicator */}
           {message.reply_to_message && (
-            <div className={`text-xs text-muted-foreground mb-1 p-2 bg-muted/50 rounded border-l-2 border-primary ${
+            <div className={`text-[10px] sm:text-xs text-muted-foreground mb-1 p-1.5 sm:p-2 bg-muted/50 rounded border-l-2 border-primary ${
               isOwn ? 'text-right' : 'text-left'
             }`}>
               <span className="font-medium">Replying to {message.reply_to_message.employee_name}: </span>
@@ -273,7 +273,7 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
           {isTargeted && (
             <div className={`flex items-center gap-1 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
               <Users className="w-3 h-3" />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
                 To: {message.target_user_ids?.map(id => 
                   teamMembers.find(m => m.id === id)?.name || 'Unknown'
                 ).join(', ')}
@@ -281,13 +281,13 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
             </div>
           )}
           
-          <div className={`rounded-lg px-3 py-2 relative group ${
+          <div className={`rounded-lg px-2.5 py-1.5 sm:px-3 sm:py-2 relative group ${
             isOwn 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-muted'
           } ${isTargeted ? 'border-2 border-primary/20' : ''}`}>
             {message.message && (
-              <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+              <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.message}</p>
             )}
             
             {message.file_url && (
@@ -305,16 +305,16 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
               <Button
                 size="sm"
                 variant="ghost"
-                className="absolute -bottom-6 right-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -bottom-6 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 text-[10px] sm:text-xs"
                 onClick={() => handleReplyToMessage(message)}
               >
-                <Reply className="w-3 h-3" />
+                <Reply className="w-3 h-3 mr-0.5" />
                 Reply
               </Button>
             )}
           </div>
           
-          <div className={`flex items-center gap-2 mt-1 text-xs text-muted-foreground ${
+          <div className={`flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-muted-foreground ${
             isOwn ? 'flex-row-reverse' : ''
           }`}>
             <span>{message.employee_name}</span>
