@@ -343,20 +343,20 @@ const LogisticsOut: React.FC = () => {
           </Card>
 
           <Card className="overflow-hidden">
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
-                <Package className="h-5 w-5 shrink-0" />
+            <CardHeader className={isMobile ? 'px-3 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex flex-wrap items-center gap-1.5 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 <span className="truncate">
-                  {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
+                  {selectedDate ? format(selectedDate, isMobile ? 'MMM d, yyyy' : 'MMMM d, yyyy') : t("select_date")}
                 </span>
                 {selectedDayEvents.length > 0 && (
-                  <Badge variant="secondary">
-                    {selectedDayEvents.length} {selectedDayEvents.length === 1 ? t("event") : t("events")}
+                  <Badge variant="secondary" className={isMobile ? 'text-[10px] px-1.5' : ''}>
+                    {selectedDayEvents.length}
                   </Badge>
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 md:px-6">
+            <CardContent className={isMobile ? 'px-3 pb-3' : 'px-3 md:px-6'}>
               {selectedDayEvents.length > 0 ? (
                 <div className="space-y-3">
                   {selectedDayEvents.map((event, index) => (
