@@ -831,7 +831,7 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 </div>
                 <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white text-xs h-7 px-2"
                   onClick={markOnboardingComplete}>
-                  Skip tour
+                  {ui.skipTour}
                 </Button>
               </div>
 
