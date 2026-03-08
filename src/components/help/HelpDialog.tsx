@@ -184,7 +184,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       image_url: formData.get('image_url') as string || undefined,
       tags,
       display_order: parseInt(formData.get('display_order') as string) || 0,
-      is_published: formData.get('is_published') === 'on'
+      is_published: formData.get('is_published') === 'on',
+      is_global: false
     };
 
     try {
