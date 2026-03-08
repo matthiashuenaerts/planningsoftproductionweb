@@ -529,7 +529,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         size="sm" 
                         onClick={() => handleStatusChange(task, 'IN_PROGRESS')}
                       >
-                        Start Task
+                        {t('tl_start_task')}
                       </Button>
                       {showCompleteButton && (
                         <Button 
