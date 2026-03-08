@@ -639,8 +639,6 @@ const TaskList: React.FC<TaskListProps> = ({
           </Card>
         );
       })}
-        );
-      })}
       
       {/* Checklist Dialog */}
       {checklistDialogTask && (
