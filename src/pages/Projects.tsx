@@ -84,6 +84,37 @@ const Projects = () => {
       );
       setProjects(sortedData);
       setFilteredProjects(sortedData);
+
+      // Load service dates for all projects
+      const projectIds = sortedData.map(p => p.id);
+      if (projectIds.length > 0) {
+        const { data: serviceAssignments } = await supabase
+          .from('project_team_assignments')
+          .select('project_id, start_date, team_id')
+          .in('project_id', projectIds);
+        
+        if (serviceAssignments && serviceAssignments.length > 0) {
+          // Get team types to filter service teams
+          const teamIds = [...new Set(serviceAssignments.map(a => a.team_id).filter(Boolean))];
+          const { data: teams } = await supabase
+            .from('placement_teams')
+            .select('id, team_type')
+            .in('id', teamIds as string[]);
+          
+          const serviceTeamIds = new Set((teams || []).filter(t => t.team_type === 'service').map(t => t.id));
+          
+          const dateMap: Record<string, string[]> = {};
+          serviceAssignments.forEach(a => {
+            if (a.team_id && serviceTeamIds.has(a.team_id)) {
+              if (!dateMap[a.project_id]) dateMap[a.project_id] = [];
+              if (!dateMap[a.project_id].includes(a.start_date)) {
+                dateMap[a.project_id].push(a.start_date);
+              }
+            }
+          });
+          setServiceDates(dateMap);
+        }
+      }
     } catch (error: any) {
       toast({
         title: t('error'),
