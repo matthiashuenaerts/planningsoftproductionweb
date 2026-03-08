@@ -70,6 +70,18 @@ export const floorplanService = {
     if (error) throw error;
   },
 
+  async updateBufferPosition(workstationId: string, bufferX: number, bufferY: number): Promise<void> {
+    const { error } = await supabase
+      .from('workstation_positions')
+      .update({
+        buffer_x_position: bufferX,
+        buffer_y_position: bufferY,
+      })
+      .eq('workstation_id', workstationId);
+    
+    if (error) throw error;
+  },
+
   // Production Flow Lines
   async getProductionFlowLines(): Promise<ProductionFlowLine[]> {
     const { data, error } = await supabase
