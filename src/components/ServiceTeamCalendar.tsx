@@ -586,7 +586,7 @@ const ServiceTeamCalendar: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: team.color }} />
                   <CardTitle className="text-lg">{team.name}</CardTitle>
-                  <Badge variant="secondary">Service</Badge>
+                  <Badge variant="secondary">{t('svc_service')}</Badge>
                 </div>
                 {teamStartAddr && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
