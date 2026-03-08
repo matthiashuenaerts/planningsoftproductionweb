@@ -560,6 +560,14 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
                               placeholder="Qty"
                             />
                             <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.unit_price ?? ''}
+                              onChange={(e) => updateOrderItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                              placeholder="Unit price (€)"
+                            />
+                            <Input
                               value={item.notes || ''}
                               onChange={(e) => updateOrderItem(index, 'notes', e.target.value)}
                               placeholder="Notes"
