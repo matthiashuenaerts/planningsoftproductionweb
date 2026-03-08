@@ -12,7 +12,7 @@ import { orderService } from '@/services/orderService';
 import { projectTeamAssignmentService } from '@/services/projectTeamAssignmentService';
 import { projectTeamAssignmentOverrideService } from '@/services/projectTeamAssignmentOverrideService';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check } from "lucide-react";
+import { ShieldCheck, Calendar, CheckCircle2, Clock, Users, BarChart3, ListTodo, Truck, ChevronLeft, ChevronRight, Factory, Package, Check, Wrench } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { format, startOfToday, isToday, subDays, parseISO, addDays, isWeekend, startOfWeek } from 'date-fns';
