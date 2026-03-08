@@ -1001,7 +1001,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <FormItem>
                     <FormLabel>{t('npm_client')}</FormLabel>
                     <FormControl>
-                      <Input placeholder={t('npm_client_placeholder')} {...field} />
+                      <Input placeholder={t('npm_client_placeholder')} className={cn(isMobile && "h-9 text-sm")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
