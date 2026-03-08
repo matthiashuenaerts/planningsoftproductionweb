@@ -910,7 +910,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                 height: '28px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                width: '256px'
+                                width: isMobile ? '128px' : '256px'
                               }}
                             >
                               <div className="truncate">
