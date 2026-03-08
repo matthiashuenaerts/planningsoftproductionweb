@@ -159,7 +159,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
   const getProjectAddress = (project: ServiceProject) => {
     const parts = [project.address_street, project.address_number, project.address_postal_code, project.address_city].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : 'No address';
+    return parts.length > 0 ? parts.join(' ') : t('svc_no_address');
   };
 
   const handleAssignProject = async () => {
