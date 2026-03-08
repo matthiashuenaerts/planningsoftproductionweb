@@ -311,29 +311,33 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
           </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="start-time">{t("start_time")}</Label>
-            <Input
-              id="start-time"
-              type="datetime-local"
-              value={formData.start_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-              required
-            />
+          <div className={isMobile ? 'grid grid-cols-2 gap-2' : 'space-y-4'}>
+            <div className="space-y-1">
+              <Label htmlFor="start-time" className={isMobile ? 'text-xs' : ''}>{t("start_time")}</Label>
+              <Input
+                id="start-time"
+                type="datetime-local"
+                value={formData.start_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                required
+                className={isMobile ? 'h-9 text-sm' : ''}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="end-time" className={isMobile ? 'text-xs' : ''}>{t("end_time")}</Label>
+              <Input
+                id="end-time"
+                type="datetime-local"
+                value={formData.end_time}
+                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                className={isMobile ? 'h-9 text-sm' : ''}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="end-time">{t("end_time")}</Label>
-            <Input
-              id="end-time"
-              type="datetime-local"
-              value={formData.end_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="duration">{t("duration_minutes")}</Label>
+          <div className="space-y-1">
+            <Label htmlFor="duration" className={isMobile ? 'text-xs' : ''}>{t("duration_minutes")}</Label>
             <Input
               id="duration"
               type="number"
@@ -341,6 +345,7 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
               value={formData.duration_minutes}
               onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value }))}
               placeholder={t("enter_duration_minutes")}
+              className={isMobile ? 'h-9 text-sm' : ''}
             />
           </div>
 
