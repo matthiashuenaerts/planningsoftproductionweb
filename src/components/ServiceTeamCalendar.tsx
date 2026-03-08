@@ -265,10 +265,12 @@ const ServiceTeamCalendar: React.FC = () => {
       const trip = osrmData.trips[0];
       const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
       
-      // Map OSRM waypoint order back to projects (skip index 0 if start point was included)
+      // Map OSRM waypoint order back to projects
+      // Skip first (start) and last (return home) if start point was included
       const offset = startCoords ? 1 : 0;
-      const orderedProjects = waypointOrder
-        .filter((_: number, i: number) => i >= offset)
+      const endOffset = startCoords ? 1 : 0; // last coordinate is return-to-start
+      const projectWaypoints = waypointOrder.slice(offset, waypointOrder.length - endOffset);
+      const orderedProjects = projectWaypoints
         .map((wpIdx: number) => {
           const projectIdx = wpIdx - offset;
           return projectsWithCoords[projectIdx];
@@ -310,6 +312,7 @@ const ServiceTeamCalendar: React.FC = () => {
           geometry: routeGeometry,
           startPoint: startPt,
           totalDrivingMinutes,
+          unrecognizedAddresses,
         }
       }));
 
