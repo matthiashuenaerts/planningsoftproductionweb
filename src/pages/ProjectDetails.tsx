@@ -1441,21 +1441,20 @@ const ProjectDetails = () => {
                   }
                   return <div key={order.id} className={cn("border rounded-lg p-2.5 sm:p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' : order.status === 'delayed' ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' : order.status === 'pending' ? 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800' : order.status === 'charged' ? 'bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-800' : 'bg-card border-border')}>
                             {/* Compact Order Header */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-base">{order.supplier}</h4>
-                                <div className="flex items-center gap-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2 mb-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <h4 className="font-semibold text-sm sm:text-base truncate">{order.supplier}</h4>
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                   {getStatusIcon(order.status)}
-                                  <Badge className={cn("text-xs", getStatusColor(order.status))}>
+                                  <Badge className={cn("text-[10px] sm:text-xs h-5", getStatusColor(order.status))}>
                                     {order.status}
                                   </Badge>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-1">
-                                {/* Manual Status Editor */}
+                              <div className="flex flex-wrap items-center gap-1">
                                 <Select value={order.status} onValueChange={value => handleStatusChange(order.id, value)}>
-                                  <SelectTrigger className="w-28 h-7 text-xs bg-background border z-50">
+                                  <SelectTrigger className="w-24 sm:w-28 h-7 text-[10px] sm:text-xs bg-background border z-50">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50">
@@ -1467,19 +1466,17 @@ const ProjectDetails = () => {
                                   </SelectContent>
                                 </Select>
 
-                                {/* Charged in Truck Button */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleChargeInTruck(order.id)}
-                                  className="h-7 px-2 text-xs hover:bg-purple-50"
-                                  title="Charge in truck and clear locations"
+                                  className="h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs hover:bg-purple-50"
+                                  title="Charge in truck"
                                 >
-                                  <Package className="h-3 w-3 mr-1" />
-                                  Charged in Truck
+                                  <Package className="h-3 w-3 sm:mr-1" />
+                                  <span className="hidden sm:inline">Charged in Truck</span>
                                 </Button>
 
-                                {/* Action Buttons */}
                                 <Button size="sm" variant="outline" onClick={() => handleEditOrder(order.id)} className="h-7 w-7 p-0 hover:bg-blue-50" title="Edit order">
                                   <Edit3 className="h-3 w-3" />
                                 </Button>
