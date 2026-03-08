@@ -520,10 +520,10 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
   const result: ReturnType<typeof extractTotals> = {};
 
   // Subtotal
-  const subMatch = text.match(/(?:subtotaal|subtotal|netto\s*bedrag|net\s*amount)[:\s]*€?\s*([\d.,]+)/i);
+  const subMatch = text.match(/(?:subtotaal|subtotal|netto\s*bedrag|net\s*amount|sous[\-\s]?total|montant\s*h\.?t\.?)[:\s]*€?\s*([\d.,]+)/i);
   if (subMatch) result.subtotal = parseEuropeanNumber(subMatch[1]);
 
-  // VAT / BTW
+  // VAT / BTW / TVA
   const vatMatch = text.match(/(?:btw|vat|tva|mwst|tax)[:\s]*€?\s*([\d.,]+)/i);
   if (vatMatch) result.vatAmount = parseEuropeanNumber(vatMatch[1]);
   
@@ -531,16 +531,16 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
   if (vatPctMatch) result.vatPercentage = parseInt(vatPctMatch[1], 10);
 
   // Discount
-  const discMatch = text.match(/(?:korting|discount|remise|rabat)[:\s]*-?\s*€?\s*([\d.,]+)/i);
+  const discMatch = text.match(/(?:korting|discount|remise|rabat|réduction)[:\s]*-?\s*€?\s*([\d.,]+)/i);
   if (discMatch) result.discount = parseEuropeanNumber(discMatch[1]);
 
   // Shipping
-  const shipMatch = text.match(/(?:verzend(?:kosten)?|shipping|transport|bezorg(?:kosten)?|franco|vracht)[:\s]*€?\s*([\d.,]+)/i);
+  const shipMatch = text.match(/(?:verzend(?:kosten)?|shipping|transport|bezorg(?:kosten)?|franco|vracht|frais\s*(?:de\s*)?(?:port|livraison|expédition))[:\s]*€?\s*([\d.,]+)/i);
   if (shipMatch) result.shippingCost = parseEuropeanNumber(shipMatch[1]);
 
   // Grand total
   const totalPatterns = [
-    /(?:totaal\s*(?:bedrag|incl|inc)|total\s*(?:amount|incl)|grand\s*total|te\s*betalen|totaal\s*€)[:\s]*€?\s*([\d.,]+)/i,
+    /(?:totaal\s*(?:bedrag|incl|inc)|total\s*(?:amount|incl)|grand\s*total|te\s*betalen|totaal\s*€|total\s*t\.?t\.?c\.?|montant\s*t\.?t\.?c\.?|net\s*à\s*payer)[:\s]*€?\s*([\d.,]+)/i,
     /(?:^|\n)\s*(?:totaal|total)\s*€?\s*([\d.,]+)\s*(?:$|\n)/im,
   ];
   for (const p of totalPatterns) {
