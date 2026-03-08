@@ -64,12 +64,29 @@ const PasswordSettings: React.FC = () => {
         throw new Error("Current password is incorrect");
       }
 
-      // Update to new password
+      // Update to new password in Supabase Auth
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (updateError) throw updateError;
+
+      // Also update the hashed password in the employees table
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('auth_user_id', currentUser.id)
+          .maybeSingle();
+        
+        if (emp) {
+          // Use the update-employee edge function to hash and store
+          await supabase.functions.invoke('update-employee', {
+            body: { id: emp.id, password: newPassword }
+          });
+        }
+      }
 
       toast({
         title: "Success",
