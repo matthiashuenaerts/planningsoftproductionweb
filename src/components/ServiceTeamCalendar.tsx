@@ -753,7 +753,7 @@ const ServiceTeamCalendar: React.FC = () => {
               <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Project *</Label>
+              <Label>{t('svc_project')} *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
