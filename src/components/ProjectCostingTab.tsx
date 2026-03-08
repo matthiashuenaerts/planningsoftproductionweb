@@ -1572,13 +1572,13 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
 
       {/* Final Cost Summary */}
       <Card className="border-primary">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
+        <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+          <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+            <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />
             {t('costing_final_summary')}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           <Table>
             <TableBody>
               <TableRow>
