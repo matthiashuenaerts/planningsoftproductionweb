@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useLanguage } from '@/context/LanguageContext';
@@ -24,6 +23,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import SignedStorageImage from '@/components/SignedStorageImage';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import {
   DropdownMenu,
   DropdownMenuContent,
