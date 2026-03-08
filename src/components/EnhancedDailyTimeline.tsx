@@ -284,12 +284,6 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                           <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
                         </div>
-                          {task.workstation && (
-                            <>
-                              {/* Additional workstation info can be added here */}
-                            </>
-                          )}
-                        </div>
                       </div>
                       
                       {/* Status indicator */}
