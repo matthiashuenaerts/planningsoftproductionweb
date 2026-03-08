@@ -615,7 +615,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         disabled
                         className="opacity-50"
                       >
-                        Waiting for Limit Phases
+                        {t('tl_waiting_for_limit_phases')}
                       </Button>
                       <Button 
                         size="sm" 
