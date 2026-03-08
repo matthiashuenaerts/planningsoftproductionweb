@@ -14,6 +14,9 @@
   "login_failed": "Échec de la connexion",
 
   "dashboard": "Tableau de bord",
+  "good_morning": "☀️ Bonjour",
+  "good_afternoon": "🌤️ Bon après-midi",
+  "good_evening": "🌙 Bonsoir",
   "control_panel": "Panneau de contrôle",
   "projects": "Projets",
   "workstations": "Postes de travail",
