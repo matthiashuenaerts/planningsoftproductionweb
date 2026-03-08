@@ -1567,35 +1567,72 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 const pathColor = hexToRgb(annotation.stroke || '#000000');
                 const pathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
                 
-                // Path position (top-left corner of path bounding box)
                 const pathLeft = (annotation.leftPct || 0) * width;
                 const pathTop = (annotation.topPct || 0) * height;
                 
-                let svgPathStr = '';
+                const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * width : 0;
+                const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * height : 0;
+                
+                let lastX = 0, lastY = 0;
+                const steps = 8;
+                
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    // Path coordinates are stored as percentages - multiply by page dimensions
-                    const px = pathLeft + cmd[1] * width;
-                    const py = height - (pathTop + cmd[2] * height);
-                    svgPathStr += `M ${px} ${py} `;
-                  } else if (cmd[0] === 'Q') {
-                    const cpx = pathLeft + cmd[1] * width;
-                    const cpy = height - (pathTop + cmd[2] * height);
-                    const endx = pathLeft + cmd[3] * width;
-                    const endy = height - (pathTop + cmd[4] * height);
-                    svgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
+                    lastX = pathLeft + cmd[1] * width - offsetX;
+                    lastY = pathTop + cmd[2] * height - offsetY;
                   } else if (cmd[0] === 'L') {
-                    const lx = pathLeft + cmd[1] * width;
-                    const ly = height - (pathTop + cmd[2] * height);
-                    svgPathStr += `L ${lx} ${ly} `;
+                    const lx = pathLeft + cmd[1] * width - offsetX;
+                    const ly = pathTop + cmd[2] * height - offsetY;
+                    page.drawLine({
+                      start: { x: lastX, y: height - lastY },
+                      end: { x: lx, y: height - ly },
+                      thickness: pathStrokeWidth,
+                      color: rgb(pathColor.r / 255, pathColor.g / 255, pathColor.b / 255),
+                    });
+                    lastX = lx;
+                    lastY = ly;
+                  } else if (cmd[0] === 'Q') {
+                    const cpx = pathLeft + cmd[1] * width - offsetX;
+                    const cpy = pathTop + cmd[2] * height - offsetY;
+                    const endx = pathLeft + cmd[3] * width - offsetX;
+                    const endy = pathTop + cmd[4] * height - offsetY;
+                    const sx = lastX, sy = lastY;
+                    for (let t = 1; t <= steps; t++) {
+                      const tt = t / steps;
+                      const px = (1 - tt) * (1 - tt) * sx + 2 * (1 - tt) * tt * cpx + tt * tt * endx;
+                      const py = (1 - tt) * (1 - tt) * sy + 2 * (1 - tt) * tt * cpy + tt * tt * endy;
+                      page.drawLine({
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
+                        thickness: pathStrokeWidth,
+                        color: rgb(pathColor.r / 255, pathColor.g / 255, pathColor.b / 255),
+                      });
+                      lastX = px;
+                      lastY = py;
+                    }
+                  } else if (cmd[0] === 'C') {
+                    const cp1x = pathLeft + cmd[1] * width - offsetX;
+                    const cp1y = pathTop + cmd[2] * height - offsetY;
+                    const cp2x = pathLeft + cmd[3] * width - offsetX;
+                    const cp2y = pathTop + cmd[4] * height - offsetY;
+                    const endx = pathLeft + cmd[5] * width - offsetX;
+                    const endy = pathTop + cmd[6] * height - offsetY;
+                    const sx = lastX, sy = lastY;
+                    for (let t = 1; t <= steps; t++) {
+                      const tt = t / steps;
+                      const mt = 1 - tt;
+                      const px = mt * mt * mt * sx + 3 * mt * mt * tt * cp1x + 3 * mt * tt * tt * cp2x + tt * tt * tt * endx;
+                      const py = mt * mt * mt * sy + 3 * mt * mt * tt * cp1y + 3 * mt * tt * tt * cp2y + tt * tt * tt * endy;
+                      page.drawLine({
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
+                        thickness: pathStrokeWidth,
+                        color: rgb(pathColor.r / 255, pathColor.g / 255, pathColor.b / 255),
+                      });
+                      lastX = px;
+                      lastY = py;
+                    }
                   }
-                }
-                
-                if (svgPathStr.trim()) {
-                  page.drawSvgPath(svgPathStr.trim(), {
-                    borderColor: rgb(pathColor.r / 255, pathColor.g / 255, pathColor.b / 255),
-                    borderWidth: pathStrokeWidth,
-                  });
                 }
               }
               break;
@@ -1697,35 +1734,75 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 const dlPathColor = hexToRgb(annotation.stroke || '#000000');
                 const dlPathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
                 
-                // Path position (top-left corner of path bounding box)
                 const pathLeft = (annotation.leftPct || 0) * width;
                 const pathTop = (annotation.topPct || 0) * height;
                 
-                let dlSvgPathStr = '';
+                // Account for pathOffset (Fabric.js centers paths around their bounding box center)
+                const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * width : 0;
+                const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * height : 0;
+                
+                let lastX = 0, lastY = 0;
+                const steps = 8; // bezier approximation steps
+                
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    // Path coordinates are stored as percentages - multiply by page dimensions
-                    const px = pathLeft + cmd[1] * width;
-                    const py = height - (pathTop + cmd[2] * height);
-                    dlSvgPathStr += `M ${px} ${py} `;
-                  } else if (cmd[0] === 'Q') {
-                    const cpx = pathLeft + cmd[1] * width;
-                    const cpy = height - (pathTop + cmd[2] * height);
-                    const endx = pathLeft + cmd[3] * width;
-                    const endy = height - (pathTop + cmd[4] * height);
-                    dlSvgPathStr += `Q ${cpx} ${cpy} ${endx} ${endy} `;
+                    lastX = pathLeft + cmd[1] * width - offsetX;
+                    lastY = pathTop + cmd[2] * height - offsetY;
                   } else if (cmd[0] === 'L') {
-                    const lx = pathLeft + cmd[1] * width;
-                    const ly = height - (pathTop + cmd[2] * height);
-                    dlSvgPathStr += `L ${lx} ${ly} `;
+                    const lx = pathLeft + cmd[1] * width - offsetX;
+                    const ly = pathTop + cmd[2] * height - offsetY;
+                    page.drawLine({
+                      start: { x: lastX, y: height - lastY },
+                      end: { x: lx, y: height - ly },
+                      thickness: dlPathStrokeWidth,
+                      color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
+                    });
+                    lastX = lx;
+                    lastY = ly;
+                  } else if (cmd[0] === 'Q') {
+                    // Quadratic bezier - approximate with line segments
+                    const cpx = pathLeft + cmd[1] * width - offsetX;
+                    const cpy = pathTop + cmd[2] * height - offsetY;
+                    const endx = pathLeft + cmd[3] * width - offsetX;
+                    const endy = pathTop + cmd[4] * height - offsetY;
+                    const sx = lastX, sy = lastY;
+                    for (let t = 1; t <= steps; t++) {
+                      const tt = t / steps;
+                      const px = (1 - tt) * (1 - tt) * sx + 2 * (1 - tt) * tt * cpx + tt * tt * endx;
+                      const py = (1 - tt) * (1 - tt) * sy + 2 * (1 - tt) * tt * cpy + tt * tt * endy;
+                      page.drawLine({
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
+                        thickness: dlPathStrokeWidth,
+                        color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
+                      });
+                      lastX = px;
+                      lastY = py;
+                    }
+                  } else if (cmd[0] === 'C') {
+                    // Cubic bezier - approximate with line segments
+                    const cp1x = pathLeft + cmd[1] * width - offsetX;
+                    const cp1y = pathTop + cmd[2] * height - offsetY;
+                    const cp2x = pathLeft + cmd[3] * width - offsetX;
+                    const cp2y = pathTop + cmd[4] * height - offsetY;
+                    const endx = pathLeft + cmd[5] * width - offsetX;
+                    const endy = pathTop + cmd[6] * height - offsetY;
+                    const sx = lastX, sy = lastY;
+                    for (let t = 1; t <= steps; t++) {
+                      const tt = t / steps;
+                      const mt = 1 - tt;
+                      const px = mt * mt * mt * sx + 3 * mt * mt * tt * cp1x + 3 * mt * tt * tt * cp2x + tt * tt * tt * endx;
+                      const py = mt * mt * mt * sy + 3 * mt * mt * tt * cp1y + 3 * mt * tt * tt * cp2y + tt * tt * tt * endy;
+                      page.drawLine({
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
+                        thickness: dlPathStrokeWidth,
+                        color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
+                      });
+                      lastX = px;
+                      lastY = py;
+                    }
                   }
-                }
-                
-                if (dlSvgPathStr.trim()) {
-                  page.drawSvgPath(dlSvgPathStr.trim(), {
-                    borderColor: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
-                    borderWidth: dlPathStrokeWidth,
-                  });
                 }
               }
               break;
