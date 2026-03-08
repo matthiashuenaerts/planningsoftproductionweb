@@ -952,5 +952,31 @@
   "br_no_pending": "No pending receipts to confirm",
   "br_article_received": "Article received for order from {{supplier}}",
   "br_scan_barcode": "Scan Barcode",
-  "br_pending": "Pending"
+  "br_pending": "Pending",
+
+  "ud_upcoming_deliveries_title": "Upcoming Deliveries ({{count}})",
+  "ud_no_upcoming": "No upcoming deliveries",
+  "ud_no_upcoming_desc": "No orders scheduled for future delivery.",
+  "ud_planned": "Planned",
+  "ud_to_plan": "To Plan",
+
+  "td_todays_deliveries_title": "Today's Deliveries ({{count}})",
+  "td_no_deliveries": "No deliveries today",
+  "td_no_deliveries_desc": "No orders expected for delivery today.",
+
+  "lo_order_from": "Order from {{supplier}}",
+  "lo_project": "Project",
+  "lo_order_date": "Order Date",
+  "lo_expected_delivery": "Expected Delivery",
+  "lo_show_items": "Show Items",
+  "lo_hide_items": "Hide Items",
+  "lo_confirm_delivery": "Confirm Delivery",
+  "lo_loading_items": "Loading order items...",
+  "lo_no_items": "No items found for this order.",
+  "lo_description": "Description",
+  "lo_ordered": "Ordered",
+  "lo_delivered": "Delivered",
+  "lo_article_code": "Article Code",
+  "lo_ean": "EAN",
+  "lo_location": "Location"
 }

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,8 @@ import { format } from 'date-fns';
 import { Calendar, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UpcomingDeliveriesProps {
   orders: Order[];
@@ -20,19 +21,15 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
   orders, 
   onDeliveryConfirmed 
 }) => {
+  const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const getStatusColor = (status: string, hasTeamAssignment: boolean) => {
-    // Check if project is assigned to installation team to determine badge
     if (status === 'pending') {
-      if (hasTeamAssignment) {
-        return 'bg-green-100 text-green-800'; // Planned
-      } else {
-        return 'bg-yellow-100 text-yellow-800'; // To Plan
-      }
+      return hasTeamAssignment ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
     }
-    
     switch (status) {
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'partially_delivered': return 'bg-blue-100 text-blue-800';
@@ -43,9 +40,8 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
   };
 
   const getStatusText = (status: string, hasTeamAssignment: boolean) => {
-    // Check if project is assigned to installation team to determine text
     if (status === 'pending') {
-      return hasTeamAssignment ? 'Planned' : 'To Plan';
+      return hasTeamAssignment ? t('ud_planned') : t('ud_to_plan');
     }
     return status;
   };
@@ -60,7 +56,6 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
     setExpandedOrders(newExpanded);
   };
 
-  // Query for order items when order is expanded
   const OrderItems = ({ orderId, isExpanded }: { orderId: string; isExpanded: boolean }) => {
     const { data: orderItems = [], isLoading } = useQuery({
       queryKey: ['order-items', orderId],
@@ -72,31 +67,56 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
 
     if (isLoading) {
       return (
-        <div className="px-6 pb-4">
-          <div className="text-sm text-gray-500">Loading order items...</div>
+        <div className="px-4 md:px-6 pb-4">
+          <div className="text-sm text-muted-foreground">{t('lo_loading_items')}</div>
         </div>
       );
     }
 
     if (orderItems.length === 0) {
       return (
-        <div className="px-6 pb-4">
-          <div className="text-sm text-gray-500">No items found for this order.</div>
+        <div className="px-4 md:px-6 pb-4">
+          <div className="text-sm text-muted-foreground">{t('lo_no_items')}</div>
+        </div>
+      );
+    }
+
+    if (isMobile) {
+      return (
+        <div className="px-4 pb-4 space-y-3">
+          {orderItems.map((item) => (
+            <div key={item.id} className="rounded-lg border p-3 space-y-1 text-sm">
+              <p className="font-medium">{item.description}</p>
+              <p className="text-xs text-muted-foreground">{t('lo_article_code')}: {item.article_code}</p>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{t('lo_ordered')}: {item.quantity}</span>
+                <span className={item.delivered_quantity && item.delivered_quantity > 0 ? 'text-green-600 font-medium' : ''}>
+                  {t('lo_delivered')}: {item.delivered_quantity || 0}
+                </span>
+              </div>
+              {item.stock_location && (
+                <p className="text-xs text-muted-foreground">{t('lo_location')}: {item.stock_location}</p>
+              )}
+              {item.ean && (
+                <p className="text-xs text-muted-foreground font-mono">{t('lo_ean')}: {item.ean}</p>
+              )}
+            </div>
+          ))}
         </div>
       );
     }
 
     return (
-      <div className="px-6 pb-4">
+      <div className="px-6 pb-4 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Article Code</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-center">Ordered</TableHead>
-              <TableHead className="text-center">Delivered</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead className="text-right">EAN</TableHead>
+              <TableHead>{t('lo_article_code')}</TableHead>
+              <TableHead>{t('lo_description')}</TableHead>
+              <TableHead className="text-center">{t('lo_ordered')}</TableHead>
+              <TableHead className="text-center">{t('lo_delivered')}</TableHead>
+              <TableHead>{t('lo_location')}</TableHead>
+              <TableHead className="text-right">{t('lo_ean')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -115,7 +135,7 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
                   {item.ean ? (
                     <span className="font-mono text-xs">{item.ean}</span>
                   ) : (
-                    <span className="text-gray-400">-</span>
+                    <span className="text-muted-foreground">-</span>
                   )}
                 </TableCell>
               </TableRow>
@@ -130,101 +150,99 @@ export const UpcomingDeliveries: React.FC<UpcomingDeliveriesProps> = ({
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-gray-500">
-            <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No upcoming deliveries</h3>
-            <p className="mt-1 text-sm text-gray-500">No orders scheduled for future delivery.</p>
+          <div className="text-center text-muted-foreground">
+            <Calendar className="mx-auto h-12 w-12 text-muted-foreground/60" />
+            <h3 className="mt-2 text-sm font-medium text-foreground">{t('ud_no_upcoming')}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{t('ud_no_upcoming_desc')}</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Sort by delivery date
   const sortedOrders = [...orders].sort((a, b) => 
     new Date(a.expected_delivery).getTime() - new Date(b.expected_delivery).getTime()
   );
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-600">
-            <Calendar className="h-5 w-5" />
-            Upcoming Deliveries ({orders.length})
+      <Card className="w-full overflow-hidden">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center gap-2 text-green-600 text-base md:text-lg">
+            <Calendar className="h-5 w-5 shrink-0" />
+            {(t('ud_upcoming_deliveries_title') || '').replace('{{count}}', String(orders.length))}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 md:px-6">
           <div className="space-y-4">
             {sortedOrders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
-              // Check if the project has a team assignment to determine badge
-              const hasTeamAssignment = (order as any).project_team_assignments && 
-                                      (order as any).project_team_assignments.length > 0;
+              const hasTeamAssignment = (order as any).project_team_assignments?.length > 0;
               
               return (
-                <Card key={order.id} className="border-l-4 border-l-green-500">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Order from {order.supplier}
+                <Card key={order.id} className="border-l-4 border-l-green-500 overflow-hidden">
+                  <CardHeader className="px-4 md:px-6 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <CardTitle className="text-sm md:text-base flex items-center gap-2 min-w-0">
+                        <Package className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+                        <span className="truncate">
+                          {(t('lo_order_from') || '').replace('{{supplier}}', order.supplier)}
+                        </span>
                       </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(order.status, hasTeamAssignment)}>
-                          {getStatusText(order.status, hasTeamAssignment)}
-                        </Badge>
-                      </div>
+                      <Badge className={`shrink-0 ${getStatusColor(order.status, hasTeamAssignment)}`}>
+                        {getStatusText(order.status, hasTeamAssignment)}
+                      </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <p className="text-sm text-gray-500">Project</p>
-                          <p className="font-medium">
+                  <CardContent className="px-4 md:px-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{t('lo_project')}</p>
+                          <p className="font-medium text-sm truncate">
                             {(order as any).project_name || order.project_id}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div>
-                          <p className="text-sm text-gray-500">Order Date</p>
-                          <p className="font-medium">{format(new Date(order.order_date), 'PPP')}</p>
+                          <p className="text-xs text-muted-foreground">{t('lo_order_date')}</p>
+                          <p className="font-medium text-sm">{format(new Date(order.order_date), 'PPP')}</p>
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Expected Delivery</p>
-                        <p className="font-medium">
+                        <p className="text-xs text-muted-foreground">{t('lo_expected_delivery')}</p>
+                        <p className="font-medium text-sm">
                           {format(new Date(order.expected_delivery), 'PPP')}
                         </p>
                       </div>
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center gap-2 sm:justify-end">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => toggleOrderExpansion(order.id)}
+                          className="text-xs"
                         >
                           {isExpanded ? (
                             <>
-                              <ChevronUp className="h-4 w-4 mr-1" />
-                              Hide Items
+                              <ChevronUp className="h-3 w-3 mr-1" />
+                              {t('lo_hide_items')}
                             </>
                           ) : (
                             <>
-                              <ChevronDown className="h-4 w-4 mr-1" />
-                              Show Items
+                              <ChevronDown className="h-3 w-3 mr-1" />
+                              {t('lo_show_items')}
                             </>
                           )}
                         </Button>
                         <Button 
                           onClick={() => setSelectedOrder(order)}
-                          className="bg-green-600 hover:bg-green-700"
                           size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-xs"
                         >
-                          Confirm Delivery
+                          {t('lo_confirm_delivery')}
                         </Button>
                       </div>
                     </div>

@@ -1430,5 +1430,31 @@
   "br_no_pending": "Geen openstaande ontvangsten om te bevestigen",
   "br_article_received": "Artikel ontvangen voor bestelling van {{supplier}}",
   "br_scan_barcode": "Scan Barcode",
-  "br_pending": "In afwachting"
+  "br_pending": "In afwachting",
+
+  "ud_upcoming_deliveries_title": "Komende Leveringen ({{count}})",
+  "ud_no_upcoming": "Geen komende leveringen",
+  "ud_no_upcoming_desc": "Geen bestellingen gepland voor toekomstige levering.",
+  "ud_planned": "Gepland",
+  "ud_to_plan": "Te Plannen",
+
+  "td_todays_deliveries_title": "Leveringen Vandaag ({{count}})",
+  "td_no_deliveries": "Geen leveringen vandaag",
+  "td_no_deliveries_desc": "Geen bestellingen verwacht voor levering vandaag.",
+
+  "lo_order_from": "Bestelling van {{supplier}}",
+  "lo_project": "Project",
+  "lo_order_date": "Besteldatum",
+  "lo_expected_delivery": "Verwachte Levering",
+  "lo_show_items": "Toon Artikelen",
+  "lo_hide_items": "Verberg Artikelen",
+  "lo_confirm_delivery": "Levering Bevestigen",
+  "lo_loading_items": "Bestellingsartikelen laden...",
+  "lo_no_items": "Geen artikelen gevonden voor deze bestelling.",
+  "lo_description": "Beschrijving",
+  "lo_ordered": "Besteld",
+  "lo_delivered": "Geleverd",
+  "lo_article_code": "Artikelcode",
+  "lo_ean": "EAN",
+  "lo_location": "Locatie"
 }

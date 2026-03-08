@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { Truck, Package, Building2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TodaysDeliveriesProps {
   orders: Order[];
@@ -19,6 +21,8 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
   orders, 
   onDeliveryConfirmed 
 }) => {
+  const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
@@ -42,7 +46,6 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
     setExpandedOrders(newExpanded);
   };
 
-  // Query for order items when order is expanded
   const OrderItems = ({ orderId, isExpanded }: { orderId: string; isExpanded: boolean }) => {
     const { data: orderItems = [], isLoading } = useQuery({
       queryKey: ['order-items', orderId],
@@ -54,30 +57,50 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
 
     if (isLoading) {
       return (
-        <div className="px-6 pb-4">
-          <div className="text-sm text-gray-500">Loading order items...</div>
+        <div className="px-4 md:px-6 pb-4">
+          <div className="text-sm text-muted-foreground">{t('lo_loading_items')}</div>
         </div>
       );
     }
 
     if (orderItems.length === 0) {
       return (
-        <div className="px-6 pb-4">
-          <div className="text-sm text-gray-500">No items found for this order.</div>
+        <div className="px-4 md:px-6 pb-4">
+          <div className="text-sm text-muted-foreground">{t('lo_no_items')}</div>
+        </div>
+      );
+    }
+
+    if (isMobile) {
+      return (
+        <div className="px-4 pb-4 space-y-3">
+          {orderItems.map((item) => (
+            <div key={item.id} className="rounded-lg border p-3 space-y-1 text-sm">
+              <p className="font-medium">{item.description}</p>
+              <p className="text-xs text-muted-foreground">{t('lo_article_code')}: {item.article_code}</p>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{t('lo_ordered')}: {item.quantity}</span>
+                <span>{t('lo_delivered')}: {item.delivered_quantity || 0}</span>
+              </div>
+              {item.ean && (
+                <p className="text-xs text-muted-foreground font-mono">{t('lo_ean')}: {item.ean}</p>
+              )}
+            </div>
+          ))}
         </div>
       );
     }
 
     return (
-      <div className="px-6 pb-4">
+      <div className="px-6 pb-4 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Ordered</TableHead>
-              <TableHead className="text-right">Delivered</TableHead>
-              <TableHead className="text-right">Article Code</TableHead>
-              <TableHead className="text-right">EAN</TableHead>
+              <TableHead>{t('lo_description')}</TableHead>
+              <TableHead className="text-right">{t('lo_ordered')}</TableHead>
+              <TableHead className="text-right">{t('lo_delivered')}</TableHead>
+              <TableHead className="text-right">{t('lo_article_code')}</TableHead>
+              <TableHead className="text-right">{t('lo_ean')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -91,7 +114,7 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
                   {item.ean ? (
                     <span className="font-mono text-xs">{item.ean}</span>
                   ) : (
-                    <span className="text-gray-400">-</span>
+                    <span className="text-muted-foreground">-</span>
                   )}
                 </TableCell>
               </TableRow>
@@ -106,10 +129,10 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-gray-500">
-            <Truck className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No deliveries today</h3>
-            <p className="mt-1 text-sm text-gray-500">No orders expected for delivery today.</p>
+          <div className="text-center text-muted-foreground">
+            <Truck className="mx-auto h-12 w-12 text-muted-foreground/60" />
+            <h3 className="mt-2 text-sm font-medium text-foreground">{t('td_no_deliveries')}</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{t('td_no_deliveries_desc')}</p>
           </div>
         </CardContent>
       </Card>
@@ -118,81 +141,82 @@ export const TodaysDeliveries: React.FC<TodaysDeliveriesProps> = ({
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-600">
-            <Truck className="h-5 w-5" />
-            Today's Deliveries ({orders.length})
+      <Card className="w-full overflow-hidden">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="flex items-center gap-2 text-blue-600 text-base md:text-lg">
+            <Truck className="h-5 w-5 shrink-0" />
+            {(t('td_todays_deliveries_title') || '').replace('{{count}}', String(orders.length))}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 md:px-6">
           <div className="space-y-4">
             {orders.map((order) => {
               const isExpanded = expandedOrders.has(order.id);
               
               return (
-                <Card key={order.id} className="border-l-4 border-l-blue-500">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Package className="h-5 w-5" />
-                        Order from {order.supplier}
+                <Card key={order.id} className="border-l-4 border-l-blue-500 overflow-hidden">
+                  <CardHeader className="px-4 md:px-6 pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <CardTitle className="text-sm md:text-base flex items-center gap-2 min-w-0">
+                        <Package className="h-4 w-4 md:h-5 md:w-5 shrink-0" />
+                        <span className="truncate">
+                          {(t('lo_order_from') || '').replace('{{supplier}}', order.supplier)}
+                        </span>
                       </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </div>
+                      <Badge className={`shrink-0 ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <p className="text-sm text-gray-500">Project</p>
-                          <p className="font-medium">
+                  <CardContent className="px-4 md:px-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{t('lo_project')}</p>
+                          <p className="font-medium text-sm truncate">
                             {(order as any).project_name || order.project_id}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-gray-400" />
+                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
                         <div>
-                          <p className="text-sm text-gray-500">Order Date</p>
-                          <p className="font-medium">{format(new Date(order.order_date), 'PPP')}</p>
+                          <p className="text-xs text-muted-foreground">{t('lo_order_date')}</p>
+                          <p className="font-medium text-sm">{format(new Date(order.order_date), 'PPP')}</p>
                         </div>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-500">Expected Delivery</p>
-                        <p className="font-medium">
+                        <p className="text-xs text-muted-foreground">{t('lo_expected_delivery')}</p>
+                        <p className="font-medium text-sm">
                           {format(new Date(order.expected_delivery), 'PPP')}
                         </p>
                       </div>
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center gap-2 sm:justify-end">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => toggleOrderExpansion(order.id)}
+                          className="text-xs"
                         >
                           {isExpanded ? (
                             <>
-                              <ChevronUp className="h-4 w-4 mr-1" />
-                              Hide Items
+                              <ChevronUp className="h-3 w-3 mr-1" />
+                              {t('lo_hide_items')}
                             </>
                           ) : (
                             <>
-                              <ChevronDown className="h-4 w-4 mr-1" />
-                              Show Items
+                              <ChevronDown className="h-3 w-3 mr-1" />
+                              {t('lo_show_items')}
                             </>
                           )}
                         </Button>
                         <Button 
                           onClick={() => setSelectedOrder(order)}
-                          className="bg-green-600 hover:bg-green-700"
                           size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-xs"
                         >
-                          Confirm Delivery
+                          {t('lo_confirm_delivery')}
                         </Button>
                       </div>
                     </div>
