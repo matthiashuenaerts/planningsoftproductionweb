@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -937,8 +938,9 @@ const ProductsSettings: React.FC = () => {
                       />
                       {editingProduct?.image_path && !imageFile && (
                         <div className="mt-2">
-                          <img
-                            src={getImageUrl(editingProduct.image_path) || ''}
+                          <SignedStorageImage
+                            bucket="product-images"
+                            path={editingProduct.image_path}
                             alt="Current product"
                             className="h-20 w-20 object-cover rounded"
                           />
@@ -1007,8 +1009,9 @@ const ProductsSettings: React.FC = () => {
                   <TableRow key={product.id}>
                     <TableCell>
                       {product.image_path ? (
-                        <img
-                          src={getImageUrl(product.image_path) || ''}
+                        <SignedStorageImage
+                          bucket="product-images"
+                          path={product.image_path}
                           alt={product.name}
                           className="h-10 w-10 object-cover rounded"
                         />
@@ -1113,8 +1116,9 @@ const ProductsSettings: React.FC = () => {
                   <TableRow key={group.id}>
                     <TableCell>
                       {group.image_path ? (
-                        <img
-                          src={getImageUrl(group.image_path) || ''}
+                        <SignedStorageImage
+                          bucket="product-images"
+                          path={group.image_path}
                           alt={group.name}
                           className="h-10 w-10 object-cover rounded"
                         />
