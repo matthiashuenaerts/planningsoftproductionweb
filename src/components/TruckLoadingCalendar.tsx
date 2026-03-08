@@ -327,21 +327,25 @@ const TruckLoadingCalendar = () => {
                 <div
                   key={`${assignment.project.id}-${index}`}
                   className={cn(
-                    "p-4 rounded-lg border-2",
-                    getProjectColor(assignment.project.status)
+                    "p-4 rounded-lg border-2 cursor-pointer hover:shadow-md transition-shadow",
+                    !assignment.project.team_color && getProjectColor(assignment.project.status)
                   )}
+                  style={assignment.project.team_color ? getTeamColorStyle(assignment.project.team_color) : undefined}
+                  onClick={() => handleProjectClick(assignment.project.id)}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge className={cn("text-lg px-3 py-1", getProjectColor(assignment.project.status))}>
+                    <Badge className={cn("text-lg px-3 py-1", !assignment.project.team_color && getProjectColor(assignment.project.status))}
+                      style={assignment.project.team_color ? { backgroundColor: `${assignment.project.team_color}30`, color: assignment.project.team_color, borderColor: assignment.project.team_color } : undefined}
+                    >
                       {assignment.project.status.replace('_', ' ').toUpperCase()}
                     </Badge>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {t('truck_install')}: {format(new Date(assignment.project.installation_date), 'MMM d')}
                     </div>
                   </div>
                   <h3 className="font-bold text-lg mb-1">{assignment.project.name}</h3>
-                  <p className="text-gray-600 mb-2">{assignment.project.client}</p>
-                  <div className="text-sm text-gray-500">
+                  <p className="text-muted-foreground mb-2">{assignment.project.client}</p>
+                  <div className="text-sm text-muted-foreground">
                     {t('truck_loading_today')}
                   </div>
                 </div>
