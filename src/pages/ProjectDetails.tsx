@@ -1439,7 +1439,7 @@ const ProjectDetails = () => {
                   if (!orderAttachments[order.id]) {
                     loadOrderAttachments(order.id);
                   }
-                  return <div key={order.id} className={cn("border rounded-lg p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200' : order.status === 'delayed' ? 'bg-red-50 border-red-200' : order.status === 'pending' ? 'bg-orange-50 border-orange-200' : order.status === 'charged' ? 'bg-purple-50 border-purple-200' : 'bg-card border-border')}>
+                  return <div key={order.id} className={cn("border rounded-lg p-2.5 sm:p-3 transition-all duration-200", order.status === 'delivered' ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' : order.status === 'delayed' ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' : order.status === 'pending' ? 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800' : order.status === 'charged' ? 'bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-800' : 'bg-card border-border')}>
                             {/* Compact Order Header */}
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
