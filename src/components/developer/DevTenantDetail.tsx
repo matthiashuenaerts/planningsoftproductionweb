@@ -309,6 +309,48 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
           </Card>
         </TabsContent>
 
+        {/* Login Logs Tab */}
+        <TabsContent value="logins" className="space-y-4">
+          <Card className="bg-white/5 border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2 text-sm">
+                <LogIn className="h-4 w-4" /> Login History ({loginLogs?.length || 0})
+                <span className="text-xs text-slate-400 font-normal ml-2">Last 30 days · auto-cleaned</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!loginLogs?.length ? (
+                <p className="text-slate-400 text-sm">No login activity recorded yet</p>
+              ) : (
+                <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                  {loginLogs.map((log: any) => (
+                    <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${log.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-white">{log.employee_name}</p>
+                          <p className="text-xs text-slate-400">
+                            {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
+                            {log.login_method && log.login_method !== 'password' && ` · ${log.login_method}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {log.error_message && (
+                          <span className="text-xs text-red-400 max-w-[200px] truncate">{log.error_message}</span>
+                        )}
+                        <Badge className={log.success ? 'bg-emerald-600/60 text-emerald-200' : 'bg-red-600/60 text-red-200'}>
+                          {log.success ? 'Success' : 'Failed'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Billing Tab */}
         <TabsContent value="billing" className="space-y-6">
           <Card className="bg-white/5 border-white/10">
