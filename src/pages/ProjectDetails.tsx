@@ -1130,14 +1130,14 @@ const ProjectDetails = () => {
       <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-4 sm:mb-6">
-            <Button variant="outline" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm">
+            <Button variant="ghost" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm rounded-xl hover:bg-muted/60 -ml-2">
               <ArrowLeft className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> {t('back_to_projects')}
             </Button>
             
             <div className="flex flex-col gap-3 sm:gap-4">
               <div>
-                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-3xl'}`}>{project?.name}</h1>
-                <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
+                <h1 className={`font-bold tracking-tight ${isMobile ? 'text-lg leading-tight' : 'text-2xl'}`}>{project?.name}</h1>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">{t('client_label')}: {project?.client}</p>
               </div>
               
               <div className="flex flex-wrap gap-1 sm:gap-1.5 pb-1.5">
