@@ -2066,12 +2066,14 @@ const Planning = () => {
           style={{ height: '100vh' }}
         >
           <div className="w-full max-w-full">
-            <div className="flex flex-col gap-4 mb-6">
+            <div className={cn("flex flex-col mb-4", isMobile ? "gap-2" : "gap-4 mb-6")}>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold">{t('planning_title')}</h1>
-                <p className="text-muted-foreground mt-1 text-sm md:text-base">
-                  {t('planning_description')}
-                </p>
+                <h1 className={cn("font-bold", isMobile ? "text-lg" : "text-2xl md:text-3xl")}>{t('planning_title')}</h1>
+                {!isMobile && (
+                  <p className="text-muted-foreground mt-1 text-sm md:text-base">
+                    {t('planning_description')}
+                  </p>
+                )}
               </div>
               
               <div className="flex flex-wrap items-center gap-2">
