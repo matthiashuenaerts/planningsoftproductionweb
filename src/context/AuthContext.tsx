@@ -66,6 +66,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Fetch employee data based on auth user
   const fetchEmployeeData = async (userId: string) => {
     try {
+      // Use service-level query - developers may have NULL tenant_id
+      // so RLS tenant filtering must not block them
       const { data: employee, error } = await supabase
         .from("employees")
         .select("*")
@@ -81,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: employee.role as Employee["role"],
           workstation: employee.workstation,
           logistics: employee.logistics,
-          tenant_id: (employee as any).tenant_id,
+          tenant_id: (employee as any).tenant_id ?? undefined,
         });
       } else {
         setCurrentEmployee(null);
