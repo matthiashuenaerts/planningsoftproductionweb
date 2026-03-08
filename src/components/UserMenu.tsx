@@ -12,6 +12,7 @@ import HolidayRequestsList from './HolidayRequestsList';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import SupportDialog from './support/SupportDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const UserMenu: React.FC = () => {
   const [showHolidayModal, setShowHolidayModal] = useState(false);
@@ -22,6 +23,7 @@ const UserMenu: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { createLocalizedPath, t } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const canManageRequests = currentEmployee?.role === 'admin' || 
                            currentEmployee?.role === 'teamleader' || 
@@ -49,7 +51,6 @@ const UserMenu: React.FC = () => {
     }
   }, [canManageRequests]);
 
-  // Close dropdown first, then open dialog after a tick to avoid Radix pointer-events conflict
   const openHolidayModal = () => {
     setDropdownOpen(false);
     setTimeout(() => setShowHolidayModal(true), 0);
@@ -69,6 +70,10 @@ const UserMenu: React.FC = () => {
     setDropdownOpen(false);
     navigate(path);
   };
+
+  const dialogClass = isMobile
+    ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-y-auto'
+    : 'max-w-4xl max-h-[90vh] overflow-y-auto';
 
   return (
     <>
@@ -112,20 +117,20 @@ const UserMenu: React.FC = () => {
       </DropdownMenu>
 
       <Dialog open={showHolidayModal} onOpenChange={setShowHolidayModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className={dialogClass}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5" />
+            <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : ''}`}>
+              <CalendarDays className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               {t('holiday_requests')}
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className={`space-y-${isMobile ? '4' : '6'}`}>
             <HolidayRequestsList showAllRequests={false} />
             
-            <div className="flex justify-center pt-4 border-t">
+            <div className={`flex justify-center ${isMobile ? 'pt-3 border-t border-border' : 'pt-4 border-t'}`}>
               <HolidayRequestDialog>
-                <Button className="flex items-center gap-2">
+                <Button className={`flex items-center gap-2 ${isMobile ? 'w-full h-10 text-sm' : ''}`}>
                   <Plus className="h-4 w-4" />
                   {t('add_new_holiday_request')}
                 </Button>
@@ -137,10 +142,10 @@ const UserMenu: React.FC = () => {
 
       {canManageRequests && (
         <Dialog open={showAdminModal} onOpenChange={setShowAdminModal}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className={dialogClass}>
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
+              <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : ''}`}>
+                <Users className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 {t('manage_requests')}
                 {pendingCount > 0 && (
                   <Badge variant="destructive" className="ml-2">
@@ -150,7 +155,7 @@ const UserMenu: React.FC = () => {
               </DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-6">
+            <div className={`space-y-${isMobile ? '4' : '6'}`}>
               <HolidayRequestsList showAllRequests={true} />
             </div>
           </DialogContent>

@@ -4,15 +4,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { holidayRequestService } from '@/services/holidayRequestService';
 import { CalendarDays, Clock, User, FileText } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DateRange } from 'react-day-picker';
+import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HolidayRequestDialogProps {
   children: React.ReactNode;
@@ -25,6 +25,8 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const isMobile = useIsMobile();
 
   const calculateDaysRequested = () => {
     if (!dateRange?.from || !dateRange?.to) return 0;
@@ -65,7 +67,6 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
         description: "Holiday request submitted successfully"
       });
 
-      // Reset form
       setDateRange(undefined);
       setReason('');
       setOpen(false);
@@ -86,145 +87,149 @@ const HolidayRequestDialog: React.FC<HolidayRequestDialogProps> = ({ children })
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={isMobile
+        ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-y-auto'
+        : 'max-w-2xl max-h-[90vh] overflow-y-auto'
+      }>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <CalendarDays className="h-6 w-6 text-blue-600" />
+          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : 'text-xl'}`}>
+            <CalendarDays className={`${isMobile ? 'h-4 w-4' : 'h-6 w-6'} text-primary`} />
             Request Holiday Leave
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
-          {/* Employee Info Card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <User className="h-5 w-5" />
-                Employee Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{currentEmployee?.name}</p>
-                  <p className="text-sm text-gray-600">{currentEmployee?.role}</p>
+        <div className={`space-y-${isMobile ? '4' : '6'}`}>
+          {/* Employee Info */}
+          <div className={`border border-border rounded-xl ${isMobile ? 'p-3' : 'p-4'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`${isMobile ? 'h-8 w-8' : 'h-9 w-9'} rounded-lg bg-primary/10 flex items-center justify-center`}>
+                  <User className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-primary`} />
                 </div>
-                <Badge variant="secondary">Active Employee</Badge>
+                <div>
+                  <p className={`font-medium ${isMobile ? 'text-sm' : ''} text-foreground`}>{currentEmployee?.name}</p>
+                  <p className="text-xs text-muted-foreground">{currentEmployee?.role}</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <Badge variant="secondary" className="text-xs">Active</Badge>
+            </div>
+          </div>
 
           {/* Date Selection */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarDays className="h-5 w-5" />
-                Select Dates
-              </CardTitle>
-              <CardDescription>
-                Choose your holiday start and end dates
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center space-y-4">
-                <div className="border rounded-lg p-3 bg-gray-50">
-                  <Calendar
-                    mode="range"
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    disabled={(date) => date < new Date()}
-                    className="w-full"
-                    numberOfMonths={1}
-                  />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-muted-foreground`} />
+              <span className={`font-medium ${isMobile ? 'text-sm' : ''} text-foreground`}>Select Dates</span>
+            </div>
+            <div className={`border border-border rounded-xl ${isMobile ? 'p-2' : 'p-3'} bg-muted/30 flex justify-center`}>
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                disabled={(date) => date < new Date()}
+                className="w-full"
+                numberOfMonths={1}
+              />
+            </div>
+            
+            {dateRange?.from && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-500/10 p-2 rounded-lg">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Start: {format(dateRange.from, isMobile ? 'MMM do, yyyy' : 'EEEE, MMMM do, yyyy')}
                 </div>
-                
-                {dateRange?.from && (
-                  <div className="w-full space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded">
-                      <CalendarDays className="h-4 w-4" />
-                      Start: {format(dateRange.from, 'EEEE, MMMM do, yyyy')}
-                    </div>
-                    {dateRange?.to && (
-                      <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded">
-                        <CalendarDays className="h-4 w-4" />
-                        End: {format(dateRange.to, 'EEEE, MMMM do, yyyy')}
-                      </div>
-                    )}
+                {dateRange?.to && (
+                  <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 p-2 rounded-lg">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    End: {format(dateRange.to, isMobile ? 'MMM do, yyyy' : 'EEEE, MMMM do, yyyy')}
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Duration Summary */}
-              {dateRange?.from && dateRange?.to && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    <span className="font-medium text-blue-900">Duration Summary</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Total Days:</span>
-                      <span className="ml-2 font-semibold text-blue-700">{calculateDaysRequested()} days</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Status:</span>
-                      <Badge variant="outline" className="ml-2">Pending Approval</Badge>
-                    </div>
-                  </div>
+            {dateRange?.from && dateRange?.to && (
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Clock className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-primary`} />
+                  <span className={`font-medium ${isMobile ? 'text-xs' : 'text-sm'} text-foreground`}>Duration Summary</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className={`flex ${isMobile ? 'flex-col gap-1' : 'gap-4'} text-xs`}>
+                  <span className="text-muted-foreground">Total: <strong className="text-foreground">{calculateDaysRequested()} days</strong></span>
+                  <Badge variant="outline" className="text-xs w-fit">Pending Approval</Badge>
+                </div>
+              </div>
+            )}
+          </div>
 
-          {/* Reason Section */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5" />
-                Reason for Leave
-              </CardTitle>
-              <CardDescription>
-                Optional: Provide additional details about your holiday request
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter the reason for your holiday request (vacation, personal, family time, etc.)..."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-              <p className="text-sm text-gray-500 mt-2">
-                {reason.length}/500 characters
-              </p>
-            </CardContent>
-          </Card>
+          {/* Reason */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <FileText className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'} text-muted-foreground`} />
+              <span className={`font-medium ${isMobile ? 'text-sm' : ''} text-foreground`}>Reason (optional)</span>
+            </div>
+            <Textarea
+              placeholder="Enter the reason for your holiday request..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={isMobile ? 3 : 4}
+              className={`resize-none ${isMobile ? 'text-sm' : ''}`}
+            />
+            <p className="text-xs text-muted-foreground">{reason.length}/500</p>
+          </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isSubmitting}
-              className="min-w-24"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !dateRange?.from || !dateRange?.to}
-              className="min-w-32"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Submitting...
-                </div>
-              ) : (
-                'Submit Request'
-              )}
-            </Button>
+          <div className={`flex ${isMobile ? 'flex-col' : 'justify-end'} gap-2 pt-3 border-t border-border`}>
+            {isMobile ? (
+              <>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !dateRange?.from || !dateRange?.to}
+                  className="h-10"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                      Submitting...
+                    </div>
+                  ) : (
+                    'Submit Request'
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={isSubmitting}
+                  className="h-10"
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={isSubmitting}
+                  className="min-w-24"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !dateRange?.from || !dateRange?.to}
+                  className="min-w-32"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                      Submitting...
+                    </div>
+                  ) : (
+                    'Submit Request'
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>
