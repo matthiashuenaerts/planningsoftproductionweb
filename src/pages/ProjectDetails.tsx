@@ -1178,29 +1178,29 @@ const ProjectDetails = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
             <Card className="py-0">
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{openTasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('open_tasks')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{openTasks.length}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('open_tasks')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
-                <p className="text-xs text-muted-foreground">{t('in_progress')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('IN_PROGRESS')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('in_progress')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
-                <p className="text-xs text-muted-foreground">{t('completed')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{getTaskCountByStatus('COMPLETED')}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('completed')}</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="pt-6 py-[10px]">
-                <div className="text-2xl font-bold">{tasks.length}</div>
-                <p className="text-xs text-muted-foreground">{t('total_tasks')}</p>
+              <CardContent className="pt-4 sm:pt-6 py-2 sm:py-[10px] px-3 sm:px-6">
+                <div className="text-xl sm:text-2xl font-bold">{tasks.length}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{t('total_tasks')}</p>
               </CardContent>
             </Card>
           </div>
