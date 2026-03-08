@@ -712,7 +712,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                 onClick={() => handleShowMap(team.id, dateStr, team.name)}
                               >
                                 <Map className="h-3 w-3 mr-1" />
-                                Show on Map
+                                {t('svc_show_on_map')}
                               </Button>
                             )}
                           </>
