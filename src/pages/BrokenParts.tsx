@@ -15,25 +15,25 @@ const BrokenParts: React.FC = () => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background overflow-hidden">
       {!isMobile && (
-        <div className="w-64 h-full">
+        <div className="w-64 h-full flex-shrink-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 overflow-auto ${isMobile ? 'pt-16' : ''}`}>
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">{t('broken_parts_title')}</h1>
-            <div className="flex space-x-2">
-              <Button variant="outline" asChild>
+      <div className={`flex-1 overflow-auto min-w-0 ${isMobile ? 'pt-16' : ''}`}>
+        <div className="px-4 py-6 max-w-full">
+          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'justify-between items-center'} mb-6`}>
+            <h1 className="text-2xl font-bold text-foreground">{t('broken_parts_title')}</h1>
+            <div className={`flex ${isMobile ? 'w-full' : ''} gap-2`}>
+              <Button variant="outline" asChild className={isMobile ? 'flex-1' : ''}>
                 <Link to={createLocalizedPath("/broken-parts/summary")}>
                   <BarChart className="h-4 w-4 mr-2" />
                   {t('view_summary')}
                 </Link>
               </Button>
-              <Button asChild>
+              <Button asChild className={isMobile ? 'flex-1' : ''}>
                 <Link to={createLocalizedPath("/broken-parts/new")}>
                   <PlusCircle className="h-4 w-4 mr-2" />
                   {t('report_new')}
