@@ -75,28 +75,28 @@ const MobileOrderCard = ({
   const navigate = useNavigate();
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
-      <div className="p-4 cursor-pointer" onClick={onToggle}>
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1 min-w-0 mr-2">
-            <p className="font-semibold text-sm truncate">{order.project_name}</p>
-            <p className="text-xs text-muted-foreground truncate">{order.supplier}</p>
+    <div className="border rounded-lg bg-card overflow-hidden shadow-sm">
+      <div className="p-3 cursor-pointer active:bg-muted/30 transition-colors" onClick={onToggle}>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-[13px] truncate leading-tight">{order.project_name}</p>
+            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{order.supplier}</p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {getStatusBadge(order.status)}
-            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
           </div>
         </div>
-        <div className="flex gap-4 text-xs text-muted-foreground">
+        <div className="flex gap-3 text-[10px] text-muted-foreground">
           <span>{t('ord_ordered')}: {formatDate(order.order_date)}</span>
           <span>{t('ord_due')}: {formatDate(order.expected_delivery)}</span>
         </div>
       </div>
 
-      <div className="flex border-t divide-x">
+      <div className="flex border-t divide-x bg-muted/20">
         {order.status === 'pending' && (
           <button
-            className="flex-1 py-2 text-xs text-green-600 hover:bg-muted/50 flex items-center justify-center gap-1"
+            className="flex-1 py-2 text-[11px] text-green-600 hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
             onClick={(e) => { e.stopPropagation(); onConfirmDelivery(order); }}
           >
             <Camera className="h-3 w-3" /> {t('ord_confirm')}
@@ -104,14 +104,14 @@ const MobileOrderCard = ({
         )}
         {order.project_id && (
           <button
-            className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
+            className="flex-1 py-2 text-[11px] text-primary hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
             onClick={(e) => { e.stopPropagation(); onViewProjectOrders(order.project_id); }}
           >
             <FileText className="h-3 w-3" /> {t('ord_project')}
           </button>
         )}
         <button
-          className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
+          className="flex-1 py-2 text-[11px] text-primary hover:bg-muted/50 active:bg-muted flex items-center justify-center gap-1 font-medium"
           onClick={(e) => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${order.project_id}`)); }}
         >
           <ExternalLink className="h-3 w-3" /> {t('ord_details')}
@@ -121,7 +121,7 @@ const MobileOrderCard = ({
             <select
               value={order.status}
               onChange={(e) => { e.stopPropagation(); onUpdateStatus(order.id, e.target.value); }}
-              className="text-xs border-0 bg-transparent w-full text-center py-2"
+              className="text-[11px] border-0 bg-transparent w-full text-center py-2 font-medium"
             >
               <option value="pending">{t('ord_pending')}</option>
               <option value="delivered">{t('ord_delivered')}</option>
