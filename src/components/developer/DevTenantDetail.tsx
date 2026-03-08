@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Users, Globe, Plus, Trash2, ExternalLink, Rocket,
-  UserPlus, FileText, Upload, Building2,
+  UserPlus, FileText, Upload, Building2, LogIn,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -92,6 +92,21 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
       const { data, error } = await supabase.from("support_tickets").select("*, creator:employees!support_tickets_created_by_fkey(name)").eq("tenant_id", tenant.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Fetch login logs
+  const { data: loginLogs } = useQuery({
+    queryKey: ["dev", "loginLogs", tenant.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("login_logs" as any)
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -228,6 +243,9 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="bg-white/10 border border-white/10">
           <TabsTrigger value="overview" className="data-[state=active]:bg-white/20 text-white">Overview</TabsTrigger>
+          <TabsTrigger value="logins" className="data-[state=active]:bg-white/20 text-white">
+            <LogIn className="h-3.5 w-3.5 mr-1" /> Logins
+          </TabsTrigger>
           <TabsTrigger value="billing" className="data-[state=active]:bg-white/20 text-white">Billing</TabsTrigger>
           <TabsTrigger value="support" className="data-[state=active]:bg-white/20 text-white">Support</TabsTrigger>
           <TabsTrigger value="settings" className="data-[state=active]:bg-white/20 text-white">Settings</TabsTrigger>
@@ -287,6 +305,48 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Login Logs Tab */}
+        <TabsContent value="logins" className="space-y-4">
+          <Card className="bg-white/5 border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2 text-sm">
+                <LogIn className="h-4 w-4" /> Login History ({loginLogs?.length || 0})
+                <span className="text-xs text-slate-400 font-normal ml-2">Last 30 days · auto-cleaned</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!loginLogs?.length ? (
+                <p className="text-slate-400 text-sm">No login activity recorded yet</p>
+              ) : (
+                <div className="space-y-1 max-h-[500px] overflow-y-auto">
+                  {loginLogs.map((log: any) => (
+                    <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${log.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                        <div>
+                          <p className="text-sm font-medium text-white">{log.employee_name}</p>
+                          <p className="text-xs text-slate-400">
+                            {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
+                            {log.login_method && log.login_method !== 'password' && ` · ${log.login_method}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {log.error_message && (
+                          <span className="text-xs text-red-400 max-w-[200px] truncate">{log.error_message}</span>
+                        )}
+                        <Badge className={log.success ? 'bg-emerald-600/60 text-emerald-200' : 'bg-red-600/60 text-red-200'}>
+                          {log.success ? 'Success' : 'Failed'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

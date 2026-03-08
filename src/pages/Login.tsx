@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { User, Lock, Shield, RefreshCw } from "lucide-react";
+import { logLoginAttempt } from "@/services/loginLogService";
 import {
   InputOTP,
   InputOTPGroup,
@@ -204,6 +205,15 @@ const Login: React.FC = () => {
         });
       }
 
+      // Log successful login
+      logLoginAttempt({
+        tenantId: row.tenant_id,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        loginMethod: "password",
+        success: true,
+      });
+
       toast({
         title: "Login successful",
         description: `Welcome, ${row.employee_name}!`,
@@ -219,6 +229,23 @@ const Login: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
+
+      // Log failed login attempt (best effort - tenant may not be resolved)
+      if (tenant) {
+        // Try to resolve tenant id for logging
+        const { data: tenantData } = await supabase.rpc("resolve_tenant", { p_slug: tenant, p_domain: null });
+        const resolvedTenant = Array.isArray(tenantData) ? tenantData[0] : tenantData;
+        if (resolvedTenant?.id) {
+          logLoginAttempt({
+            tenantId: resolvedTenant.id,
+            employeeName: nameOrEmail,
+            loginMethod: "password",
+            success: false,
+            errorMessage: error.message || "Login failed",
+          });
+        }
+      }
+
       toast({
         title: "Login failed",
         description: error.message || "An error occurred during login",
