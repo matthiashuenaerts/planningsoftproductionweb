@@ -509,7 +509,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   {task.status === 'IN_PROGRESS' && task.assignee_name && (
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4" />
-                      <span>Started by: {task.assignee_name}</span>
+                      <span>{t('tl_started_by', { name: task.assignee_name })}</span>
                     </div>
                   )}
                   {task.total_duration && (
