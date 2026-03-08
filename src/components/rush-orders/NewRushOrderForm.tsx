@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +60,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
   
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -360,10 +362,10 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   }
   
   return (
-    <form onSubmit={formHandleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        <div className="space-y-4 md:space-y-6 min-w-0">
-          <div className="space-y-2">
+    <form onSubmit={formHandleSubmit(onSubmit)} className={`${isMobile ? 'space-y-4' : 'space-y-6'}`}>
+      <div className={`grid grid-cols-1 ${isMobile ? 'gap-4' : 'md:grid-cols-2 gap-4 md:gap-6'}`}>
+        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
+          <div className="space-y-1.5">
             <label htmlFor="title" className="block text-sm font-medium">{t('ro_title')}</label>
             <Input
               id="title"
@@ -491,7 +493,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           </div>
         </div>
         
-        <div className="space-y-4 md:space-y-6 min-w-0">
+        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
           <div className="space-y-2">
             <label className="block text-sm font-medium">{t('ro_select_tasks')}</label>
             <Card>
@@ -558,8 +560,8 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
         </div>
       </div>
       
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitting} className="bg-red-600 hover:bg-red-700">
+      <div className={`flex ${isMobile ? 'pt-2' : ''} justify-end`}>
+        <Button type="submit" disabled={isSubmitting} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
           {isSubmitting ? t('ro_creating') : t('ro_create_rush_order')}
         </Button>
       </div>
