@@ -470,11 +470,11 @@ function extractSupplier(text: string): string | undefined {
 
 function extractOrderNumber(text: string): string | undefined {
   const patterns = [
-    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer|bestelling)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:order\s*(?:no|nr|number|nummer)|bestelnummer|bestellnummer|bestelling|n°\s*(?:de\s*)?commande|commande\s*n°)[:\s#]*([A-Z0-9\-\/]+)/gi,
     /(?:po|p\.o\.)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:reference|referentie|ref)\s*[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:document\s*(?:no|nr|nummer))[:\s#]*([A-Z0-9\-\/]+)/gi,
-    /(?:onze\s*ref|uw\s*ref|your\s*ref|our\s*ref)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:reference|referentie|ref|référence|réf)[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:document\s*(?:no|nr|nummer|n°))[:\s#]*([A-Z0-9\-\/]+)/gi,
+    /(?:onze\s*ref|uw\s*ref|your\s*ref|our\s*ref|notre\s*réf|votre\s*réf)[:\s#]*([A-Z0-9\-\/]+)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
