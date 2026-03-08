@@ -21,6 +21,7 @@ export interface HelpArticle {
   tags: string[];
   display_order: number;
   is_published: boolean;
+  is_global: boolean;
   created_by?: string;
   created_at: string;
   updated_at: string;
