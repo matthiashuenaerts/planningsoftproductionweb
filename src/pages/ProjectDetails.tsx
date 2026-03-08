@@ -256,6 +256,12 @@ const ProjectDetails = () => {
     console.log('Setting tasks in state:', allTasks.length, 'total tasks');
     setTasks(allTasks);
   }, [calculateAndSaveTaskEfficiency]);
+
+  // Scroll to top on mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Handle URL parameters for tab and order navigation
   useEffect(() => {
     const handlePopState = () => {
