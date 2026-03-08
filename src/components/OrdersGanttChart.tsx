@@ -809,7 +809,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             <div
               key={week.weekNumber}
               className="flex-shrink-0 px-2 py-2 text-xs font-semibold text-primary-foreground border-r border-primary-foreground/20"
-              style={{ width: `calc((100% - 16rem) * ${week.days.length / dateRange.length})` }}
+              style={{ width: `calc((100% - ${sideColWidth}) * ${week.days.length / dateRange.length})` }}
             >
               Week {week.weekNumber}
             </div>
