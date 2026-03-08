@@ -1123,23 +1123,23 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
                       onClick={() => toggleTask(task.taskId)}
                       className="w-full"
                     >
-                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                           {expandedTasks.has(task.taskId) ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           )}
-                          <div>
-                            <span className="font-medium">{task.taskTitle}</span>
-                            <Badge variant="outline" className="ml-2">{task.phaseName}</Badge>
+                          <div className="min-w-0">
+                            <span className="font-medium text-xs sm:text-sm truncate block">{task.taskTitle}</span>
+                            <Badge variant="outline" className="text-[10px] sm:text-xs mt-0.5">{task.phaseName}</Badge>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-3 sm:gap-6 text-[10px] sm:text-sm flex-shrink-0">
                           <span className="text-muted-foreground">
                             {formatTime(task.actualMinutes)}
                             {task.estimatedMinutes > 0 && (
-                              <span className="text-xs ml-1">
+                              <span className="hidden sm:inline text-xs ml-1">
                                 / {formatTime(task.estimatedMinutes)}
                               </span>
                             )}
