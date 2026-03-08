@@ -65,6 +65,7 @@ interface ServiceAssignment {
 const ServiceTeamCalendar: React.FC = () => {
   const { tenant } = useTenant();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
