@@ -1017,7 +1017,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     <FormControl>
                       <Textarea 
                         placeholder={t('npm_description_placeholder')} 
-                        className="resize-none" 
+                        className={cn("resize-none", isMobile && "text-sm min-h-[60px]")} 
                         {...field} 
                       />
                     </FormControl>
