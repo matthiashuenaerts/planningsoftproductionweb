@@ -257,37 +257,56 @@ const DevDashboard: React.FC = () => {
 
 const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug: string }> }> = ({ tenantMap }) => {
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [filterTenant, setFilterTenant] = useState<string>("all");
 
   const { data: syncLogs, refetch, isLoading } = useQuery({
-    queryKey: ["dev", "dashboard", "sync-logs"],
+    queryKey: ["dev", "dashboard", "sync-logs", filterTenant],
     queryFn: async () => {
-      const [projectLogs, orderLogs] = await Promise.all([
-        supabase
-          .from("project_sync_logs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(15),
-        supabase
-          .from("orders_sync_logs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(15),
-      ]);
+      let projectQuery = supabase
+        .from("project_sync_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      let orderQuery = supabase
+        .from("orders_sync_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (filterTenant !== "all") {
+        projectQuery = projectQuery.eq("tenant_id", filterTenant);
+        orderQuery = orderQuery.eq("tenant_id", filterTenant);
+      }
+
+      const [projectLogs, orderLogs] = await Promise.all([projectQuery, orderQuery]);
       const tagged = [
         ...(projectLogs.data ?? []).map((l: any) => ({ ...l, _sync_type: "project" })),
         ...(orderLogs.data ?? []).map((l: any) => ({ ...l, _sync_type: "order" })),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-       .slice(0, 25);
+       .slice(0, 40);
       return tagged;
     },
     refetchInterval: 30000,
   });
 
   const getTenantName = (id: string) => tenantMap?.[id]?.name ?? id?.slice(0, 8) ?? "Unknown";
+  const tenantList = Object.entries(tenantMap ?? {}).map(([id, t]) => ({ id, name: t.name }));
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-end mb-2">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <select
+            value={filterTenant}
+            onChange={(e) => setFilterTenant(e.target.value)}
+            className="bg-white/10 border border-white/20 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="all" className="bg-slate-800">All tenants</option>
+            {tenantList.map((t) => (
+              <option key={t.id} value={t.id} className="bg-slate-800">{t.name}</option>
+            ))}
+          </select>
+        </div>
         <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading} className="text-slate-400 hover:text-white text-xs">
           <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} /> Refresh
         </Button>
