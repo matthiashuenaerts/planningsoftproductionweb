@@ -1,13 +1,15 @@
 import React from "react";
 import { useMarketingLang } from "@/components/marketing/useMarketingLang";
-import { TrendingUp, Truck, RefreshCw, MessageCircle, ArrowRight } from "lucide-react";
-import solutionsImg from "@/assets/marketing/solutions-abstract.jpg";
+import { TrendingUp, Truck, RefreshCw, MessageCircle } from "lucide-react";
+import solutionsFactory from "@/assets/marketing/solutions-factory.jpg";
+import featureLogistics from "@/assets/marketing/feature-logistics.jpg";
+import featureTeam from "@/assets/marketing/feature-team.jpg";
 
 const solutions = [
-  { titleKey: "sol_efficiency_title", problemKey: "sol_efficiency_problem", solutionKey: "sol_efficiency_solution", Icon: TrendingUp, color: "blue" },
-  { titleKey: "sol_logistics_title", problemKey: "sol_logistics_problem", solutionKey: "sol_logistics_solution", Icon: Truck, color: "cyan" },
-  { titleKey: "sol_flexibility_title", problemKey: "sol_flexibility_problem", solutionKey: "sol_flexibility_solution", Icon: RefreshCw, color: "blue" },
-  { titleKey: "sol_communication_title", problemKey: "sol_communication_problem", solutionKey: "sol_communication_solution", Icon: MessageCircle, color: "cyan" },
+  { titleKey: "sol_efficiency_title", problemKey: "sol_efficiency_problem", solutionKey: "sol_efficiency_solution", Icon: TrendingUp },
+  { titleKey: "sol_logistics_title", problemKey: "sol_logistics_problem", solutionKey: "sol_logistics_solution", Icon: Truck },
+  { titleKey: "sol_flexibility_title", problemKey: "sol_flexibility_problem", solutionKey: "sol_flexibility_solution", Icon: RefreshCw },
+  { titleKey: "sol_communication_title", problemKey: "sol_communication_problem", solutionKey: "sol_communication_solution", Icon: MessageCircle },
 ];
 
 const MarketingSolutions: React.FC = () => {
@@ -16,9 +18,10 @@ const MarketingSolutions: React.FC = () => {
   return (
     <>
       {/* Hero */}
-      <section className="relative pt-28 pb-16 overflow-hidden">
+      <section className="relative pt-28 pb-20 overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-1/3 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[150px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:80px_80px]" />
         </div>
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -28,8 +31,38 @@ const MarketingSolutions: React.FC = () => {
               <p className="text-slate-400 text-lg leading-relaxed">{t("solutions_subtitle")}</p>
             </div>
             <div className="hidden lg:block">
-              <div className="rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-                <img src={solutionsImg} alt="Solutions" className="w-full" loading="eager" />
+              <div className="relative group">
+                <div className="absolute -inset-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+                  <img src={solutionsFactory} alt="Solutions" className="w-full" loading="eager" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/30 via-transparent to-transparent" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Image showcase row */}
+      <section className="pb-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="relative group rounded-2xl border border-white/10 overflow-hidden">
+              <img src={featureLogistics} alt="Logistics" className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-[1.03]" loading="lazy" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/80 to-transparent flex items-end p-8">
+                <div>
+                  <h3 className="text-xl font-bold mb-1">{t("sol_logistics_title")}</h3>
+                  <p className="text-sm text-slate-400">{t("sol_logistics_solution")}</p>
+                </div>
+              </div>
+            </div>
+            <div className="relative group rounded-2xl border border-white/10 overflow-hidden">
+              <img src={featureTeam} alt="Team" className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-[1.03]" loading="lazy" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120]/80 to-transparent flex items-end p-8">
+                <div>
+                  <h3 className="text-xl font-bold mb-1">{t("sol_communication_title")}</h3>
+                  <p className="text-sm text-slate-400">{t("sol_communication_solution")}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -40,7 +73,7 @@ const MarketingSolutions: React.FC = () => {
       <section className="pb-28">
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {solutions.map((s, i) => (
+            {solutions.map((s) => (
               <div
                 key={s.titleKey}
                 className="group rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-8 hover:border-blue-500/20 hover:bg-white/[0.04] transition-all duration-500"
