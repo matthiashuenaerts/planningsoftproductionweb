@@ -619,7 +619,7 @@ const ServiceInstallation: React.FC = () => {
                                     ) : (
                                       <Play className="h-4 w-4 mr-1" />
                                     )}
-                                    Start Time Registration
+                                    {t('start_time_registration')}
                                   </Button>
                                 </div>
                               </div>
