@@ -1238,13 +1238,13 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 </div>
               </div>
 
-              <DialogFooter className="pt-4">
+              <DialogFooter className={cn("pt-3", isMobile && "flex-col gap-2")}>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={submitting}>
+                  <Button type="button" variant="outline" disabled={submitting} className={cn(isMobile && "w-full h-10")}>
                     {t('npm_cancel')}
                   </Button>
                 </DialogClose>
-                <Button type="submit" disabled={isGeneratingCode || submitting}>
+                <Button type="submit" disabled={isGeneratingCode || submitting} className={cn(isMobile && "w-full h-10")}>
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
