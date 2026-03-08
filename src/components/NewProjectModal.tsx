@@ -835,7 +835,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
+      <DialogContent className="w-[95vw] max-w-[700px] max-h-[90vh] p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>{t('npm_create_new_project')}</DialogTitle>
         </DialogHeader>
