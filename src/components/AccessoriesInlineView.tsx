@@ -840,7 +840,138 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Card>
           )}
 
-          <div className="overflow-x-auto max-w-full">
+          {/* Mobile Card Layout */}
+          <div className="sm:hidden">
+            <div className="divide-y">
+              {filteredAccessories.map((accessory) => (
+                <div key={accessory.id} className={`p-3 ${getRowClassName(accessory.status)} transition-colors`}>
+                  <div className="flex items-start gap-2 mb-1.5">
+                    <Checkbox
+                      checked={selectedAccessories.includes(accessory.id)}
+                      onCheckedChange={(checked) => handleAccessorySelection(accessory.id, checked as boolean)}
+                      disabled={accessory.status !== 'to_order' || !!accessory.order_id}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{accessory.article_name}</p>
+                      {accessory.article_description && (
+                        <p className="text-[10px] text-muted-foreground line-clamp-2">{accessory.article_description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => handleEditAccessory(accessory)} className="h-6 w-6 p-0">
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      {accessory.order_id && (
+                        <Button size="sm" variant="outline" onClick={() => handleEditOrder(accessory.order_id!)} className="h-6 w-6 p-0">
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => setAccessoryToDelete(accessory.id)} className="h-6 w-6 p-0 text-destructive hover:text-destructive">
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground ml-6">
+                    {accessory.article_code && <span className="font-mono">{accessory.article_code}</span>}
+                    <span className="font-semibold text-foreground">×{accessory.quantity}</span>
+                    {accessory.supplier && <span>{accessory.supplier}</span>}
+                    {accessory.stock_location && <span>📍{accessory.stock_location}</span>}
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 ml-6">
+                    {editingStatusAccessoryId === accessory.id ? (
+                      <Popover
+                        defaultOpen
+                        onOpenChange={(open) => {
+                          if (!open) setEditingStatusAccessoryId(null);
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-6 text-[10px]">
+                            {accessory.status.replace('_', ' ').toUpperCase()}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72">
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs">New Status</Label>
+                              <Select
+                                value={statusUpdateInfo.status}
+                                onValueChange={(value: Accessory['status']) => 
+                                  setStatusUpdateInfo(prev => ({ ...prev, status: value }))
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {statuses.map(status => (
+                                    <SelectItem key={status} value={status}>
+                                      {status.replace('_', ' ').toUpperCase()}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {statusUpdateInfo.status === 'to_order' && (
+                              <div>
+                                <Label className="text-xs">Quantity to Order</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max={accessory.quantity}
+                                  value={statusUpdateInfo.quantity}
+                                  onChange={(e) => 
+                                    setStatusUpdateInfo(prev => ({ 
+                                      ...prev, 
+                                      quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
+                                    }))
+                                  }
+                                  className="h-8"
+                                />
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button size="sm" className="h-7" onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)} disabled={loading}>
+                                Update
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7" onClick={() => setEditingStatusAccessoryId(null)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => {
+                          setEditingStatusAccessoryId(accessory.id);
+                          setStatusUpdateInfo({ status: accessory.status, quantity: accessory.quantity });
+                        }}
+                      >
+                        {accessory.status.replace('_', ' ').toUpperCase()}
+                      </Button>
+                    )}
+                    {accessory.order_id && (() => {
+                      const orderInfo = getOrderInfo(accessory.order_id);
+                      return orderInfo ? (
+                        <Button size="sm" variant="ghost" onClick={() => handleGoToOrder(accessory.order_id!)} className="h-6 text-[10px] px-2">
+                          {orderInfo.supplier} <ExternalLink className="ml-1 h-3 w-3" />
+                        </Button>
+                      ) : null;
+                    })()}
+                    <span className="text-[10px] text-muted-foreground">{formatDate(accessory.created_at)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden sm:block overflow-x-auto max-w-full">
             <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
