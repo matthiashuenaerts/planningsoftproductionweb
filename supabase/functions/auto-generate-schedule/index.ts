@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const workingHours = workingHoursData || []
 
-    // Get holidays
+    // Get company holidays
     const { data: holidaysData } = await supabase
       .from('holidays')
       .select('*')
@@ -55,40 +55,77 @@ Deno.serve(async (req) => {
 
     const holidaySet = new Set((holidaysData || []).map((h: any) => h.date))
 
-    // Get projects ordered by installation_date
-    const { data: projects } = await supabase
-      .from('projects')
-      .select('id, name, client, installation_date, start_date, status')
-      .in('status', ['planned', 'in_progress'])
-      .gte('installation_date', today)
-      .order('installation_date', { ascending: true })
-      .limit(totalProjects)
+    // Get approved employee holiday requests (personal holidays/vacations)
+    const { data: holidayRequestsData } = await supabase
+      .from('holiday_requests')
+      .select('user_id, start_date, end_date')
+      .eq('status', 'approved')
+      .gte('end_date', today)
 
-    if (!projects || projects.length === 0) {
+    const employeeHolidayRequests = holidayRequestsData || []
+    console.log(`Found ${employeeHolidayRequests.length} approved employee holiday requests`)
+
+    // Helper: check if an employee is on personal holiday on a given date
+    function isEmployeeOnHoliday(employeeId: string, dateStr: string): boolean {
+      return employeeHolidayRequests.some((hr: any) => 
+        hr.user_id === employeeId && hr.start_date <= dateStr && hr.end_date >= dateStr
+      )
+    }
+
+    // Get projects ordered by installation_date
+    // Fetch ALL projects (paginated to bypass 1000 limit)
+    let projects: any[] = []
+    let projectOffset = 0
+    const PROJECT_PAGE_SIZE = 1000
+    while (true) {
+      const { data: batch } = await supabase
+        .from('projects')
+        .select('id, name, client, installation_date, start_date, status')
+        .in('status', ['planned', 'in_progress'])
+        .gte('installation_date', today)
+        .order('installation_date', { ascending: true })
+        .range(projectOffset, projectOffset + PROJECT_PAGE_SIZE - 1)
+      
+      if (!batch || batch.length === 0) break
+      projects.push(...batch)
+      if (batch.length < PROJECT_PAGE_SIZE) break
+      projectOffset += PROJECT_PAGE_SIZE
+    }
+
+    if (projects.length === 0) {
       return new Response(JSON.stringify({ message: 'No projects found' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
+    console.log(`Fetched ${projects.length} projects to schedule`)
     const projectIds = projects.map((p: any) => p.id)
 
-    // Get tasks
+    // Get tasks (paginated per project batch)
     const allTasks: any[] = []
     const BATCH_SIZE = 50
     for (let i = 0; i < projectIds.length; i += BATCH_SIZE) {
       const batchIds = projectIds.slice(i, i + BATCH_SIZE)
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select(`
-          id, title, duration, status, standard_task_id, phase_id,
-          phases!inner (project_id, projects!inner (id, name, installation_date)),
-          standard_tasks (task_number, multi_user_task),
-          task_workstation_links (workstation_id)
-        `)
-        .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
-        .in('phases.project_id', batchIds)
+      
+      // Paginate tasks too
+      let taskOffset = 0
+      while (true) {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select(`
+            id, title, duration, status, standard_task_id, phase_id,
+            phases!inner (project_id, projects!inner (id, name, installation_date)),
+            standard_tasks (task_number, multi_user_task),
+            task_workstation_links (workstation_id)
+          `)
+          .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
+          .in('phases.project_id', batchIds)
+          .range(taskOffset, taskOffset + 999)
 
-      if (tasks) allTasks.push(...tasks)
+        if (tasks) allTasks.push(...tasks)
+        if (!tasks || tasks.length < 1000) break
+        taskOffset += 1000
+      }
     }
 
     console.log(`Found ${allTasks.length} tasks to schedule`)
@@ -216,7 +253,7 @@ Deno.serve(async (req) => {
       whMap.set(wh.day_of_week, wh)
     }
 
-    // Step 4: Simple scheduling engine (mirrors client-side logic)
+    // Step 4: Scheduling engine
     const startDate = new Date()
     startDate.setHours(0, 0, 0, 0)
 
@@ -296,11 +333,16 @@ Deno.serve(async (req) => {
       taskId: string, standardTaskId: string, projectId: string, workstationId: string,
       startTime: Date, endTime: Date
     ) {
+      // Determine what dates this slot spans to check employee holidays
+      const slotDateStr = startTime.toISOString().split('T')[0]
+
       // Check task affinity
       const affinityEmpId = taskAffinityMap.get(taskId)
       if (affinityEmpId) {
         const emp = employees.find(e => e.employee_id === affinityEmpId && e.standard_task_ids.includes(standardTaskId))
         if (emp) {
+          // Check if employee is on holiday
+          if (isEmployeeOnHoliday(emp.employee_id, slotDateStr)) return null
           const conflict = employeeTimeBlocks.some(b => b.employee_id === emp.employee_id && startTime < b.end && endTime > b.start)
           if (!conflict) return emp
           return null // Only this person may do it
@@ -311,13 +353,16 @@ Deno.serve(async (req) => {
       const pwEmpId = projectWsAffinity.get(pwKey)
       if (pwEmpId) {
         const emp = employees.find(e => e.employee_id === pwEmpId && e.standard_task_ids.includes(standardTaskId))
-        if (emp) {
+        if (emp && !isEmployeeOnHoliday(emp.employee_id, slotDateStr)) {
           const conflict = employeeTimeBlocks.some(b => b.employee_id === emp.employee_id && startTime < b.end && endTime > b.start)
           if (!conflict) return emp
         }
       }
-      // Normal
-      const eligible = employees.filter(e => e.standard_task_ids.includes(standardTaskId))
+      // Normal - filter out employees on holiday
+      const eligible = employees.filter(e => 
+        e.standard_task_ids.includes(standardTaskId) && 
+        !isEmployeeOnHoliday(e.employee_id, slotDateStr)
+      )
       for (const emp of eligible) {
         const conflict = employeeTimeBlocks.some(b => b.employee_id === emp.employee_id && startTime < b.end && endTime > b.start)
         if (!conflict) return emp
@@ -410,7 +455,6 @@ Deno.serve(async (req) => {
 
         // Check if this is a multi-user task
         if (task.is_multi_user && task.standard_task_id) {
-          // Multi-user: split duration across multiple eligible employees
           const eligibleEmps = employees.filter(e => e.standard_task_ids.includes(task.standard_task_id))
           const maxCapacity = workstationCapacityMap.get(wsId) || 1
           const numWorkers = Math.min(eligibleEmps.length, maxCapacity, 4)
@@ -419,10 +463,8 @@ Deno.serve(async (req) => {
             const perWorkerDuration = Math.ceil(task.duration / numWorkers)
             const assignedEmps: string[] = []
             let overallLatestEnd: Date | null = null
-            let allAssigned = true
             
             for (let wi = 0; wi < numWorkers; wi++) {
-              // Find slot for this worker's portion
               let workerDate = new Date(taskMinStart)
               let workerFound = false
               let wDaysSearched = 0
@@ -442,11 +484,13 @@ Deno.serve(async (req) => {
                   if (wTaskSlots.length === 0) break
                   const wFirstStart = wTaskSlots[0].start
                   const wLastEnd = wTaskSlots[wTaskSlots.length - 1].end
+                  const wSlotDateStr = wFirstStart.toISOString().split('T')[0]
                   
-                  // Find an eligible employee not yet assigned for this multi-user split
+                  // Find an eligible employee not yet assigned for this multi-user split, not on holiday
                   const availableEmps = employees.filter(e => 
                     e.standard_task_ids.includes(task.standard_task_id) && 
-                    !assignedEmps.includes(e.employee_id)
+                    !assignedEmps.includes(e.employee_id) &&
+                    !isEmployeeOnHoliday(e.employee_id, wSlotDateStr)
                   )
                   let wEmp = null
                   for (const emp of availableEmps) {
@@ -484,8 +528,6 @@ Deno.serve(async (req) => {
                 }
                 if (!workerFound) { workerDate = getNextWorkday(workerDate); wDaysSearched++ }
               }
-              
-              if (!workerFound) { allAssigned = false }
             }
             
             if (overallLatestEnd) {
@@ -556,20 +598,32 @@ Deno.serve(async (req) => {
       if (insertErr) console.error('Error inserting gantt batch:', insertErr)
     }
 
-    // Step 6: Sync to personal planning (schedules + workstation_schedules) — same as "Generate from Gantt"
+    // Step 6: Sync to personal planning (schedules + workstation_schedules) — "Generate from Gantt" method
     // Read 7-day window from gantt_schedules
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + 7)
     const startStr = startDate.toISOString().split('T')[0]
     const endStr = endDate.toISOString().split('T')[0]
 
-    const { data: ganttSchedules } = await supabase
-      .from('gantt_schedules')
-      .select('*, tasks (id, title, description), employees (id, name), workstations (id, name)')
-      .gte('scheduled_date', startStr)
-      .lt('scheduled_date', endStr)
-      .order('scheduled_date')
-      .order('start_time')
+    // Paginate gantt_schedules read
+    let ganttSchedules: any[] = []
+    let gsOffset = 0
+    while (true) {
+      const { data: gsBatch } = await supabase
+        .from('gantt_schedules')
+        .select('*, tasks (id, title, description), employees (id, name), workstations (id, name)')
+        .gte('scheduled_date', startStr)
+        .lt('scheduled_date', endStr)
+        .order('scheduled_date')
+        .order('start_time')
+        .range(gsOffset, gsOffset + 999)
+      
+      if (gsBatch) ganttSchedules.push(...gsBatch)
+      if (!gsBatch || gsBatch.length < 1000) break
+      gsOffset += 1000
+    }
+
+    console.log(`Read ${ganttSchedules.length} gantt schedules for sync to personal tasks`)
 
     // Clear existing schedules
     await supabase.from('schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -580,7 +634,7 @@ Deno.serve(async (req) => {
     const scheduleInserts: any[] = []
     const wsScheduleInserts: any[] = []
 
-    for (const gs of ganttSchedules || []) {
+    for (const gs of ganttSchedules) {
       if (!gs.employee_id || !gs.tasks) continue
       scheduleInserts.push({
         employee_id: gs.employee_id,
