@@ -4,6 +4,7 @@ import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Calendar, GripVertical } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
