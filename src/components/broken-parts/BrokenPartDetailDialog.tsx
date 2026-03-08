@@ -113,7 +113,7 @@ This is an urgent repair request for a broken part that is blocking production.`
 
   if (!brokenPart) return null;
 
-  const imageUrl = getImageUrl(brokenPart.image_path);
+  // imageUrl is already computed from useEffect above
 
   const content = (
     <div className={`flex flex-col gap-4 ${isMobile ? '' : 'grid grid-cols-2 gap-6'}`}>
