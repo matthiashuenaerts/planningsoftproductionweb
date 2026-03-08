@@ -48,6 +48,7 @@ import { Label } from './ui/label';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Add the missing interface
 interface NewProjectModalProps {
