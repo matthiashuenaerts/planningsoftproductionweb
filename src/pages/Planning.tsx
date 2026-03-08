@@ -2528,48 +2528,48 @@ const Planning = () => {
                     {/* Available Tasks */}
                     {selectedWorkerSchedule && selectedWorkerSchedule.tasks.length > 0 && (
                       <Card>
-                        <CardHeader>
-                          <CardTitle>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
-                          <p className="text-sm text-gray-600">
+                        <CardHeader className={isMobile ? "p-3 pb-2" : ""}>
+                          <CardTitle className={isMobile ? "text-sm" : ""}>Available TODO Tasks for {selectedWorkerSchedule.employee.name}</CardTitle>
+                          <p className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>
                             Tasks from assigned workstations: {selectedWorkerSchedule.assignedWorkstations.join(', ') || 'None'}
                           </p>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-3">
-                            {selectedWorkerSchedule.tasks.slice(0, 10).map((task) => (
-                              <div key={task.id} className="flex items-center justify-between p-3 border rounded">
-                                <div className="flex-1">
-                                  <h5 className="font-medium">{task.title}</h5>
+                        <CardContent className={isMobile ? "p-2" : ""}>
+                          <div className={cn(isMobile ? "space-y-2" : "space-y-3")}>
+                            {selectedWorkerSchedule.tasks.slice(0, isMobile ? 5 : 10).map((task) => (
+                              <div key={task.id} className={cn("border rounded", isMobile ? "p-2" : "p-3 flex items-center justify-between")}>
+                                <div className="flex-1 min-w-0">
+                                  <h5 className={cn("font-medium truncate", isMobile && "text-sm")}>{task.title}</h5>
                                   {task.phases && (
-                                    <p className="text-sm text-blue-600">Project: {task.phases.projects.name}</p>
+                                    <p className={cn("text-primary truncate", isMobile ? "text-xs" : "text-sm")}>Project: {task.phases.projects.name}</p>
                                   )}
-                                  {task.description && (
-                                    <p className="text-sm text-gray-600">{task.description}</p>
+                                  {!isMobile && task.description && (
+                                    <p className="text-sm text-muted-foreground">{task.description}</p>
                                   )}
-                                  <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                  <div className={cn("flex flex-wrap items-center text-muted-foreground mt-1", isMobile ? "gap-x-2 gap-y-0.5 text-[10px]" : "space-x-4 text-sm")}>
                                     <span>Duration: {task.duration || 60} min</span>
                                     <span>Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                    <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>
+                                    {!isMobile && <span>Workstations: {task.workstations?.map(ws => ws.name).join(', ') || 'None'}</span>}
                                     {task.assignee_id === selectedWorkerSchedule.employee.id && (
-                                      <Badge variant="secondary">Directly Assigned</Badge>
+                                      <Badge variant="secondary" className={isMobile ? "text-[10px] px-1 py-0" : ""}>Directly Assigned</Badge>
                                     )}
                                   </div>
                                 </div>
                                 
-                                <div className="flex items-center space-x-2">
-                                  <Badge className={getPriorityColor(task.priority)}>
+                                <div className={cn("flex items-center", isMobile ? "gap-1 mt-1" : "space-x-2")}>
+                                  <Badge className={cn(getPriorityColor(task.priority), isMobile && "text-[10px] px-1.5 py-0")}>
                                     {task.priority}
                                   </Badge>
-                                  <Badge variant="outline">
+                                  <Badge variant="outline" className={isMobile ? "text-[10px] px-1.5 py-0" : ""}>
                                     {task.status}
                                   </Badge>
                                 </div>
                               </div>
                             ))}
                             
-                            {selectedWorkerSchedule.tasks.length > 10 && (
-                              <div className="text-center py-4 text-sm text-gray-500">
-                                ... and {selectedWorkerSchedule.tasks.length - 10} more TODO tasks
+                            {selectedWorkerSchedule.tasks.length > (isMobile ? 5 : 10) && (
+                              <div className="text-center py-2 text-sm text-muted-foreground">
+                                ... and {selectedWorkerSchedule.tasks.length - (isMobile ? 5 : 10)} more TODO tasks
                               </div>
                             )}
                           </div>
