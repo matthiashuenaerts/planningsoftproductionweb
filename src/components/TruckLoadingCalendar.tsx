@@ -31,7 +31,7 @@ interface LoadingAssignment {
 
 const TruckLoadingCalendar = () => {
   const { tenant } = useTenant();
-  const { t } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
   const [weekStartDate, setWeekStartDate] = useState(() => {
     const today = new Date();
