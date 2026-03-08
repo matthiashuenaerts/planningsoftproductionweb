@@ -90,6 +90,47 @@ export type Database = {
           },
         ]
       }
+      automation_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          details: Json | null
+          error_message: string | null
+          id: string
+          status: string
+          summary: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          summary?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          summary?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_logs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broken_parts: {
         Row: {
           created_at: string
