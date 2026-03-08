@@ -37,6 +37,7 @@ export const LabelPrintDialog: React.FC<LabelPrintDialogProps> = ({
   onClose
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
