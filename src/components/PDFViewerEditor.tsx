@@ -1874,44 +1874,46 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
   return (
     <div className={`flex flex-col bg-background ${fullscreen ? 'h-full' : 'min-h-[70vh] h-[80vh]'}`} ref={containerRef}>
       {/* Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b bg-card">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            Page {currentVisiblePage} of {totalPages}
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-3 border-b bg-card">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="text-[10px] sm:text-sm text-muted-foreground whitespace-nowrap">
+            Page {currentVisiblePage}/{totalPages}
           </span>
           
-          <div className="flex items-center gap-1 ml-4">
+          <div className="flex items-center gap-0.5 sm:gap-1 ml-1 sm:ml-4">
             <Button
               onClick={() => setScale(s => Math.max(0.5, s - 0.25))}
               size="sm"
               variant="outline"
               disabled={scale <= 0.5}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             >
-              <ZoomOut className="h-4 w-4" />
+              <ZoomOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <span className="text-sm w-16 text-center">{Math.round(scale * 100)}%</span>
+            <span className="text-[10px] sm:text-sm w-10 sm:w-16 text-center">{Math.round(scale * 100)}%</span>
             <Button
               onClick={() => setScale(s => Math.min(3, s + 0.25))}
               size="sm"
               variant="outline"
               disabled={scale >= 3}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             >
-              <ZoomIn className="h-4 w-4" />
+              <ZoomIn className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {lastSaved && (
-            <span className="text-xs text-muted-foreground">
+            <span className="hidden sm:inline text-xs text-muted-foreground">
               Saved {lastSaved.toLocaleTimeString()}
             </span>
           )}
           
           {isEditMode && (
-            <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? 'Saving...' : 'Save'}
+            <Button onClick={saveToPDF} size="sm" variant="default" disabled={saving} className="h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3">
+              <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+              {saving ? '...' : 'Save'}
             </Button>
           )}
           
@@ -1919,35 +1921,36 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             onClick={toggleEditMode}
             size="sm"
             variant={isEditMode ? "secondary" : "default"}
-            className={isEditMode ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}
+            className={`h-7 sm:h-8 text-[10px] sm:text-sm px-2 sm:px-3 ${isEditMode ? "bg-blue-500 hover:bg-blue-600 text-white" : ""}`}
           >
             {isEditMode ? (
               <>
-                <Eye className="h-4 w-4 mr-1" />
-                Preview
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                <span className="hidden sm:inline">Preview</span>
               </>
             ) : (
               <>
-                <Edit3 className="h-4 w-4 mr-1" />
-                Edit PDF
+                <Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
+                <span className="hidden sm:inline">Edit PDF</span>
+                <span className="sm:hidden">Edit</span>
               </>
             )}
           </Button>
           
           {isEditMode && (
-            <Button onClick={cancelEdits} size="sm" variant="outline">
-              <X className="h-4 w-4 mr-1" />
-              Cancel
+            <Button onClick={cancelEdits} size="sm" variant="outline" className="h-7 sm:h-8 p-0 w-7 sm:w-auto sm:px-3">
+              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Cancel</span>
             </Button>
           )}
           
-          <Button onClick={downloadPDF} size="sm" variant="outline">
-            <Download className="h-4 w-4" />
+          <Button onClick={downloadPDF} size="sm" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+            <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </Button>
           
           {!fullscreen && (
-            <Button onClick={openInNewTab} size="sm" variant="outline" title="Open in new tab">
-              <ExternalLink className="h-4 w-4" />
+            <Button onClick={openInNewTab} size="sm" variant="outline" title="Open in new tab" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           )}
         </div>
