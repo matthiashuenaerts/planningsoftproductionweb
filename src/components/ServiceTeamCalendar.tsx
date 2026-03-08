@@ -749,7 +749,7 @@ const ServiceTeamCalendar: React.FC = () => {
               <Input value={selectedDate ? format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMM d yyyy') : ''} disabled />
             </div>
             <div className="space-y-2">
-              <Label>Team</Label>
+              <Label>{t('svc_team')}</Label>
               <Input value={serviceTeams.find(t => t.id === selectedTeamId)?.name || ''} disabled />
             </div>
             <div className="space-y-2">
