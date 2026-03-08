@@ -282,17 +282,23 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
         description: `Scanner verbonden (${selectedBaudRate} baud). ${relayEnabled ? 'Relay actief.' : ''}`,
       });
     } catch (error: any) {
-      if (error.name === 'InvalidStateError' || error.message?.includes('already open') || error.message?.includes('access') || error.message?.includes('denied') || error.message?.includes('busy')) {
+      if (error.message?.includes('permissions policy') || error.message?.includes('disallowed')) {
+        toast({
+          title: 'COM poort geblokkeerd',
+          description: 'WebSerial is geblokkeerd in een iframe/preview. Open de app in een apart tabblad of gebruik HID keyboard modus.',
+          variant: 'destructive',
+        });
+      } else if (error.name === 'InvalidStateError' || error.message?.includes('already open') || error.message?.includes('access') || error.message?.includes('denied') || error.message?.includes('busy')) {
         toast({
           title: 'COM poort bezet',
-          description: 'Deze poort is al in gebruik. Gebruik de Relay/Bypass modus: lees van een andere poort of gebruik HID keyboard modus.',
+          description: 'Deze poort is al in gebruik. Gebruik de Relay/Bypass modus of HID keyboard modus.',
           variant: 'destructive',
         });
       } else if (error.name !== 'NotFoundError') {
         console.error('Serial port error:', error);
         toast({
           title: 'Verbindingsfout',
-          description: error.message || 'Kon geen verbinding maken. Probeer Relay/Bypass modus.',
+          description: error.message || 'Kon geen verbinding maken.',
           variant: 'destructive',
         });
       }
