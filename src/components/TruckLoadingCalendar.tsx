@@ -486,7 +486,7 @@ const TruckLoadingCalendar = () => {
               
               {upcomingAssignments.length > 10 && (
                 <div className="text-center py-2 text-sm text-gray-500">
-                  +{upcomingAssignments.length - 10} more assignments
+                  +{t('truck_more_assignments', { count: String(upcomingAssignments.length - 10) })}
                 </div>
               )}
             </div>
