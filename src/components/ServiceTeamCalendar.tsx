@@ -507,7 +507,7 @@ const ServiceTeamCalendar: React.FC = () => {
       if (error) throw error;
       loadData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
   };
 
