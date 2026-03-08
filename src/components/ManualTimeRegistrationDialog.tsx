@@ -228,13 +228,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className={isMobile ? 'space-y-3' : 'space-y-4'}>
-          <div className="space-y-2">
-            <Label htmlFor="employee">{t("employee")}</Label>
+          <div className="space-y-1">
+            <Label htmlFor="employee" className={isMobile ? 'text-xs' : ''}>{t("employee")}</Label>
             <Select value={formData.employee_id} onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}>
-              <SelectTrigger>
+              <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                 <SelectValue placeholder={t("select_employee")} />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+              <SelectContent className="bg-background border shadow-lg z-50">
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
