@@ -458,7 +458,7 @@ const ServiceInstallation: React.FC = () => {
                 )}
                 {routeData.workStartTime && (
                   <Badge variant="outline" className="gap-1">
-                    🏁 First stop: {routeData.workStartTime}
+                    🏁 {t('si_first_stop')}: {routeData.workStartTime}
                   </Badge>
                 )}
                 <Badge variant="outline" className="gap-1">
