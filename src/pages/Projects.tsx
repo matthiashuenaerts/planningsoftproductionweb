@@ -391,7 +391,7 @@ const Projects = () => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
@@ -399,207 +399,186 @@ const Projects = () => {
       )}
       {isMobile && <Navbar />}
       
-      <div className={`flex-1 ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
+      <div className={`flex-1 ${!isMobile ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
             <div>
               <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t('projects_title')}</h1>
-              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 sm:mt-1">{t('projects_description')}</p>
+              <p className="text-muted-foreground text-sm mt-0.5">
+                {t('projects_description')}
+              </p>
             </div>
             
             {isAdmin && (
-              <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className={isMobile ? 'w-full' : ''}>
+              <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
                 <Plus className="mr-2 h-4 w-4" />
                 {t('new_project')}
               </Button>
             )}
           </div>
           
-          <div className="mb-4 sm:mb-8 flex gap-4 flex-col sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder={t('search_projects_placeholder')}
-                className="pl-8 h-9 sm:h-10 text-sm" 
+                className="pl-9 h-10 rounded-xl bg-muted/50 border-border/60 focus:bg-card" 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
               />
             </div>
           </div>
           
-          {isLoading ? <div className="flex justify-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div> : filteredProjects.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-              {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
-                  <div>
-                    <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-base sm:text-xl mb-0.5 sm:mb-1 break-words leading-tight">{project.name}</CardTitle>
-                            <CardDescription className="truncate text-xs sm:text-sm">{project.client}</CardDescription>
-                          </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                          {isAdmin && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem 
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    handleExportProject(project, e, 'pdf');
-                                  }}
-                                  disabled={exportingProject === project.id}
-                                >
-                                  <Download className="mr-2 h-4 w-4" />
-                                  {exportingProject === project.id ? t('exporting_project') : t('export_comprehensive_pdf')}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    handleExportProject(project, e, 'zip');
-                                  }}
-                                  disabled={exportingProject === project.id}
-                                >
-                                  <Package className="mr-2 h-4 w-4" />
-                                  {exportingProject === project.id ? t('exporting_project') : t('export_zip_archive')}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={e => {
-                                  e.stopPropagation();
-                                  navigate(createLocalizedPath(`/projects/${project.id}/edit`));
-                                }}>
-                                  <Settings className="mr-2 h-4 w-4" />
-                                  {t('edit_project')}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={e => {
-                                  e.stopPropagation();
-                                  navigate(createLocalizedPath(`/projects/${project.id}/orders`));
-                                }}>
-                                  <Package className="mr-2 h-4 w-4" />
-                                  {t('orders')}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={e => {
-                                  e.stopPropagation();
-                                  setAfterSalesProject({ id: project.id, name: project.name });
-                                }}>
-                                  <HeadphonesIcon className="mr-2 h-4 w-4" />
-                                  After Sales Service
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="text-destructive focus:text-destructive" 
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    setProjectToDelete(project.id);
-                                  }}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  {t('delete_project')}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center p-16 gap-3">
+              <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+              <p className="text-sm text-muted-foreground">{t('projects_title')}...</p>
+            </div>
+          ) : filteredProjects.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProjects.map(project => (
+                <Card 
+                  key={project.id} 
+                  className="group overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                  onClick={() => handleProjectClick(project.id)}
+                >
+                  <CardHeader className="pb-2 px-4 sm:px-5 pt-4 sm:pt-5">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-sm sm:text-base font-semibold mb-0.5 break-words leading-tight">{project.name}</CardTitle>
+                        <CardDescription className="truncate text-xs">{project.client}</CardDescription>
                       </div>
-                    </CardHeader>
-                    <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-                      {project.description && <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-3 sm:mb-4">
-                          {project.description}
-                        </p>}
-                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-x-6 sm:gap-y-2 text-xs sm:text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <Clock className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span>
-                            {t('start_date')}: {new Date(project.start_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <CalendarDays className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span>
-                            {t('installation_date')}: {new Date(project.installation_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        {serviceDates[project.id] && serviceDates[project.id].length > 0 && (
-                          <div className="flex items-center">
-                            <Wrench className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 flex-shrink-0" />
-                            <span>
-                              Service: {serviceDates[project.id].map(d => new Date(d).toLocaleDateString()).join(', ')}
-                            </span>
-                          </div>
+                      <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                              <Button variant="secondary" size="icon" className={`h-8 w-8 rounded-xl shadow-sm ${isMobile ? 'opacity-100' : ''}`}>
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="rounded-xl">
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleExportProject(project, e, 'pdf'); }} disabled={exportingProject === project.id}>
+                                <Download className="mr-2 h-4 w-4" />
+                                {exportingProject === project.id ? t('exporting_project') : t('export_comprehensive_pdf')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleExportProject(project, e, 'zip'); }} disabled={exportingProject === project.id}>
+                                <Package className="mr-2 h-4 w-4" />
+                                {exportingProject === project.id ? t('exporting_project') : t('export_zip_archive')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${project.id}/edit`)); }}>
+                                <Settings className="mr-2 h-4 w-4" />
+                                {t('edit_project')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${project.id}/orders`)); }}>
+                                <Package className="mr-2 h-4 w-4" />
+                                {t('orders')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setAfterSalesProject({ id: project.id, name: project.name }); }}>
+                                <HeadphonesIcon className="mr-2 h-4 w-4" />
+                                After Sales Service
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={e => { e.stopPropagation(); setProjectToDelete(project.id); }}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                {t('delete_project')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
-                      
-                      {/* Status Expand Button */}
-                      <div className="mt-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => toggleProjectExpansion(project.id, e)}
-                          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          {expandedProjects.has(project.id) ? (
-                            <>
-                              <ChevronUp className="h-3 w-3 mr-1" />
-                              Hide Status
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-3 w-3 mr-1" />
-                              Show Status
-                            </>
-                          )}
-                        </Button>
-                        
-                        {/* Workstation Progress Indicators - Only shown when expanded */}
-                        {expandedProjects.has(project.id) && (
-                          <WorkstationProgress progress={projectProgress[project.id]} />
-                        )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="px-4 sm:px-5 pb-4 sm:pb-5">
+                    {project.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{project.description}</p>
+                    )}
+                    
+                    {/* Dates as compact pills */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(project.start_date).toLocaleDateString()}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-primary/8 px-2 py-1 text-[11px] text-primary font-medium">
+                        <CalendarDays className="h-3 w-3" />
+                        {new Date(project.installation_date).toLocaleDateString()}
+                      </span>
+                      {serviceDates[project.id] && serviceDates[project.id].length > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-destructive/8 px-2 py-1 text-[11px] text-destructive font-medium">
+                          <Wrench className="h-3 w-3" />
+                          {serviceDates[project.id].map(d => new Date(d).toLocaleDateString()).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Status toggle */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => toggleProjectExpansion(project.id, e)}
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground rounded-lg mb-2"
+                    >
+                      {expandedProjects.has(project.id) ? (
+                        <><ChevronUp className="h-3 w-3 mr-1" />Hide Status</>
+                      ) : (
+                        <><ChevronDown className="h-3 w-3 mr-1" />Show Status</>
+                      )}
+                    </Button>
+                    
+                    {expandedProjects.has(project.id) && (
+                      <WorkstationProgress progress={projectProgress[project.id]} />
+                    )}
+                    
+                    {/* Progress bar */}
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs mb-1.5">
+                        <span className="text-muted-foreground">{t('progress')}</span>
+                        <span className="font-semibold text-foreground">{project.progress}%</span>
                       </div>
-                      
-                      <div className="mt-3 sm:mt-4">
-                        <div className="flex justify-between text-xs sm:text-sm mb-1">
-                          <span>{t('progress')}</span>
-                          <span className="font-medium">{project.progress}%</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{
-                      width: `${project.progress}%`
-                    }}></div>
-                        </div>
+                      <div className="w-full bg-muted/80 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-primary h-full rounded-full transition-all duration-500 ease-out" 
+                          style={{ width: `${project.progress}%` }}
+                        />
                       </div>
-                    </CardContent>
-                  </div>
-                </Card>)}
-            </div> : <div className="text-center p-12 border border-dashed rounded-lg">
-              <h3 className="text-lg font-medium mb-2">{t('no_projects_found')}</h3>
-              <p className="text-muted-foreground">
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-16 border border-dashed border-border/60 rounded-2xl bg-muted/30">
+              <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+              <h3 className="text-base font-semibold mb-1">{t('no_projects_found')}</h3>
+              <p className="text-sm text-muted-foreground">
                 {searchQuery ? t('no_projects_found_search') : t('no_projects_found_create')}
               </p>
-              {isAdmin && !searchQuery && <Button variant="outline" className="mt-4" onClick={() => setIsNewProjectModalOpen(true)}>
+              {isAdmin && !searchQuery && (
+                <Button variant="outline" className="mt-4 rounded-xl" onClick={() => setIsNewProjectModalOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t('create_project')}
-                </Button>}
-            </div>}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       
       <NewProjectModal open={isNewProjectModalOpen} onOpenChange={setIsNewProjectModalOpen} onSuccess={loadProjects} />
 
-      {/* Delete Project Confirmation Dialog */}
       <AlertDialog open={!!projectToDelete} onOpenChange={open => !open && setProjectToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('delete_project_confirm_title')}</AlertDialogTitle>
-            <AlertDialogDescription className="text-red-600">
+            <AlertDialogDescription className="text-destructive">
               {t('delete_project_confirm_description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel className="rounded-xl">{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive hover:bg-destructive/90 rounded-xl">
               {t('delete_project')}
             </AlertDialogAction>
           </AlertDialogFooter>
