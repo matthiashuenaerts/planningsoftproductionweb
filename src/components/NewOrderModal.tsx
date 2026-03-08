@@ -207,6 +207,7 @@ const NewOrderModal = ({
           description: item.description,
           quantity: item.quantity,
           article_code: item.article_code,
+          ean: item.ean || '',
           notes: item.notes || '',
         }));
         setOrderItems(prev => {

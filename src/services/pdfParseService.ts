@@ -33,6 +33,7 @@ export interface ParsedOrderItem {
   description: string;
   quantity: number;
   article_code: string;
+  ean?: string;
   unit_price?: number;
   total_price?: number;
   unit?: string;
@@ -200,13 +201,15 @@ function mergeMultiLineRows(rows: TableRow[], maxGap: number = 12): TableRow[] {
 }
 
 const COLUMN_HEADER_PATTERNS: Record<string, RegExp> = {
-  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)/i,
-  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)/i,
-  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)/i,
-  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)/i,
-  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)/i,
-  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal|montant|total\s*ligne)/i,
-  'discount': /^(discount|korting|remise|rabat|réduction)/i,
+  'ean': /^(ean|ean[\-\s]*code|barcode|gtin|upc)\b/i,
+  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)\b/i,
+  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)\b/i,
+  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)\b/i,
+  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)\b/i,
+  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)\b/i,
+  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|montant|total\s*ligne)\b/i,
+  'subtotal': /^(subtotal|subtotaal|sous[\-\s]?total)\b/i,
+  'discount': /^(discount|korting|remise|rabat|réduction)\b/i,
 };
 
 function detectColumns(rows: TableRow[]): { columns: Map<string, number>; headerRowIndex: number } {
@@ -218,12 +221,24 @@ function detectColumns(rows: TableRow[]): { columns: Map<string, number>; header
     let matchCount = 0;
     const tempCols = new Map<string, number>();
 
+    // Build concatenated text per item and also try merging adjacent items for multi-word headers
+    const itemTexts: { text: string; x: number }[] = [];
     for (const item of row.items) {
-      const text = item.str.trim();
+      itemTexts.push({ text: item.str.trim(), x: item.x });
+    }
+    // Also create merged pairs for multi-word headers like "Prijs per stuk [excl. BTW]"
+    for (let j = 0; j < itemTexts.length; j++) {
+      const merged = itemTexts.slice(j, j + 3).map(it => it.text).join(' ').trim();
+      if (merged.length > itemTexts[j].text.length) {
+        itemTexts.push({ text: merged, x: itemTexts[j].x });
+      }
+    }
+
+    for (const { text, x } of itemTexts) {
       if (!text) continue;
       for (const [colName, pattern] of Object.entries(COLUMN_HEADER_PATTERNS)) {
         if (pattern.test(text) && !tempCols.has(colName)) {
-          tempCols.set(colName, item.x);
+          tempCols.set(colName, x);
           matchCount++;
           break;
         }
@@ -307,6 +322,32 @@ function extractArticleCodeFromLine(line: string): string {
   return '';
 }
 
+/** Extract an article code embedded at the start of a description, e.g. "11731 Stekkerdoos..." → { code: "11731", remaining: "Stekkerdoos..." } */
+function extractEmbeddedArticleCode(description: string): { code: string; remainingDescription: string } | null {
+  if (!description) return null;
+  const trimmed = description.trim();
+  
+  // Pattern 1: Number at the start (e.g., "11731 Stekkerdoos...", "500438 SC FIS-CT...", "2608669278 Starlock...")
+  const leadingNumMatch = trimmed.match(/^(\d{4,10})\s+(.+)/);
+  if (leadingNumMatch) {
+    return { code: leadingNumMatch[1], remainingDescription: leadingNumMatch[2].trim() };
+  }
+  
+  // Pattern 2: Alphanumeric code at start (e.g., "AB-1234 Description...")
+  const leadingCodeMatch = trimmed.match(/^([A-Z0-9]{2,}[\-\.\/][A-Z0-9\-\.\/]+)\s+(.+)/i);
+  if (leadingCodeMatch && leadingCodeMatch[1].length <= 20) {
+    return { code: leadingCodeMatch[1], remainingDescription: leadingCodeMatch[2].trim() };
+  }
+  
+  // Pattern 3: Code with letters and numbers mixed (e.g., "FIS123 Description...")
+  const mixedMatch = trimmed.match(/^([A-Z]{1,5}\d{3,10}[A-Z0-9]*)\s+(.+)/i);
+  if (mixedMatch) {
+    return { code: mixedMatch[1], remainingDescription: mixedMatch[2].trim() };
+  }
+  
+  return null;
+}
+
 // ─── TABLE EXTRACTION ────────────────────────────────────────────────────────
 
 function extractTableData(rows: TableRow[], columnPositions: Map<string, number>, headerRowIndex: number): Record<string, string>[] {
@@ -314,13 +355,21 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
   const columns = Array.from(columnPositions.entries()).sort((a, b) => a[1] - b[1]);
   if (columns.length === 0) return result;
 
+  // Calculate adaptive max distance based on average column spacing
+  const colXValues = columns.map(c => c[1]).sort((a, b) => a - b);
+  let maxDistance = 150; // generous default
+  if (colXValues.length >= 2) {
+    const avgSpacing = (colXValues[colXValues.length - 1] - colXValues[0]) / (colXValues.length - 1);
+    maxDistance = Math.max(avgSpacing * 0.6, 80);
+  }
+
   const dataRows = rows.slice(headerRowIndex + 1);
 
   for (const row of dataRows) {
     const totalText = row.items.map(i => i.str).join('').trim();
     if (totalText.length < 2) continue;
-    // Stop at summary rows
-    if (/^(totaal|total|subtotal|sub\s*totaal|btw|vat|netto|bruto)\b/i.test(totalText)) break;
+    // Stop at summary rows (but not "subtotal" column values that are numbers)
+    if (/^(totaal|total|sub\s*totaal|btw|vat|netto|bruto)\b/i.test(totalText) && !/^\d/.test(totalText)) break;
 
     const record: Record<string, string> = {};
 
@@ -329,7 +378,7 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
       let minDistance = Infinity;
       for (const [colName, colX] of columns) {
         const distance = Math.abs(item.x - colX);
-        if (distance < minDistance && distance < 120) {
+        if (distance < minDistance && distance < maxDistance) {
           minDistance = distance;
           bestColumn = colName;
         }
@@ -339,7 +388,7 @@ function extractTableData(rows: TableRow[], columnPositions: Map<string, number>
       }
     }
 
-    if (record['description'] || record['article_code']) {
+    if (record['description'] || record['article_code'] || record['ean']) {
       result.push(record);
     }
   }
@@ -830,30 +879,67 @@ export async function parsePDFForOrder(
   let items: ParsedOrderItem[] = [];
 
   if (tableData.length > 0) {
+    console.log('Table data sample:', JSON.stringify(tableData.slice(0, 3)));
     items = tableData.map(row => {
       let description = row['description'] || '';
       let article_code = row['article_code'] || '';
+      let ean = row['ean'] || '';
       const quantity = parseQuantityValue(row['quantity']) || 1;
       const unit_price = parsePriceValue(row['price']);
-      const total_price = parsePriceValue(row['total']);
+      const total_price = parsePriceValue(row['total'] || row['subtotal']);
       const unit = row['unit'] || extractUnitFromLine(row['quantity'] || '') || undefined;
       const discount = parsePriceValue(row['discount']);
 
+      // If we have an EAN column value but no article_code, check if description has embedded code
+      if (!article_code && ean) {
+        // EAN is the barcode; try to extract the real article code from description
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        } else {
+          // Use EAN as article code fallback
+          article_code = ean;
+        }
+      }
+
+      // If article_code column captured what looks like an EAN (13 digits), move it
+      if (article_code && /^\d{12,13}$/.test(article_code.trim()) && !ean) {
+        ean = article_code.trim();
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        }
+      }
+
       if (!description && article_code) description = article_code;
       if ((!article_code || article_code.length > 30) && description) {
-        const extracted = extractArticleCodeFromLine(description);
-        if (extracted) article_code = extracted;
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        } else {
+          const extracted = extractArticleCodeFromLine(description);
+          if (extracted) article_code = extracted;
+        }
+      }
+
+      // Clean description: remove the article code if it's at the start
+      if (article_code && description.startsWith(article_code)) {
+        description = description.substring(article_code.length).trim();
       }
 
       // Determine match confidence by checking against products DB
       let matchConfidence: 'exact' | 'partial' | 'none' = 'none';
-      if (article_code) {
-        const acLower = article_code.toLowerCase();
-        if (products.some(p => p.article_code?.toLowerCase() === acLower)) matchConfidence = 'exact';
-        else if (materials.some(m => m.sku?.toLowerCase() === acLower)) matchConfidence = 'exact';
+      const codesToCheck = [article_code, ean].filter(Boolean);
+      for (const code of codesToCheck) {
+        const codeLower = code.toLowerCase();
+        if (products.some(p => p.article_code?.toLowerCase() === codeLower)) { matchConfidence = 'exact'; break; }
+        if (materials.some(m => m.sku?.toLowerCase() === codeLower)) { matchConfidence = 'exact'; break; }
       }
 
-      return { description, quantity, article_code, unit_price, total_price, unit, discount, matchConfidence };
+      return { description, quantity, article_code, ean: ean || undefined, unit_price, total_price, unit, discount, matchConfidence };
     }).filter(item => item.description || item.article_code);
   }
 
