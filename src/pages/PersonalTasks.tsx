@@ -681,7 +681,7 @@ const PersonalTasks = () => {
                   <div className="flex items-center gap-2 ml-4">
                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                     <span className="text-sm text-orange-600 font-medium">
-                      {isViewingTomorrow ? 'Tomorrow' : 'Future Date'}
+                    {isViewingTomorrow ? t('pt_tomorrow') : t('pt_future_date')}
                     </span>
                   </div>
                 )}
