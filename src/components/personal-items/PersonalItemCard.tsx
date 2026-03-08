@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { extractStoragePath } from '@/lib/storageUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -92,9 +93,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
   };
 
   const getSignedImageUrl = async (filePath: string) => {
+    const storagePath = extractStoragePath('personal-attachments', filePath);
+    if (!storagePath) return '';
     const { data, error } = await supabase.storage
       .from('personal-attachments')
-      .createSignedUrl(filePath, 3600);
+      .createSignedUrl(storagePath, 3600);
     if (error) {
       console.error('Error creating signed URL:', error);
       return '';
@@ -113,9 +116,11 @@ const PersonalItemCard: React.FC<PersonalItemCardProps> = ({
   const handleDownloadAttachment = async (attachment: any) => {
     setIsDownloading(attachment.id);
     try {
+      const storagePath = extractStoragePath('personal-attachments', attachment.file_path);
+      if (!storagePath) throw new Error('Invalid file path');
       const { data, error } = await supabase.storage
         .from('personal-attachments')
-        .download(attachment.file_path);
+        .download(storagePath);
 
       if (error) throw error;
 
@@ -333,9 +338,11 @@ const ImagePreview: React.FC<{
   React.useEffect(() => {
     const loadImage = async () => {
       try {
+        const storagePath = extractStoragePath('personal-attachments', attachment.file_path);
+        if (!storagePath) { setLoading(false); return; }
         const { data, error } = await supabase.storage
           .from('personal-attachments')
-          .createSignedUrl(attachment.file_path, 3600);
+          .createSignedUrl(storagePath, 3600);
         if (error) throw error;
         setImageUrl(data.signedUrl);
       } catch (error) {
