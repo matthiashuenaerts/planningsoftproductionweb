@@ -832,8 +832,8 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
             </Card>
           )}
 
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto max-w-full">
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
