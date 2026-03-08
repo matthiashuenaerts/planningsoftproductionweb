@@ -14,7 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 const DevSupportManagement: React.FC = () => {
   const qc = useQueryClient();
   const { currentEmployee } = useAuth();
+  const { toast } = useToast();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["dev", "all-support-tickets"],
