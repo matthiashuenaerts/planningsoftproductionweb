@@ -56,7 +56,8 @@ export const HelpManagement: React.FC = () => {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       display_order: parseInt(formData.get('display_order') as string),
-      is_active: formData.get('is_active') === 'on'
+      is_active: formData.get('is_active') === 'on',
+      is_global: false
     };
 
     try {
