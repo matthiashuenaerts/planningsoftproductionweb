@@ -599,7 +599,7 @@ const ServiceInstallation: React.FC = () => {
 
                                   <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                                     <Clock className="h-3 w-3 flex-shrink-0" />
-                                    <span>{stop.serviceHours}h estimated</span>
+                                    <span>{stop.serviceHours}h {t('si_estimated')}</span>
                                   </div>
 
                                   {stop.serviceNotes && (
