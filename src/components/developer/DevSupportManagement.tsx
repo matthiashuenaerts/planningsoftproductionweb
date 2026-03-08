@@ -35,6 +35,27 @@ const DevSupportManagement: React.FC = () => {
     if (!error) qc.invalidateQueries({ queryKey: ["dev", "all-support-tickets"] });
   };
 
+  const handleDelete = async (e: React.MouseEvent, ticketId: string) => {
+    e.stopPropagation();
+    if (!confirm("Delete this ticket? The user will be notified that it's resolved.")) return;
+    setDeleting(ticketId);
+    try {
+      // Send resolved notification email first
+      await supabase.functions.invoke("send-support-notification", {
+        body: { ticketId, type: "ticket_resolved" },
+      });
+      // Delete messages then ticket
+      await supabase.from("support_messages").delete().eq("ticket_id", ticketId);
+      await supabase.from("support_tickets").delete().eq("id", ticketId);
+      qc.invalidateQueries({ queryKey: ["dev", "all-support-tickets"] });
+      toast({ title: "Ticket deleted", description: "The user has been notified via email." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message ?? "Failed to delete ticket", variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const statusColors: Record<string, string> = {
     open: 'bg-blue-500/20 text-blue-300',
     in_progress: 'bg-yellow-500/20 text-yellow-300',
