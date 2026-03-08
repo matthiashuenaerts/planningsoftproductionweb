@@ -520,31 +520,31 @@ const { data, error } = await supabase.functions.invoke(
               </div>
 
               {/* Files list */}
-              <ScrollArea className="h-[300px] border rounded-lg">
+              <ScrollArea className="h-[250px] sm:h-[300px] border rounded-lg">
                 {filesLoading ? (
                   <div className="flex justify-center items-center h-full">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
                 ) : files.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4">
-                    <Folder className="h-12 w-12 mb-2 opacity-50" />
-                    <p>Geen bestanden gevonden</p>
+                    <Folder className="h-10 w-10 sm:h-12 sm:w-12 mb-2 opacity-50" />
+                    <p className="text-xs sm:text-sm">Geen bestanden gevonden</p>
                   </div>
                 ) : (
                   <div className="divide-y">
                     {files.map((file) => (
                       <div
                         key={file.id}
-                        className={`flex items-center justify-between p-3 hover:bg-muted/50 ${
+                        className={`flex items-center justify-between p-2.5 sm:p-3 hover:bg-muted/50 active:bg-muted/70 ${
                           file.isFolder ? 'cursor-pointer' : ''
                         }`}
                         onClick={() => file.isFolder && navigateToFolder(file)}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                           {getFileIcon(file)}
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="font-medium text-xs sm:text-sm truncate">{file.name}</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">
                               {file.isFolder 
                                 ? `${file.childCount || 0} items` 
                                 : formatFileSize(file.size)}
