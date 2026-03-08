@@ -10,9 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/components/ui/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Camera, File as FileIcon, Check, X, RotateCcw, Image } from 'lucide-react';
+import { Calendar as CalendarIcon, Camera, File as FileIcon, Check, X, RotateCcw, Image, ChevronsUpDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { StandardTask, standardTasksService } from '@/services/standardTasksService';
 import { rushOrderService } from '@/services/rushOrderService';
 import { useAuth } from '@/context/AuthContext';
@@ -426,23 +426,57 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           
           <div className="space-y-1">
             <label htmlFor="projectId" className={`block font-medium ${isMobile ? 'text-xs' : 'text-sm'}`}>{t('ro_project_optional')}</label>
-            <Select value={watchData.projectId || 'none'} onValueChange={(value) => setValue('projectId', value === 'none' ? '' : value)}>
-              <SelectTrigger className={`w-full ${isMobile ? 'h-9 text-sm' : ''}`}>
-                <SelectValue placeholder={t('ro_select_project')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('ro_no_project')}</SelectItem>
-                {loadingProjects ? (
-                  <SelectItem value="loading" disabled>{t('ro_loading_projects')}</SelectItem>
-                ) : (
-                  projects?.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name} - {project.client}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className={cn(
+                    "w-full justify-between font-normal",
+                    isMobile && "h-9 text-sm",
+                    !watchData.projectId && "text-muted-foreground"
+                  )}
+                >
+                  <span className="truncate">
+                    {watchData.projectId
+                      ? projects?.find(p => p.id === watchData.projectId)
+                        ? `${projects.find(p => p.id === watchData.projectId)!.name} - ${projects.find(p => p.id === watchData.projectId)!.client}`
+                        : t('ro_select_project')
+                      : t('ro_no_project')}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder={t('ro_select_project')} className={isMobile ? 'text-sm' : ''} />
+                  <CommandList>
+                    <CommandEmpty className="py-3 text-center text-sm text-muted-foreground">
+                      {loadingProjects ? t('ro_loading_projects') : 'No projects found'}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => setValue('projectId', '')}
+                      >
+                        <Check className={cn("mr-2 h-3.5 w-3.5", !watchData.projectId ? "opacity-100" : "opacity-0")} />
+                        {t('ro_no_project')}
+                      </CommandItem>
+                      {projects?.map((project) => (
+                        <CommandItem
+                          key={project.id}
+                          value={`${project.name} ${project.client}`}
+                          onSelect={() => setValue('projectId', project.id)}
+                        >
+                          <Check className={cn("mr-2 h-3.5 w-3.5", watchData.projectId === project.id ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{project.name} - {project.client}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-1">
