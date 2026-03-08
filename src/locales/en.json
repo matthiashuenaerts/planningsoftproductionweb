@@ -1096,5 +1096,27 @@
   "inv_status_paid": "Paid",
   "inv_status_overdue": "Overdue",
   "inv_status_cancelled": "Cancelled",
-  "service_installation": "Service Installation"
+  "service_installation": "Service Installation",
+
+  "set_system_settings": "System Settings",
+  "set_access_denied": "Access Denied",
+  "set_no_permission": "You don't have permission to access the settings page",
+  "set_go_back": "Go Back",
+  "set_workstations": "Workstations",
+  "set_employees": "Employees",
+  "set_production_routing": "Production Routing",
+  "set_standard_tasks": "Standard Tasks",
+  "set_calculation_relationships": "Calculation Relationships",
+  "set_holiday_planner": "Holiday Planner",
+  "set_suppliers": "Suppliers",
+  "set_products": "Products",
+  "set_stock_locations": "Stock Locations",
+  "set_materials": "Materials",
+  "set_installation_teams": "Installation Teams",
+  "set_external_database": "External Database API",
+  "set_supabase_connection": "Supabase Connection",
+  "set_mail": "Mail",
+  "set_help_management": "Help Management",
+  "set_csv_import": "CSV Import",
+  "set_order_task_groups": "Order Task Groups"
 }

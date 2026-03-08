@@ -1574,5 +1574,27 @@
   "inv_status_paid": "Betaald",
   "inv_status_overdue": "Achterstallig",
   "inv_status_cancelled": "Geannuleerd",
-  "service_installation": "Service Installatie"
+  "service_installation": "Service Installatie",
+
+  "set_system_settings": "Systeeminstellingen",
+  "set_access_denied": "Toegang Geweigerd",
+  "set_no_permission": "U heeft geen toestemming om de instellingenpagina te openen",
+  "set_go_back": "Terug",
+  "set_workstations": "Werkstations",
+  "set_employees": "Werknemers",
+  "set_production_routing": "Productierouting",
+  "set_standard_tasks": "Standaardtaken",
+  "set_calculation_relationships": "Berekeningsrelaties",
+  "set_holiday_planner": "Vakantieplanner",
+  "set_suppliers": "Leveranciers",
+  "set_products": "Producten",
+  "set_stock_locations": "Voorraadlocaties",
+  "set_materials": "Materialen",
+  "set_installation_teams": "Installatieteams",
+  "set_external_database": "Externe Database API",
+  "set_supabase_connection": "Supabase Verbinding",
+  "set_mail": "Mail",
+  "set_help_management": "Helpbeheer",
+  "set_csv_import": "CSV Import",
+  "set_order_task_groups": "Besteltaakgroepen"
 }

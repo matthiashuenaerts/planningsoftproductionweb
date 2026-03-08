@@ -1574,5 +1574,27 @@
   "inv_status_paid": "Payée",
   "inv_status_overdue": "En retard",
   "inv_status_cancelled": "Annulée",
-  "service_installation": "Service Installation"
+  "service_installation": "Service Installation",
+
+  "set_system_settings": "Paramètres du système",
+  "set_access_denied": "Accès refusé",
+  "set_no_permission": "Vous n'avez pas la permission d'accéder à la page des paramètres",
+  "set_go_back": "Retour",
+  "set_workstations": "Postes de travail",
+  "set_employees": "Employés",
+  "set_production_routing": "Routage de production",
+  "set_standard_tasks": "Tâches standard",
+  "set_calculation_relationships": "Relations de calcul",
+  "set_holiday_planner": "Planificateur de vacances",
+  "set_suppliers": "Fournisseurs",
+  "set_products": "Produits",
+  "set_stock_locations": "Emplacements de stock",
+  "set_materials": "Matériaux",
+  "set_installation_teams": "Équipes d'installation",
+  "set_external_database": "API Base de données externe",
+  "set_supabase_connection": "Connexion Supabase",
+  "set_mail": "Courrier",
+  "set_help_management": "Gestion de l'aide",
+  "set_csv_import": "Import CSV",
+  "set_order_task_groups": "Groupes de tâches de commande"
 }
