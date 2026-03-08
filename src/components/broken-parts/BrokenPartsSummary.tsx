@@ -114,16 +114,16 @@ const BrokenPartsSummary: React.FC = () => {
   const uniqueProjects = new Set(filteredData.map(part => part.project_id)).size;
   const uniqueWorkstations = new Set(filteredData.map(part => part.workstation_id)).size;
   const uniqueEmployees = new Set(filteredData.map(part => part.reported_by)).size;
-  return <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-1 justify-between mt-10">
-        <h1 className="text-2xl font-bold">Broken Parts Summary</h1>
+  return <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-4 sm:mt-10">
+        <h1 className="text-xl sm:text-2xl font-bold">Broken Parts Summary</h1>
         
-        <div className="flex flex-wrap gap-2 py-[10px]">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 py-1 sm:py-[10px]">
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <Label>Time Period:</Label>
+            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label className="text-xs sm:text-sm shrink-0">Time Period:</Label>
             <Select value={timeFilter} onValueChange={value => setTimeFilter(value as TimeFilter)}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[120px] sm:w-[150px] h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select time period" />
               </SelectTrigger>
               <SelectContent>
@@ -137,10 +137,10 @@ const BrokenPartsSummary: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <ListFilter className="h-4 w-4 text-muted-foreground" />
-            <Label>Group By:</Label>
+            <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Label className="text-xs sm:text-sm shrink-0">Group By:</Label>
             <Select value={groupBy} onValueChange={value => setGroupBy(value as GroupBy)}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[120px] sm:w-[150px] h-8 sm:h-9 text-xs sm:text-sm">
                 <SelectValue placeholder="Select grouping" />
               </SelectTrigger>
               <SelectContent>
@@ -151,76 +151,74 @@ const BrokenPartsSummary: React.FC = () => {
             </Select>
           </div>
           
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/broken-parts">
-                <List className="h-4 w-4 mr-2" />
-                List View
-              </Link>
-            </Button>
-          </div>
+          <Button variant="outline" asChild size="sm" className="text-xs sm:text-sm w-fit">
+            <Link to="/broken-parts">
+              <List className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+              List View
+            </Link>
+          </Button>
         </div>
       </div>
       
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Reports</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalReports}</div>
-            <p className="text-xs text-muted-foreground">in selected time period</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{totalReports}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">in selected time period</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unique Projects</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Unique Projects</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueProjects}</div>
-            <p className="text-xs text-muted-foreground">with broken parts reported</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueProjects}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">with broken parts reported</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Workstations Affected</CardTitle>
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Workstations Affected</CardTitle>
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueWorkstations}</div>
-            <p className="text-xs text-muted-foreground">with issues reported</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueWorkstations}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">with issues reported</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reporters</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Reporters</CardTitle>
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{uniqueEmployees}</div>
-            <p className="text-xs text-muted-foreground">employees reported issues</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{uniqueEmployees}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">employees reported issues</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="charts" className="w-full">
         <TabsList>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="charts" className="text-xs sm:text-sm">Charts</TabsTrigger>
+          <TabsTrigger value="table" className="text-xs sm:text-sm">Table</TabsTrigger>
         </TabsList>
-        <TabsContent value="charts" className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
+        <TabsContent value="charts" className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Broken Parts by {groupBy === 'project' ? 'Project' : groupBy === 'workstation' ? 'Workstation' : 'Employee'}</CardTitle>
-                <CardDescription>Distribution of broken parts in the selected time period</CardDescription>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-sm sm:text-base">Broken Parts by {groupBy === 'project' ? 'Project' : groupBy === 'workstation' ? 'Workstation' : 'Employee'}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Distribution of broken parts in the selected time period</CardDescription>
               </CardHeader>
-              <CardContent className="pt-2">
-                <ChartContainer config={{}} className="h-80">
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-2">
+                <ChartContainer config={{}} className="h-60 sm:h-80">
                   <PieChart>
-                    <Pie data={groupedData} cx="50%" cy="50%" labelLine={false} outerRadius={80} fill="#8884d8" dataKey="value" label={({
+                    <Pie data={groupedData} cx="50%" cy="50%" labelLine={false} outerRadius={60} fill="#8884d8" dataKey="value" label={({
                     name,
                     percent
                   }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
@@ -234,16 +232,16 @@ const BrokenPartsSummary: React.FC = () => {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Broken Parts Trend (Last 7 Days)</CardTitle>
-                <CardDescription>Number of reports per day</CardDescription>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-sm sm:text-base">Broken Parts Trend (Last 7 Days)</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Number of reports per day</CardDescription>
               </CardHeader>
-              <CardContent className="pt-2">
-                <ChartContainer config={{}} className="h-80">
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-2">
+                <ChartContainer config={{}} className="h-60 sm:h-80">
                   <BarChart data={timeBasedData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis allowDecimals={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Bar dataKey="count" name="Reports" fill="#3B82F6" />
@@ -256,33 +254,35 @@ const BrokenPartsSummary: React.FC = () => {
         
         <TabsContent value="table">
           <Card>
-            <CardHeader>
-              <CardTitle>Detailed Broken Parts Data</CardTitle>
-              <CardDescription>Complete listing of all broken parts in the selected time period</CardDescription>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-sm sm:text-base">Detailed Broken Parts Data</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Complete listing of all broken parts in the selected time period</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Workstation</TableHead>
-                    <TableHead>Reported By</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.length === 0 ? <TableRow>
-                      <TableCell colSpan={5} className="text-center">No data available for the selected filters</TableCell>
-                    </TableRow> : filteredData.map(part => <TableRow key={part.id}>
-                        <TableCell>{part.created_at ? format(new Date(part.created_at), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                        <TableCell>{part.projects?.name || 'N/A'}</TableCell>
-                        <TableCell>{part.workstations?.name || 'N/A'}</TableCell>
-                        <TableCell>{part.employees?.name || 'N/A'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{part.description}</TableCell>
-                      </TableRow>)}
-                </TableBody>
-              </Table>
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Date</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Project</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Workstation</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Reported By</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.length === 0 ? <TableRow>
+                        <TableCell colSpan={5} className="text-center text-xs sm:text-sm">No data available for the selected filters</TableCell>
+                      </TableRow> : filteredData.map(part => <TableRow key={part.id}>
+                          <TableCell className="text-xs sm:text-sm whitespace-nowrap">{part.created_at ? format(new Date(part.created_at), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm">{part.projects?.name || 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{part.workstations?.name || 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{part.employees?.name || 'N/A'}</TableCell>
+                          <TableCell className="max-w-[120px] sm:max-w-xs truncate text-xs sm:text-sm">{part.description}</TableCell>
+                        </TableRow>)}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
