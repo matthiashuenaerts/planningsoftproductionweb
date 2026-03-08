@@ -33,6 +33,7 @@ export interface ParsedOrderItem {
   description: string;
   quantity: number;
   article_code: string;
+  ean?: string;
   unit_price?: number;
   total_price?: number;
   unit?: string;
