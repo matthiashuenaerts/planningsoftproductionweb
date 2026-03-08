@@ -28,6 +28,7 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const navigate = useNavigate();
+  const { tenant, lang } = useParams<{ tenant: string; lang: string }>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = currentEmployee?.role === 'admin';
 
