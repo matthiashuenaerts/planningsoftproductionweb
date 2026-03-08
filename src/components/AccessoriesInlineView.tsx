@@ -879,73 +879,48 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     {accessory.supplier && <span>{accessory.supplier}</span>}
                     {accessory.stock_location && <span>📍{accessory.stock_location}</span>}
                   </div>
-                  <div className="flex items-center justify-between mt-1.5 ml-6">
+                  <div className="flex items-center gap-2 mt-1.5 ml-6">
                     {editingStatusAccessoryId === accessory.id ? (
-                      <>
-                        <Button variant="outline" size="sm" className="h-6 text-[10px] ring-2 ring-primary">
-                          {accessory.status.replace('_', ' ').toUpperCase()}
-                        </Button>
-                        <Dialog
-                          open={editingStatusAccessoryId === accessory.id}
-                          onOpenChange={(open) => {
-                            if (!open) setEditingStatusAccessoryId(null);
-                          }}
+                      <div className="flex items-center gap-1.5">
+                        <Select
+                          value={statusUpdateInfo.status}
+                          onValueChange={(value: Accessory['status']) => 
+                            setStatusUpdateInfo(prev => ({ ...prev, status: value }))
+                          }
                         >
-                          <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-sm">
-                            <DialogHeader>
-                              <DialogTitle className="text-sm">Change Status</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                              <div>
-                                <Label className="text-xs">New Status</Label>
-                                <Select
-                                  value={statusUpdateInfo.status}
-                                  onValueChange={(value: Accessory['status']) => 
-                                    setStatusUpdateInfo(prev => ({ ...prev, status: value }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {statuses.map(status => (
-                                      <SelectItem key={status} value={status}>
-                                        {status.replace('_', ' ').toUpperCase()}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {statusUpdateInfo.status === 'to_order' && (
-                                <div>
-                                  <Label className="text-xs">Quantity to Order</Label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    max={accessory.quantity}
-                                    value={statusUpdateInfo.quantity}
-                                    onChange={(e) => 
-                                      setStatusUpdateInfo(prev => ({ 
-                                        ...prev, 
-                                        quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
-                                      }))
-                                    }
-                                    className="h-9"
-                                  />
-                                </div>
-                              )}
-                              <div className="flex gap-2">
-                                <Button size="sm" className="h-9 flex-1" onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)} disabled={loading}>
-                                  Update
-                                </Button>
-                                <Button size="sm" variant="outline" className="h-9 flex-1" onClick={() => setEditingStatusAccessoryId(null)}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </>
+                          <SelectTrigger className="h-7 text-[10px] w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statuses.map(status => (
+                              <SelectItem key={status} value={status}>
+                                {status.replace('_', ' ').toUpperCase()}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {statusUpdateInfo.status === 'to_order' && (
+                          <Input
+                            type="number"
+                            min="1"
+                            max={accessory.quantity}
+                            value={statusUpdateInfo.quantity}
+                            onChange={(e) => 
+                              setStatusUpdateInfo(prev => ({ 
+                                ...prev, 
+                                quantity: Math.min(parseInt(e.target.value) || 1, accessory.quantity) 
+                              }))
+                            }
+                            className="h-7 w-14 text-[10px]"
+                          />
+                        )}
+                        <Button size="sm" className="h-7 text-[10px] px-2" onClick={() => handleStatusUpdate(accessory.id, statusUpdateInfo.status, statusUpdateInfo.quantity)} disabled={loading}>
+                          ✓
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-[10px] px-1.5" onClick={() => setEditingStatusAccessoryId(null)}>
+                          ✕
+                        </Button>
+                      </div>
                     ) : (
                       <Button
                         variant="outline"
