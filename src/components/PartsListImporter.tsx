@@ -33,6 +33,7 @@ export const PartsListImporter: React.FC<PartsListImporterProps> = ({
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const navigate = useNavigate();
+  const { tenant, lang } = useParams<{ tenant: string; lang: string }>();
   const isAdmin = currentEmployee?.role === 'admin';
 
   useEffect(() => {
