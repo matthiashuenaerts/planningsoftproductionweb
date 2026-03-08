@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
         .select(`
           id, title, duration, status, standard_task_id, phase_id,
           phases!inner (project_id, projects!inner (id, name, installation_date)),
-          standard_tasks (task_number),
+          standard_tasks (task_number, multi_user_task),
           task_workstation_links (workstation_id)
         `)
         .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
@@ -350,6 +350,7 @@ Deno.serve(async (req) => {
       installation_date: t.phases?.projects?.installation_date || '',
       task_number: t.standard_tasks?.task_number || '999',
       workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean),
+      is_multi_user: t.standard_tasks?.multi_user_task || false,
     }))
 
     // Group by project
@@ -407,7 +408,94 @@ Deno.serve(async (req) => {
           taskMinStart = deliveryConstraint
         }
 
-        // Find slot
+        // Check if this is a multi-user task
+        if (task.is_multi_user && task.standard_task_id) {
+          // Multi-user: split duration across multiple eligible employees
+          const eligibleEmps = employees.filter(e => e.standard_task_ids.includes(task.standard_task_id))
+          const maxCapacity = workstationCapacityMap.get(wsId) || 1
+          const numWorkers = Math.min(eligibleEmps.length, maxCapacity, 4)
+          
+          if (numWorkers > 1) {
+            const perWorkerDuration = Math.ceil(task.duration / numWorkers)
+            const assignedEmps: string[] = []
+            let overallLatestEnd: Date | null = null
+            let allAssigned = true
+            
+            for (let wi = 0; wi < numWorkers; wi++) {
+              // Find slot for this worker's portion
+              let workerDate = new Date(taskMinStart)
+              let workerFound = false
+              let wDaysSearched = 0
+              
+              while (wDaysSearched < 365 && !workerFound) {
+                if (!isWorkingDay(workerDate)) { workerDate = getNextWorkday(workerDate); wDaysSearched++; continue }
+                const wwh = getWorkHours(workerDate)
+                if (!wwh) { workerDate = getNextWorkday(workerDate); wDaysSearched++; continue }
+                
+                let wSlotStart = new Date(wwh.start)
+                let wAttempts = 100
+                while (wSlotStart < wwh.end && wAttempts-- > 0) {
+                  const wBrk = wwh.breaks.find((b: any) => wSlotStart >= b.start && wSlotStart < b.end)
+                  if (wBrk) { wSlotStart = new Date(wBrk.end); continue }
+                  
+                  const wTaskSlots = getTaskSlots(wSlotStart, perWorkerDuration)
+                  if (wTaskSlots.length === 0) break
+                  const wFirstStart = wTaskSlots[0].start
+                  const wLastEnd = wTaskSlots[wTaskSlots.length - 1].end
+                  
+                  // Find an eligible employee not yet assigned for this multi-user split
+                  const availableEmps = employees.filter(e => 
+                    e.standard_task_ids.includes(task.standard_task_id) && 
+                    !assignedEmps.includes(e.employee_id)
+                  )
+                  let wEmp = null
+                  for (const emp of availableEmps) {
+                    const conflict = employeeTimeBlocks.some(b => b.employee_id === emp.employee_id && wFirstStart < b.end && wLastEnd > b.start)
+                    if (!conflict && !isWorkstationAtCapacity(wsId, emp.employee_id, wFirstStart, wLastEnd)) {
+                      wEmp = emp
+                      break
+                    }
+                  }
+                  
+                  if (wEmp) {
+                    assignedEmps.push(wEmp.employee_id)
+                    employeeTimeBlocks.push({ employee_id: wEmp.employee_id, start: wFirstStart, end: wLastEnd })
+                    workstationTimeBlocks.push({ workstation_id: wsId, employee_id: wEmp.employee_id, start: wFirstStart, end: wLastEnd })
+                    
+                    if (!overallLatestEnd || wLastEnd > overallLatestEnd) overallLatestEnd = wLastEnd
+                    
+                    const wLaneIdx = getEmployeeLaneIndex(wsId, wEmp.employee_id)
+                    for (let si = 0; si < wTaskSlots.length; si++) {
+                      const slot = wTaskSlots[si]
+                      schedules.push({
+                        task_id: task.id,
+                        workstation_id: wsId,
+                        employee_id: wEmp.employee_id,
+                        scheduled_date: slot.start.toISOString().split('T')[0],
+                        start_time: slot.start.toISOString(),
+                        end_time: slot.end.toISOString(),
+                        worker_index: wLaneIdx * 100 + si,
+                      })
+                    }
+                    workerFound = true
+                    break
+                  }
+                  wSlotStart = new Date(wSlotStart.getTime() + 15 * 60000)
+                }
+                if (!workerFound) { workerDate = getNextWorkday(workerDate); wDaysSearched++ }
+              }
+              
+              if (!workerFound) { allAssigned = false }
+            }
+            
+            if (overallLatestEnd) {
+              scheduledTaskEndTimes.set(task.id, overallLatestEnd)
+            }
+            continue // Skip single-user scheduling below
+          }
+        }
+
+        // Single-user scheduling (default path)
         let currentDate = new Date(taskMinStart)
         let found = false
         let daysSearched = 0

@@ -26,6 +26,7 @@ export interface SchedulableTask {
   installation_date: string;
   task_number: string;
   workstation_ids: string[];
+  is_multi_user?: boolean;
 }
 
 export interface EmployeeTaskEligibility {
@@ -340,7 +341,7 @@ class AutomaticSchedulingService {
             project_id,
             projects!inner (id, name, installation_date)
           ),
-          standard_tasks (task_number),
+          standard_tasks (task_number, multi_user_task),
           task_workstation_links (workstation_id)
         `)
         .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
@@ -362,7 +363,8 @@ class AutomaticSchedulingService {
         project_name: t.phases?.projects?.name || '',
         installation_date: t.phases?.projects?.installation_date || '',
         task_number: t.standard_tasks?.task_number || '999',
-        workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean)
+        workstation_ids: (t.task_workstation_links || []).map((l: any) => l.workstation_id).filter(Boolean),
+        is_multi_user: t.standard_tasks?.multi_user_task || false
       }));
       
       allTasks.push(...mapped);
@@ -726,6 +728,146 @@ class AutomaticSchedulingService {
   }
 
   /**
+   * Schedule a multi-user task by splitting the total duration across multiple eligible employees.
+   * Each employee gets their own portion scheduled independently (flexible start/end times).
+   * This reduces the overall task timeline.
+   */
+  private scheduleMultiUserTask(
+    task: SchedulableTask,
+    employees: EmployeeTaskEligibility[],
+    minStartTime: Date
+  ): ScheduleSlot[] {
+    if (task.workstation_ids.length === 0) {
+      console.warn(`Multi-user task ${task.id} has no workstation assigned, skipping`);
+      return [];
+    }
+    
+    const workstationId = task.workstation_ids[0];
+    
+    // Find all eligible employees for this task
+    if (!task.standard_task_id) return [];
+    const eligibleEmployees = employees.filter(e => 
+      e.standard_task_ids.includes(task.standard_task_id!)
+    );
+    
+    if (eligibleEmployees.length === 0) {
+      console.warn(`No eligible employees for multi-user task ${task.id}`);
+      return [];
+    }
+    
+    // If only 1 eligible employee, fall back to single-user scheduling
+    if (eligibleEmployees.length === 1) {
+      return this.scheduleTask(task, employees, minStartTime);
+    }
+    
+    // Determine max concurrent workers (limited by workstation capacity and eligible employees)
+    const maxCapacity = this.workstationCapacityMap.get(workstationId) || 1;
+    const numWorkers = Math.min(eligibleEmployees.length, maxCapacity, 4); // Cap at 4 for sanity
+    
+    if (numWorkers <= 1) {
+      return this.scheduleTask(task, employees, minStartTime);
+    }
+    
+    // Split duration among workers - divide the total work equally
+    const perWorkerDuration = Math.ceil(task.duration / numWorkers);
+    
+    console.log(`Multi-user task ${task.title}: ${task.duration}min ÷ ${numWorkers} workers = ${perWorkerDuration}min each`);
+    
+    const allSlots: ScheduleSlot[] = [];
+    let overallLatestEnd: Date | null = null;
+    const assignedEmployees: string[] = [];
+    
+    for (let workerIdx = 0; workerIdx < numWorkers; workerIdx++) {
+      // Create a virtual sub-task with the split duration
+      const subTask: SchedulableTask = {
+        ...task,
+        duration: perWorkerDuration
+      };
+      
+      // Find the earliest available slot for this sub-task
+      // Each worker can start independently from minStartTime
+      const result = this.findEarliestSlots(
+        subTask,
+        // Filter to only the employees not yet assigned for this multi-user split
+        employees.filter(e => 
+          e.standard_task_ids.includes(task.standard_task_id!) &&
+          !assignedEmployees.includes(e.employee_id)
+        ),
+        minStartTime,
+        workstationId
+      );
+      
+      if (!result || result.slots.length === 0) {
+        console.warn(`Could not find slot for multi-user task ${task.id} worker ${workerIdx + 1}`);
+        continue;
+      }
+      
+      const { slots, employee } = result;
+      assignedEmployees.push(employee.employee_id);
+      
+      const firstSlotStart = slots[0].start;
+      const lastSlotEnd = slots[slots.length - 1].end;
+      
+      // Block employee time
+      this.employeeTimeBlocks.push({
+        employee_id: employee.employee_id,
+        start: firstSlotStart,
+        end: lastSlotEnd
+      });
+      
+      // Track workstation occupancy
+      this.workstationTimeBlocks.push({
+        workstation_id: workstationId,
+        employee_id: employee.employee_id,
+        start: firstSlotStart,
+        end: lastSlotEnd
+      });
+      
+      // Track the latest end time across all workers for dependency resolution
+      if (!overallLatestEnd || lastSlotEnd > overallLatestEnd) {
+        overallLatestEnd = lastSlotEnd;
+      }
+      
+      // Get lane index for this employee
+      const employeeLaneIndex = this.getEmployeeLaneIndex(workstationId, employee.employee_id);
+      
+      // Create schedule slots for this worker's portion
+      const workerSlots = slots.map((slot, segmentIndex) => {
+        const dateKey = format(slot.start, 'yyyy-MM-dd');
+        const workerIndex = employeeLaneIndex * 100 + segmentIndex;
+        
+        return {
+          task_id: task.id,
+          workstation_id: workstationId,
+          employee_id: employee.employee_id,
+          employee_name: employee.employee_name,
+          scheduled_date: dateKey,
+          start_time: slot.start.toISOString(),
+          end_time: slot.end.toISOString(),
+          worker_index: workerIndex
+        };
+      });
+      
+      allSlots.push(...workerSlots);
+    }
+    
+    // Set the task end time as the latest end across all workers
+    if (overallLatestEnd) {
+      this.scheduledTaskEndTimes.set(task.id, overallLatestEnd);
+    }
+    
+    if (allSlots.length === 0) {
+      // Fallback to single-user if multi-user failed
+      console.warn(`Multi-user scheduling failed for task ${task.id}, falling back to single-user`);
+      return this.scheduleTask(task, employees, minStartTime);
+    }
+    
+    console.log(`Multi-user task ${task.title}: assigned to ${assignedEmployees.length} workers, ${allSlots.length} total slots`);
+    
+    return allSlots;
+  }
+
+  /**
    * Check if all limit phases for a HOLD task are completed
    */
   private areLimitPhasesSatisfied(
@@ -985,7 +1127,9 @@ class AutomaticSchedulingService {
             effectiveStart = deliveryDate;
           }
         }
-        const taskSlots = this.scheduleTask(task, employees, effectiveStart);
+        const taskSlots = task.is_multi_user 
+          ? this.scheduleMultiUserTask(task, employees, effectiveStart)
+          : this.scheduleTask(task, employees, effectiveStart);
         schedules.push(...taskSlots);
         
         if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
@@ -1020,7 +1164,9 @@ class AutomaticSchedulingService {
               effectiveStartTime = deliveryDate;
             }
           }
-          const taskSlots = this.scheduleTask(task, employees, effectiveStartTime);
+          const taskSlots = task.is_multi_user
+            ? this.scheduleMultiUserTask(task, employees, effectiveStartTime)
+            : this.scheduleTask(task, employees, effectiveStartTime);
           schedules.push(...taskSlots);
           
           if (taskSlots.length > 0 && task.standard_task_id === lastProductionStepId) {
