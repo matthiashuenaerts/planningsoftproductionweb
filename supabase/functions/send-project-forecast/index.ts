@@ -385,6 +385,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully:", emailResponse);
 
+    // Log success to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        tenant_id: resolvedTenantId,
+        action_type: 'forecast_email',
+        status: 'success',
+        summary: `Forecast sent to ${recipients.length} recipients, ${projectsWithOrders.length} projects`,
+        details: {
+          recipients: recipients.length,
+          projectCount: projectsWithOrders.length,
+          forecastWeeks,
+          language,
+          resend_id: emailResponse?.data?.id,
+        },
+      });
+    } catch (logErr) {
+      console.error('Failed to log automation result:', logErr);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -401,6 +420,32 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("Error in send-project-forecast function:", error);
+
+    // Log error to automation_logs and send alert
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const errorSupabase = createClient(supabaseUrl, supabaseKey);
+
+      await errorSupabase.from('automation_logs').insert({
+        action_type: 'forecast_email',
+        status: 'error',
+        summary: 'Forecast email failed',
+        error_message: error.message,
+        details: { resend_error: error?.statusCode ? { statusCode: error.statusCode, name: error.name } : null },
+      });
+
+      await errorSupabase.functions.invoke('send-error-alert', {
+        body: {
+          action_type: 'forecast_email',
+          error_message: error.message,
+          summary: 'Forecast email sending failed',
+        }
+      });
+    } catch (alertErr) {
+      console.error('Failed to send error alert:', alertErr);
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       {
