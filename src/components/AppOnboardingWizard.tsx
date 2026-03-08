@@ -72,112 +72,84 @@ interface TourStep {
   visibleForRoles: string[];
 }
 
-const ALL_TOUR_STEPS: TourStep[] = [
-  {
-    key: "dashboard", route: "/",
-    title: "Dashboard",
-    icon: <Home className="h-6 w-6" />,
-    description: "Your central hub — see project progress, upcoming deadlines and quick stats at a glance.",
-    tips: ["Active project overview", "Task completion rates", "Quick access to all features"],
-    visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater", "installation_team"],
+// ── Tour translations ──
+const TOUR_TRANSLATIONS: Record<string, Record<string, { title: string; description: string; tips: string[] }>> = {
+  en: {
+    dashboard: { title: "Dashboard", description: "Your central hub — see project progress, upcoming deadlines and quick stats at a glance.", tips: ["Active project overview", "Task completion rates", "Quick access to all features"] },
+    "control-panel": { title: "Control Panel", description: "Real-time monitoring of your entire production floor from a single screen.", tips: ["Live workstation status", "Active task tracking", "Spot bottlenecks instantly"] },
+    projects: { title: "Projects", description: "Manage all projects from creation to installation — phases, tasks, and Gantt planning.", tips: ["Create projects with deadlines", "Track progress per phase", "Visual Gantt chart planning"] },
+    workstations: { title: "Workstations", description: "See which machines are running, who is working, and scan tasks with QR codes.", tips: ["Real-time machine status", "Worker assignments", "QR code scanning"] },
+    "broken-parts": { title: "Broken Parts", description: "Report and track broken or damaged parts with photos and descriptions.", tips: ["Quick photo reports", "Track resolution status", "Summary overview"] },
+    "personal-tasks": { title: "Personal Tasks", description: "Your personal task list — start timers, add notes, and track productivity.", tips: ["Start/stop task timers", "Add notes and photos", "See assigned tasks"] },
+    "daily-tasks": { title: "Installation Planning", description: "Plan installation team schedules and assign teams to projects.", tips: ["Assign teams to projects", "View installation calendar", "Manage truck loading"] },
+    planning: { title: "Production Planning", description: "Gantt-based production planning with drag-and-drop scheduling.", tips: ["Drag to reschedule", "Capacity overview", "Deadline tracking"] },
+    orders: { title: "Orders", description: "Manage supplier orders, track deliveries, and handle backorders.", tips: ["Create and track orders", "Delivery date tracking", "Supplier management"] },
+    logistics: { title: "Logistics In", description: "Receive and confirm incoming deliveries with barcode scanning.", tips: ["Scan incoming deliveries", "Confirm quantities", "Track backorders"] },
+    "rush-orders": { title: "Rush Orders", description: "Handle urgent rush orders with priority tracking and team chat.", tips: ["Priority status tracking", "In-app team chat", "Quick assignment"] },
+    "time-registrations": { title: "Time Registrations", description: "View time reports per employee or project, compare estimated vs actual hours.", tips: ["Employee time overview", "Project cost tracking", "Overtime detection"] },
+    settings: { title: "Settings", description: "Configure workstations, tasks, employees, suppliers, and email notifications.", tips: ["Manage production routing", "Configure employees", "Set up integrations"] },
   },
-  {
-    key: "control-panel", route: "/control-panel",
-    title: "Control Panel",
-    icon: <LayoutDashboard className="h-6 w-6" />,
-    description: "Real-time monitoring of your entire production floor from a single screen.",
-    tips: ["Live workstation status", "Active task tracking", "Spot bottlenecks instantly"],
-    visibleForRoles: ["admin", "manager", "teamleader"],
+  nl: {
+    dashboard: { title: "Dashboard", description: "Uw centraal overzicht — bekijk projectvoortgang, aankomende deadlines en snelle statistieken.", tips: ["Actief projectoverzicht", "Voltooiingspercentages taken", "Snelle toegang tot alle functies"] },
+    "control-panel": { title: "Controlepaneel", description: "Realtime monitoring van uw volledige productievloer vanuit één scherm.", tips: ["Live werkpost-status", "Actieve taakopvolging", "Knelpunten direct herkennen"] },
+    projects: { title: "Projecten", description: "Beheer alle projecten van creatie tot plaatsing — fases, taken en Gantt-planning.", tips: ["Projecten aanmaken met deadlines", "Voortgang per fase volgen", "Visuele Gantt-planning"] },
+    workstations: { title: "Werkposten", description: "Bekijk welke machines draaien, wie er werkt en scan taken met QR-codes.", tips: ["Realtime machinestatus", "Medewerkertoewijzingen", "QR-code scannen"] },
+    "broken-parts": { title: "Defecte Onderdelen", description: "Meld en volg defecte of beschadigde onderdelen met foto's en beschrijvingen.", tips: ["Snelle fotorapportage", "Oplossingsstatus bijhouden", "Samenvattingsoverzicht"] },
+    "personal-tasks": { title: "Persoonlijke Taken", description: "Uw persoonlijke takenlijst — start timers, voeg notities toe en volg productiviteit.", tips: ["Start/stop taaktimers", "Notities en foto's toevoegen", "Toegewezen taken bekijken"] },
+    "daily-tasks": { title: "Plaatsingsplanning", description: "Plan plaatsingsteam-schema's en wijs teams toe aan projecten.", tips: ["Teams toewijzen aan projecten", "Plaatsingskalender bekijken", "Vrachtbelading beheren"] },
+    planning: { title: "Productieplanning", description: "Gantt-gebaseerde productieplanning met drag-and-drop planning.", tips: ["Sleep om te herplannen", "Capaciteitsoverzicht", "Deadline-opvolging"] },
+    orders: { title: "Bestellingen", description: "Beheer leveranciersbestellingen, volg leveringen en behandel nabestellingen.", tips: ["Bestellingen aanmaken en opvolgen", "Leveringsdatum-opvolging", "Leveranciersbeheer"] },
+    logistics: { title: "Logistiek In", description: "Ontvang en bevestig binnenkomende leveringen met barcodescanners.", tips: ["Binnenkomende leveringen scannen", "Aantallen bevestigen", "Nabestellingen opvolgen"] },
+    "rush-orders": { title: "Spoedbestellingen", description: "Behandel dringende spoedbestellingen met prioriteitsopvolging en teamchat.", tips: ["Prioriteitsstatus-opvolging", "In-app teamchat", "Snelle toewijzing"] },
+    "time-registrations": { title: "Tijdsregistraties", description: "Bekijk tijdrapporten per medewerker of project, vergelijk geschatte vs werkelijke uren.", tips: ["Overzicht werktijden medewerkers", "Projectkostenopvolging", "Overuren detectie"] },
+    settings: { title: "Instellingen", description: "Configureer werkposten, taken, medewerkers, leveranciers en e-mailmeldingen.", tips: ["Productierouting beheren", "Medewerkers configureren", "Integraties instellen"] },
   },
-  {
-    key: "projects", route: "/projects",
-    title: "Projects",
-    icon: <Calendar className="h-6 w-6" />,
-    description: "Manage all projects from creation to installation — phases, tasks, and Gantt planning.",
-    tips: ["Create projects with deadlines", "Track progress per phase", "Visual Gantt chart planning"],
-    visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater", "installation_team"],
+  fr: {
+    dashboard: { title: "Tableau de bord", description: "Votre centre de contrôle — consultez l'avancement des projets, les échéances et les statistiques.", tips: ["Aperçu des projets actifs", "Taux d'achèvement des tâches", "Accès rapide à toutes les fonctions"] },
+    "control-panel": { title: "Panneau de contrôle", description: "Surveillance en temps réel de votre atelier de production depuis un seul écran.", tips: ["État des postes en direct", "Suivi des tâches actives", "Détecter les goulets d'étranglement"] },
+    projects: { title: "Projets", description: "Gérez tous les projets de la création à l'installation — phases, tâches et planning Gantt.", tips: ["Créer des projets avec des délais", "Suivre la progression par phase", "Planning Gantt visuel"] },
+    workstations: { title: "Postes de travail", description: "Voyez quelles machines fonctionnent, qui travaille et scannez les tâches avec des QR codes.", tips: ["État des machines en temps réel", "Affectations des travailleurs", "Scan de QR codes"] },
+    "broken-parts": { title: "Pièces défectueuses", description: "Signalez et suivez les pièces cassées ou endommagées avec photos et descriptions.", tips: ["Rapports photo rapides", "Suivi du statut de résolution", "Vue d'ensemble"] },
+    "personal-tasks": { title: "Tâches personnelles", description: "Votre liste de tâches personnelle — démarrez des minuteries, ajoutez des notes et suivez la productivité.", tips: ["Démarrer/arrêter les minuteries", "Ajouter des notes et photos", "Voir les tâches assignées"] },
+    "daily-tasks": { title: "Planning d'installation", description: "Planifiez les équipes d'installation et assignez-les aux projets.", tips: ["Assigner des équipes aux projets", "Voir le calendrier d'installation", "Gérer le chargement des camions"] },
+    planning: { title: "Planning de production", description: "Planning de production basé sur Gantt avec glisser-déposer.", tips: ["Glisser pour replanifier", "Aperçu des capacités", "Suivi des délais"] },
+    orders: { title: "Commandes", description: "Gérez les commandes fournisseurs, suivez les livraisons et traitez les commandes en souffrance.", tips: ["Créer et suivre les commandes", "Suivi des dates de livraison", "Gestion des fournisseurs"] },
+    logistics: { title: "Logistique entrante", description: "Recevez et confirmez les livraisons entrantes avec scanner de codes-barres.", tips: ["Scanner les livraisons entrantes", "Confirmer les quantités", "Suivre les commandes en souffrance"] },
+    "rush-orders": { title: "Commandes urgentes", description: "Traitez les commandes urgentes avec suivi prioritaire et chat d'équipe.", tips: ["Suivi du statut prioritaire", "Chat d'équipe intégré", "Assignation rapide"] },
+    "time-registrations": { title: "Enregistrements de temps", description: "Consultez les rapports de temps par employé ou projet, comparez heures estimées vs réelles.", tips: ["Aperçu du temps des employés", "Suivi des coûts de projet", "Détection des heures supplémentaires"] },
+    settings: { title: "Paramètres", description: "Configurez les postes, tâches, employés, fournisseurs et notifications email.", tips: ["Gérer le routage de production", "Configurer les employés", "Configurer les intégrations"] },
   },
-  {
-    key: "workstations", route: "/workstations",
-    title: "Workstations",
-    icon: <Factory className="h-6 w-6" />,
-    description: "See which machines are running, who is working, and scan tasks with QR codes.",
-    tips: ["Real-time machine status", "Worker assignments", "QR code scanning"],
-    visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"],
-  },
-  {
-    key: "broken-parts", route: "/broken-parts",
-    title: "Broken Parts",
-    icon: <AlertTriangle className="h-6 w-6" />,
-    description: "Report and track broken or damaged parts with photos and descriptions.",
-    tips: ["Quick photo reports", "Track resolution status", "Summary overview"],
-    visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"],
-  },
-  {
-    key: "personal-tasks", route: "/personal-tasks",
-    title: "Personal Tasks",
-    icon: <ListChecks className="h-6 w-6" />,
-    description: "Your personal task list — start timers, add notes, and track productivity.",
-    tips: ["Start/stop task timers", "Add notes and photos", "See assigned tasks"],
-    visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"],
-  },
-  {
-    key: "daily-tasks", route: "/daily-tasks",
-    title: "Installation Planning",
-    icon: <Truck className="h-6 w-6" />,
-    description: "Plan installation team schedules and assign teams to projects.",
-    tips: ["Assign teams to projects", "View installation calendar", "Manage truck loading"],
-    visibleForRoles: ["admin", "manager", "teamleader", "installation_team"],
-  },
-  {
-    key: "planning", route: "/planning",
-    title: "Production Planning",
-    icon: <BarChart3 className="h-6 w-6" />,
-    description: "Gantt-based production planning with drag-and-drop scheduling.",
-    tips: ["Drag to reschedule", "Capacity overview", "Deadline tracking"],
-    visibleForRoles: ["admin", "manager", "teamleader", "installation_team"],
-  },
-  {
-    key: "orders", route: "/orders",
-    title: "Orders",
-    icon: <Package className="h-6 w-6" />,
-    description: "Manage supplier orders, track deliveries, and handle backorders.",
-    tips: ["Create and track orders", "Delivery date tracking", "Supplier management"],
-    visibleForRoles: ["admin", "manager", "teamleader", "preparater"],
-  },
-  {
-    key: "logistics", route: "/logistics",
-    title: "Logistics In",
-    icon: <Truck className="h-6 w-6" />,
-    description: "Receive and confirm incoming deliveries with barcode scanning.",
-    tips: ["Scan incoming deliveries", "Confirm quantities", "Track backorders"],
-    visibleForRoles: ["admin", "manager", "teamleader", "preparater"],
-  },
-  {
-    key: "rush-orders", route: "/rush-orders",
-    title: "Rush Orders",
-    icon: <Package className="h-6 w-6" />,
-    description: "Handle urgent rush orders with priority tracking and team chat.",
-    tips: ["Priority status tracking", "In-app team chat", "Quick assignment"],
-    visibleForRoles: ["admin", "manager", "teamleader", "worker", "installation_team"],
-  },
-  {
-    key: "time-registrations", route: "/time-registrations",
-    title: "Time Registrations",
-    icon: <Clock className="h-6 w-6" />,
-    description: "View time reports per employee or project, compare estimated vs actual hours.",
-    tips: ["Employee time overview", "Project cost tracking", "Overtime detection"],
-    visibleForRoles: ["admin", "manager", "teamleader"],
-  },
-  {
-    key: "settings", route: "/settings",
-    title: "Settings",
-    icon: <Settings className="h-6 w-6" />,
-    description: "Configure workstations, tasks, employees, suppliers, and email notifications.",
-    tips: ["Manage production routing", "Configure employees", "Set up integrations"],
-    visibleForRoles: ["admin", "teamleader"],
-  },
+};
+
+const TOUR_UI: Record<string, { skipTour: string; nextPage: string; back: string; getStarted: string; setupComplete: string; setupCompleteDesc: string; skipTourBtn: string; takeTour: string }> = {
+  en: { skipTour: "Skip tour", nextPage: "Next Page", back: "Back", getStarted: "Get Started!", setupComplete: "Setup Complete!", setupCompleteDesc: "Your workspace is configured. Would you like a guided tour of the application?", skipTourBtn: "Skip Tour", takeTour: "Take the Tour" },
+  nl: { skipTour: "Tour overslaan", nextPage: "Volgende pagina", back: "Terug", getStarted: "Aan de slag!", setupComplete: "Configuratie voltooid!", setupCompleteDesc: "Uw werkruimte is geconfigureerd. Wilt u een rondleiding door de applicatie?", skipTourBtn: "Tour overslaan", takeTour: "Start de rondleiding" },
+  fr: { skipTour: "Passer la visite", nextPage: "Page suivante", back: "Retour", getStarted: "C'est parti !", setupComplete: "Configuration terminée !", setupCompleteDesc: "Votre espace de travail est configuré. Souhaitez-vous une visite guidée de l'application ?", skipTourBtn: "Passer", takeTour: "Faire la visite" },
+};
+
+const TOUR_STEP_DEFS: Array<{ key: string; route: string; icon: React.ReactNode; visibleForRoles: string[] }> = [
+  { key: "dashboard", route: "/", icon: <Home className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater", "installation_team"] },
+  { key: "control-panel", route: "/control-panel", icon: <LayoutDashboard className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader"] },
+  { key: "projects", route: "/projects", icon: <Calendar className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater", "installation_team"] },
+  { key: "workstations", route: "/workstations", icon: <Factory className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"] },
+  { key: "broken-parts", route: "/broken-parts", icon: <AlertTriangle className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"] },
+  { key: "personal-tasks", route: "/personal-tasks", icon: <ListChecks className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "worker", "teamleader", "preparater"] },
+  { key: "daily-tasks", route: "/daily-tasks", icon: <Truck className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader", "installation_team"] },
+  { key: "planning", route: "/planning", icon: <BarChart3 className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader", "installation_team"] },
+  { key: "orders", route: "/orders", icon: <Package className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader", "preparater"] },
+  { key: "logistics", route: "/logistics", icon: <Truck className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader", "preparater"] },
+  { key: "rush-orders", route: "/rush-orders", icon: <Package className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader", "worker", "installation_team"] },
+  { key: "time-registrations", route: "/time-registrations", icon: <Clock className="h-6 w-6" />, visibleForRoles: ["admin", "manager", "teamleader"] },
+  { key: "settings", route: "/settings", icon: <Settings className="h-6 w-6" />, visibleForRoles: ["admin", "teamleader"] },
 ];
+
+function buildTourSteps(language: string): TourStep[] {
+  const translations = TOUR_TRANSLATIONS[language] || TOUR_TRANSLATIONS.en;
+  return TOUR_STEP_DEFS.map((def) => {
+    const t = translations[def.key] || TOUR_TRANSLATIONS.en[def.key];
+    return { ...def, title: t.title, description: t.description, tips: t.tips };
+  });
+}
 
 const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) => {
   const { currentEmployee, isDeveloper } = useAuth();
@@ -208,12 +180,14 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
   const [createdTaskNames, setCreatedTaskNames] = useState<string[]>([]);
   const [createdUserNames, setCreatedUserNames] = useState<string[]>([]);
 
-  // Role-filtered tour steps
-  const tourSteps = ALL_TOUR_STEPS.filter((step) => {
+  // Role-filtered tour steps (language-aware)
+  const allTourSteps = buildTourSteps(lang);
+  const tourSteps = allTourSteps.filter((step) => {
     if (isDeveloper) return true;
     if (!currentEmployee) return false;
     return step.visibleForRoles.includes(currentEmployee.role);
   });
+  const ui = TOUR_UI[lang] || TOUR_UI.en;
 
   useEffect(() => {
     checkOnboardingStatus();
@@ -797,16 +771,16 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 text-green-400">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Setup Complete!</h2>
+                <h2 className="text-2xl font-bold text-white">{ui.setupComplete}</h2>
                 <p className="text-slate-300">
-                  Your workspace is configured. Would you like a guided tour of the application?
+                  {ui.setupCompleteDesc}
                 </p>
                 <div className="flex gap-3 justify-center">
                   <Button variant="outline" className="text-slate-300 border-slate-600" onClick={markOnboardingComplete}>
-                    Skip Tour
+                    {ui.skipTourBtn}
                   </Button>
                   <Button className="bg-blue-600 hover:bg-blue-700" onClick={startTour}>
-                    <Eye className="mr-2 h-4 w-4" /> Take the Tour
+                    <Eye className="mr-2 h-4 w-4" /> {ui.takeTour}
                   </Button>
                 </div>
               </div>
@@ -857,7 +831,7 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 </div>
                 <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white text-xs h-7 px-2"
                   onClick={markOnboardingComplete}>
-                  Skip tour
+                  {ui.skipTour}
                 </Button>
               </div>
 
@@ -889,18 +863,18 @@ const AppOnboardingWizard: React.FC<AppOnboardingWizardProps> = ({ children }) =
                 {!isFirst && (
                   <Button variant="outline" size="sm" className="text-slate-300 border-slate-600 hover:bg-slate-800"
                     onClick={handleTourBack}>
-                    <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back
+                    <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {ui.back}
                   </Button>
                 )}
                 <Button size="sm" className={`ml-auto ${isLast ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`}
                   onClick={handleTourNext}>
                   {isLast ? (
                     <>
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Get Started!
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {ui.getStarted}
                     </>
                   ) : (
                     <>
-                      Next Page <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      {ui.nextPage} <ArrowRight className="h-3.5 w-3.5 ml-1" />
                     </>
                   )}
                 </Button>
