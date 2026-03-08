@@ -437,6 +437,105 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
   );
 };
 
+
+const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug: string }> }> = ({ tenantMap }) => {
+  const [filterType, setFilterType] = useState<string>("all");
+
+  const { data: automationLogs, refetch, isLoading } = useQuery({
+    queryKey: ["dev", "dashboard", "automation-logs", filterType],
+    queryFn: async () => {
+      let query = supabase
+        .from("automation_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (filterType !== "all") {
+        query = query.eq("action_type", filterType);
+      }
+
+      const { data } = await query;
+      return data ?? [];
+    },
+    refetchInterval: 30000,
+  });
+
+  const getTenantName = (id: string) => tenantMap?.[id]?.name ?? id?.slice(0, 8) ?? "—";
+
+  const actionIcons: Record<string, React.ReactNode> = {
+    midnight_scheduler: <CalendarClock className="h-3.5 w-3.5 text-indigo-400" />,
+    forecast_email: <Mail className="h-3.5 w-3.5 text-teal-400" />,
+    project_sync: <ArrowRightLeft className="h-3.5 w-3.5 text-cyan-400" />,
+    order_sync: <ArrowRightLeft className="h-3.5 w-3.5 text-purple-400" />,
+  };
+
+  const actionLabels: Record<string, string> = {
+    midnight_scheduler: "Scheduler",
+    forecast_email: "Forecast Mail",
+    project_sync: "Project Sync",
+    order_sync: "Order Sync",
+  };
+
+  const actionBadgeColors: Record<string, string> = {
+    midnight_scheduler: "bg-indigo-600/40 text-indigo-300",
+    forecast_email: "bg-teal-600/40 text-teal-300",
+    project_sync: "bg-cyan-600/40 text-cyan-300",
+    order_sync: "bg-purple-600/40 text-purple-300",
+  };
+
+  const statusIcon = (status: string) => {
+    if (status === "success") return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
+    if (status === "error") return <XCircle className="h-4 w-4 text-red-400" />;
+    return <AlertTriangle className="h-4 w-4 text-amber-400" />;
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between mb-2">
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="bg-white/10 border border-white/20 text-white text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="all" className="bg-slate-800">All types</option>
+          <option value="midnight_scheduler" className="bg-slate-800">Midnight Scheduler</option>
+          <option value="forecast_email" className="bg-slate-800">Forecast Emails</option>
+          <option value="project_sync" className="bg-slate-800">Project Sync</option>
+          <option value="order_sync" className="bg-slate-800">Order Sync</option>
+        </select>
+        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading} className="text-slate-400 hover:text-white text-xs">
+          <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+      </div>
+      <ScrollArea className="h-[400px]">
+        <div className="space-y-1.5">
+          {(automationLogs ?? []).map((log: any) => (
+            <div key={log.id} className="flex items-start gap-2 bg-white/5 rounded-md px-3 py-2 border border-white/10">
+              {statusIcon(log.status)}
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge className={`text-[10px] ${actionBadgeColors[log.action_type] || "bg-slate-600/40 text-slate-300"}`}>
+                    {actionLabels[log.action_type] || log.action_type}
+                  </Badge>
+                  <span className="text-sm text-white truncate">{log.summary || "—"}</span>
+                </div>
+                {log.error_message && (
+                  <p className="text-xs text-red-300 bg-red-500/10 rounded px-2 py-0.5 truncate">{log.error_message}</p>
+                )}
+                <p className="text-xs text-slate-400">
+                  {log.tenant_id ? getTenantName(log.tenant_id) + " · " : ""}
+                  {log.created_at ? formatDistanceToNow(new Date(log.created_at), { addSuffix: true }) : ""}
+                </p>
+              </div>
+            </div>
+          ))}
+          {!(automationLogs ?? []).length && <p className="text-slate-400 text-sm text-center py-4">No automation logs yet</p>}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
 const TenantStatsTable: React.FC = () => {
   const { data } = useQuery({
     queryKey: ["dev", "dashboard", "tenant-stats"],
