@@ -221,12 +221,24 @@ function detectColumns(rows: TableRow[]): { columns: Map<string, number>; header
     let matchCount = 0;
     const tempCols = new Map<string, number>();
 
+    // Build concatenated text per item and also try merging adjacent items for multi-word headers
+    const itemTexts: { text: string; x: number }[] = [];
     for (const item of row.items) {
-      const text = item.str.trim();
+      itemTexts.push({ text: item.str.trim(), x: item.x });
+    }
+    // Also create merged pairs for multi-word headers like "Prijs per stuk [excl. BTW]"
+    for (let j = 0; j < itemTexts.length; j++) {
+      const merged = itemTexts.slice(j, j + 3).map(it => it.text).join(' ').trim();
+      if (merged.length > itemTexts[j].text.length) {
+        itemTexts.push({ text: merged, x: itemTexts[j].x });
+      }
+    }
+
+    for (const { text, x } of itemTexts) {
       if (!text) continue;
       for (const [colName, pattern] of Object.entries(COLUMN_HEADER_PATTERNS)) {
         if (pattern.test(text) && !tempCols.has(colName)) {
-          tempCols.set(colName, item.x);
+          tempCols.set(colName, x);
           matchCount++;
           break;
         }
