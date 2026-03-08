@@ -221,6 +221,13 @@ const ServiceTeamCalendar: React.FC = () => {
       );
 
       const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
+      const unrecognizedAddresses = geocodedProjects
+        .filter(p => p.coords === null && p.fullAddress !== 'No address')
+        .map(p => `${p.name}: ${p.fullAddress}`);
+      // Also include projects with no address at all
+      geocodedProjects
+        .filter(p => p.fullAddress === 'No address')
+        .forEach(p => unrecognizedAddresses.push(`${p.name}: No address set`));
       
       if (projectsWithCoords.length < 2) {
         // Fallback to postal code heuristic if geocoding fails
@@ -229,7 +236,7 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
-      // Build OSRM coordinates string: start + all projects
+      // Build OSRM coordinates string: start + all projects + start again (return home)
       const coordinates: string[] = [];
       if (startCoords) {
         coordinates.push(`${startCoords.lng},${startCoords.lat}`);
@@ -237,9 +244,13 @@ const ServiceTeamCalendar: React.FC = () => {
       projectsWithCoords.forEach(p => {
         coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
       });
+      // Add start again as destination for return trip
+      if (startCoords) {
+        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
+      }
 
-      // Use OSRM Trip API for Travelling Salesman optimization
-      const sourceParam = startCoords ? '&source=first' : '';
+      // Use OSRM Trip API - roundtrip with source=first and destination=last (return home)
+      const sourceParam = startCoords ? '&source=first&destination=last' : '';
       const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false${sourceParam}&roundtrip=false`;
       
       const osrmResp = await fetch(osrmUrl);
