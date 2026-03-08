@@ -39,6 +39,7 @@ const Projects = () => {
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
   const [afterSalesProject, setAfterSalesProject] = useState<{ id: string; name: string } | null>(null);
+  const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
 
 
   useEffect(() => {
