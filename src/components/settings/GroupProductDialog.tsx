@@ -437,11 +437,7 @@ const GroupProductDialog: React.FC<GroupProductDialogProps> = ({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {product?.image_path && (
-                              <img
-                                src={getImageUrl(product.image_path) || ''}
-                                alt={product?.name}
-                                className="h-8 w-8 object-cover rounded"
-                              />
+                              <SignedStorageImage bucket="product-images" path={product.image_path} alt={product?.name || ''} className="h-8 w-8 object-cover rounded" />
                             )}
                             <span>{product?.name}</span>
                           </div>
