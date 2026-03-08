@@ -33,12 +33,13 @@ const OneDriveCallback: React.FC = () => {
       }
 
       const redirectUri = `${window.location.origin}/onedrive-callback`;
+      const clientId = sessionStorage.getItem('onedrive_client_id');
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke(
           'onedrive-auth?action=exchange-code',
           {
-            body: { code, redirectUri, codeVerifier },
+            body: { code, redirectUri, codeVerifier, clientId },
           }
         );
 
