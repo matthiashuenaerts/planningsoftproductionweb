@@ -275,13 +275,13 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="task">{t("task")}</Label>
+              <div className="space-y-1">
+                <Label htmlFor="task" className={isMobile ? 'text-xs' : ''}>{t("task")}</Label>
                 <Select value={formData.task_id} onValueChange={(value) => setFormData(prev => ({ ...prev, task_id: value }))} disabled={!formData.project_id}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-sm' : ''}>
                     <SelectValue placeholder={formData.project_id ? t("select_task") : t("select_project_first")} />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border shadow-lg z-50">
+                  <SelectContent className="bg-background border shadow-lg z-50">
                     {projectTasks.map((task) => (
                       <SelectItem key={task.id} value={task.id}>
                         {task.phases?.name} - {task.title}
