@@ -339,6 +339,15 @@
   "delete": "Delete",
   "add_manual_registration": "Add manual registration",
   
+  "daily_timeline": "Daily Timeline",
+  "daily_timeline_description": "Your scheduled tasks for today",
+  "pt_today": "Today",
+  "pt_tomorrow": "Tomorrow",
+  "pt_future_date": "Future Date",
+  "pt_next_workday": "Next Workday",
+  "pt_plan_next_workday": "Plan Next Workday",
+  "pt_viewing_planning_for": "You are viewing the planning for {{date}}",
+
   "holiday": "Holiday",
   "holiday_requests": "Holiday Requests",
   "my_holiday_requests": "My Holiday Requests",

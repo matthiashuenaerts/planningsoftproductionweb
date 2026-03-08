@@ -681,7 +681,7 @@ const PersonalTasks = () => {
                   <div className="flex items-center gap-2 ml-4">
                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                     <span className="text-sm text-orange-600 font-medium">
-                      {isViewingTomorrow ? 'Tomorrow' : 'Future Date'}
+                    {isViewingTomorrow ? t('pt_tomorrow') : t('pt_future_date')}
                     </span>
                   </div>
                 )}
@@ -694,7 +694,7 @@ const PersonalTasks = () => {
                 onClick={() => handleDateNavigation('today')}
                 className="flex items-center gap-2"
               >
-                Today
+                {t('pt_today')}
               </Button>
               <Button
                 variant={!isViewingToday ? "default" : "outline"}
@@ -702,7 +702,7 @@ const PersonalTasks = () => {
                 className="flex items-center gap-2"
               >
                 <ChevronRight className="h-4 w-4" />
-                Next Workday
+                {t('pt_next_workday')}
               </Button>
               <Button
                 variant="outline"
@@ -710,7 +710,7 @@ const PersonalTasks = () => {
                 className="flex items-center gap-2"
               >
                 <Calendar className="h-4 w-4" />
-                Plan Next Workday
+                {t('pt_plan_next_workday')}
               </Button>
             </div>
           </div>
@@ -721,7 +721,7 @@ const PersonalTasks = () => {
                 <div className="flex items-center gap-2 text-orange-800">
                   <Calendar className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    You are viewing the planning for {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                    {(t('pt_viewing_planning_for') || 'You are viewing the planning for {{date}}').replace('{{date}}', format(selectedDate, 'EEEE, MMMM dd, yyyy'))}
                   </span>
                 </div>
               </CardContent>
