@@ -2066,15 +2066,15 @@ const Planning = () => {
           style={{ height: '100vh' }}
         >
           <div className="w-full max-w-full">
-            <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+            <div className="flex flex-col gap-4 mb-6">
               <div>
-                <h1 className="text-3xl font-bold">{t('planning_title')}</h1>
-                <p className="text-slate-600 mt-1">
+                <h1 className="text-2xl md:text-3xl font-bold">{t('planning_title')}</h1>
+                <p className="text-muted-foreground mt-1 text-sm md:text-base">
                   {t('planning_description')}
                 </p>
               </div>
               
-              <div className="flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4">
+              <div className="flex flex-wrap items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
