@@ -769,9 +769,9 @@ const ServiceTeamCalendar: React.FC = () => {
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search by name, client, address..." />
+                    <CommandInput placeholder={t('svc_search_placeholder')} />
                     <CommandList>
-                      <CommandEmpty>No projects found.</CommandEmpty>
+                      <CommandEmpty>{t('svc_no_projects_found')}</CommandEmpty>
                       <CommandGroup>
                         {projects
                           .filter(p => p.installation_date)
