@@ -160,18 +160,63 @@ export const BackorderDeliveries: React.FC<BackorderDeliveriesProps> = ({
   return (
     <>
       <Card className="w-full overflow-hidden">
-        <CardHeader className="px-4 md:px-6">
-          <CardTitle className="flex items-center gap-2 text-destructive text-base md:text-lg">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
+        <CardHeader className={isMobile ? 'px-3 py-2.5' : 'px-4 md:px-6'}>
+          <CardTitle className={`flex items-center gap-2 text-destructive ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+            <AlertTriangle className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
             {(t('bo_overdue_deliveries') || '').replace('{{count}}', String(orders.length))}
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-4 md:px-6">
-          <div className="space-y-4">
+        <CardContent className={isMobile ? 'px-3 pb-3' : 'px-4 md:px-6'}>
+          <div className={isMobile ? 'space-y-2' : 'space-y-4'}>
             {sortedOrders.map((order) => {
               const daysOverdue = getDaysOverdue(order.expected_delivery);
               const isExpanded = expandedOrders.has(order.id);
               
+              if (isMobile) {
+                return (
+                  <Card key={order.id} className="border-l-4 border-l-destructive overflow-hidden">
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold truncate">
+                            {order.supplier}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {(order as any).project_name || order.project_id}
+                          </p>
+                        </div>
+                        <Badge variant="destructive" className="shrink-0 text-[10px] px-1.5 py-0">
+                          {daysOverdue}d
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span className={getOverdueColor(daysOverdue)}>📅 {format(new Date(order.expected_delivery), 'dd MMM yyyy')}</span>
+                        <Badge className={`text-[9px] px-1 py-0 ${getStatusColor(order.status)}`}>{order.status}</Badge>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleOrderExpansion(order.id)}
+                          className="flex-1 h-7 text-[10px] px-2"
+                        >
+                          {isExpanded ? <ChevronUp className="h-3 w-3 mr-0.5" /> : <ChevronDown className="h-3 w-3 mr-0.5" />}
+                          {isExpanded ? t('bo_hide_items') : t('bo_show_items')}
+                        </Button>
+                        <Button 
+                          onClick={() => setSelectedOrder(order)}
+                          size="sm"
+                          className="flex-1 h-7 text-[10px] px-2 bg-green-600 hover:bg-green-700"
+                        >
+                          {t('bo_confirm_delivery')}
+                        </Button>
+                      </div>
+                    </div>
+                    <OrderItems orderId={order.id} isExpanded={isExpanded} />
+                  </Card>
+                );
+              }
+
               return (
                 <Card key={order.id} className="border-l-4 border-l-destructive overflow-hidden">
                   <CardHeader className="px-4 md:px-6 pb-3">
