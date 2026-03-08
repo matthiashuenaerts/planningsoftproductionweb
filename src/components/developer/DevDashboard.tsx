@@ -206,7 +206,7 @@ const DevDashboard: React.FC = () => {
         <Card className="bg-white/5 border-white/10">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4" /> Recent Support Tickets
+              <Clock className="h-4 w-4" /> Open Support Tickets ({recentTickets?.length ?? 0})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
