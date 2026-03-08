@@ -557,19 +557,24 @@ export const taskService = {
     return processedTasks;
   },
   
-  async getByWorkstation(workstation: string): Promise<Task[]> {
+  async getByWorkstation(workstation: string, tenantId?: string): Promise<Task[]> {
     try {
-      // First get the workstation ID
-      const { data: workstationData, error: workstationError } = await supabase
+      // First get the workstation ID - filter by tenant to avoid cross-tenant conflicts
+      let query = supabase
         .from('workstations')
         .select('id')
-        .eq('name', workstation)
-        .maybeSingle();
+        .eq('name', workstation);
+      
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+      
+      const { data: workstationData, error: workstationError } = await query.maybeSingle();
       
       if (workstationError) throw workstationError;
       
       if (!workstationData) {
-        console.warn(`No workstation found with name: ${workstation}`);
+        console.warn(`No workstation found with name: ${workstation}${tenantId ? ` for tenant ${tenantId}` : ''}`);
         return [];
       }
       
