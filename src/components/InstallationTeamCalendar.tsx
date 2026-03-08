@@ -519,9 +519,9 @@ const TeamCalendar = ({
   return <Collapsible open={!isCollapsed} onOpenChange={(open) => setIsCollapsed(!open)} className="mb-6">
       <div className={cn("rounded-lg border", teamColor.border)}>
         <CollapsibleTrigger asChild>
-          <div className={cn("p-3 rounded-t-lg cursor-pointer flex items-center justify-between hover:opacity-80 transition-opacity", teamColor.header)}>
-            <h3 className="text-lg font-medium">{team}</h3>
-            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          <div className={cn("p-2 sm:p-3 rounded-t-lg cursor-pointer flex items-center justify-between hover:opacity-80 transition-opacity", teamColor.header)}>
+            <h3 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium`}>{team}</h3>
+            {isCollapsed ? <ChevronDown className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} /> : <ChevronUp className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />}
           </div>
         </CollapsibleTrigger>
         
