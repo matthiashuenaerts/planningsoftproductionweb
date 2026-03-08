@@ -239,6 +239,18 @@ const DevDashboard: React.FC = () => {
             <TenantStatsTable />
           </CardContent>
         </Card>
+        {/* Automation Logs */}
+        <Card className="bg-white/5 border-white/10 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2 text-sm">
+              <Zap className="h-4 w-4" /> Automation Logs
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AutomationLogsPanel tenantMap={tenantMap} />
+          </CardContent>
+        </Card>
+
         {/* Sync Logs */}
         <Card className="bg-white/5 border-white/10 lg:col-span-2">
           <CardHeader>
