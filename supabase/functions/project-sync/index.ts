@@ -159,49 +159,79 @@ async function syncProject(
 
     const normalizedExternal = externalInstallationDate ? new Date(externalInstallationDate).toISOString().split('T')[0] : null;
     const normalizedCurrent = project.installation_date ? new Date(project.installation_date).toISOString().split('T')[0] : null;
+    const normalizedEndFromPlanning = endFromPlanning ? new Date(endFromPlanning).toISOString().split('T')[0] : null;
 
-    if (normalizedExternal === normalizedCurrent) {
+    // Resolve the external team
+    let matchedTeam: any = null;
+    let externalTeamName = 'unnamed';
+    for (const teamText of planningTeams) {
+      if (!teamText || typeof teamText !== 'string') continue;
+      const normalizedTeamText = teamText.trim().toLowerCase();
+      matchedTeam = placementTeams?.find(team => {
+        if (!team.external_team_names || !Array.isArray(team.external_team_names)) return false;
+        return team.external_team_names.some((extName: string) => {
+          const n = extName.trim().toLowerCase();
+          return n === normalizedTeamText || normalizedTeamText.includes(n) || n.includes(normalizedTeamText);
+        });
+      });
+      if (matchedTeam) { externalTeamName = teamText; break; }
+    }
+
+    // Fetch current team assignment to compare
+    const { data: currentPTA } = await supabase
+      .from('project_team_assignments')
+      .select('team_id, team, start_date, duration')
+      .eq('project_id', project.id)
+      .limit(1)
+      .maybeSingle();
+
+    const currentTeamId = currentPTA?.team_id || null;
+    const currentStartDate = currentPTA?.start_date ? new Date(currentPTA.start_date).toISOString().split('T')[0] : null;
+    const currentDuration = currentPTA?.duration || null;
+
+    const newDuration = (startFromPlanning && endFromPlanning) ? daysBetweenInclusive(startFromPlanning, endFromPlanning) : null;
+    const newTeamId = matchedTeam?.id || null;
+
+    // Determine what changed
+    const dateChanged = normalizedExternal !== normalizedCurrent;
+    const teamChanged = newTeamId && newTeamId !== currentTeamId;
+    const startDateChanged = startFromPlanning && startFromPlanning !== currentStartDate;
+    const durationChanged = newDuration && newDuration !== currentDuration;
+
+    const changes: string[] = [];
+    if (dateChanged) changes.push('installation_date');
+    if (teamChanged) changes.push('team');
+    if (startDateChanged) changes.push('start_date');
+    if (durationChanged) changes.push('duration');
+
+    if (changes.length === 0) {
       return {
-        detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'up_to_date', current_date: normalizedCurrent },
+        detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'up_to_date', current_date: normalizedCurrent, current_team: currentPTA?.team || null },
         synced: false
       };
     }
 
-    // Update project installation date
-    const { error: updateProjectError } = await supabase
-      .from('projects')
-      .update({ installation_date: normalizedExternal, updated_at: new Date().toISOString() })
-      .eq('id', project.id);
+    console.log(`Project ${project.name}: changes detected: ${changes.join(', ')}`);
 
-    if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
+    // Update project installation date if changed
+    if (dateChanged && normalizedExternal) {
+      const { error: updateProjectError } = await supabase
+        .from('projects')
+        .update({ installation_date: normalizedExternal, updated_at: new Date().toISOString() })
+        .eq('id', project.id);
+      if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
+    }
 
-    // Upsert team assignment
+    // Upsert team assignment if any team/date/duration changed
     if (startFromPlanning && endFromPlanning) {
-      const durationDays = daysBetweenInclusive(startFromPlanning, endFromPlanning);
-      let matchedTeam: any = null;
-      let externalTeamName = 'unnamed';
-
-      for (const teamText of planningTeams) {
-        if (!teamText || typeof teamText !== 'string') continue;
-        const normalizedTeamText = teamText.trim().toLowerCase();
-        matchedTeam = placementTeams?.find(team => {
-          if (!team.external_team_names || !Array.isArray(team.external_team_names)) return false;
-          return team.external_team_names.some((extName: string) => {
-            const n = extName.trim().toLowerCase();
-            return n === normalizedTeamText || normalizedTeamText.includes(n) || n.includes(normalizedTeamText);
-          });
-        });
-        if (matchedTeam) { externalTeamName = teamText; break; }
-      }
-
       const { error: upsertErr } = await supabase
         .from('project_team_assignments')
         .upsert({
           project_id: project.id,
-          team_id: matchedTeam?.id || null,
+          team_id: newTeamId,
           team: matchedTeam?.name || externalTeamName,
           start_date: startFromPlanning,
-          duration: durationDays,
+          duration: newDuration!,
           updated_at: new Date().toISOString()
         }, { onConflict: 'project_id' });
 
