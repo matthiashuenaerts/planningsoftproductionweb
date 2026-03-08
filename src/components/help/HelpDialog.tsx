@@ -146,7 +146,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       display_order: parseInt(formData.get('display_order') as string) || 0,
-      is_active: formData.get('is_active') === 'on'
+      is_active: formData.get('is_active') === 'on',
+      is_global: false
     };
 
     try {
@@ -183,7 +184,8 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       image_url: formData.get('image_url') as string || undefined,
       tags,
       display_order: parseInt(formData.get('display_order') as string) || 0,
-      is_published: formData.get('is_published') === 'on'
+      is_published: formData.get('is_published') === 'on',
+      is_global: false
     };
 
     try {
@@ -446,6 +448,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 description: '',
                 display_order: 0,
                 is_active: true,
+                is_global: false,
                 created_at: '',
                 updated_at: ''
               })}
@@ -492,10 +495,11 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
                 tags: [],
                 display_order: 0,
                 is_published: true,
+                is_global: false,
                 created_by: '',
                 created_at: '',
                 updated_at: '',
-                category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, created_at: '', updated_at: '' }
+                category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, is_global: false, created_at: '', updated_at: '' }
               })}
             >
               <Plus className="h-4 w-4 mr-1" />

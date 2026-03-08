@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
   ChevronDown, ChevronRight, LogOut, Shield, Rocket, UserPlus,
-  FileText, LifeBuoy, Activity, Upload,
+  FileText, LifeBuoy, Activity, Upload, HelpCircle,
 } from "lucide-react";
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 import DevTenantDetail from "@/components/developer/DevTenantDetail";
 import DevDeveloperManagement from "@/components/developer/DevDeveloperManagement";
 import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
+import DevHelpManagement from "@/components/developer/DevHelpManagement";
 
 type TenantRow = {
   id: string;
@@ -121,6 +122,9 @@ const DeveloperPortal: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-white/20 text-white">
               <LifeBuoy className="h-4 w-4 mr-1" /> Support
+            </TabsTrigger>
+            <TabsTrigger value="help" className="data-[state=active]:bg-white/20 text-white">
+              <HelpCircle className="h-4 w-4 mr-1" /> Help
             </TabsTrigger>
           </TabsList>
 
@@ -228,6 +232,11 @@ const DeveloperPortal: React.FC = () => {
           {/* Support Tab */}
           <TabsContent value="support">
             <DevSupportManagement />
+          </TabsContent>
+
+          {/* Help Tab */}
+          <TabsContent value="help">
+            <DevHelpManagement />
           </TabsContent>
         </Tabs>
       </div>
