@@ -16,6 +16,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { orderService } from '@/services/orderService';
 import { Order, OrderItem, OrderStep } from '@/types/order';
 import { Accessory } from '@/services/accessoriesService';
+import { cn } from '@/lib/utils';
 import { addBusinessDays, subBusinessDays, format, parseISO, isAfter } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { parsePDFForOrder, ParsedOrderData } from '@/services/pdfParseService';
