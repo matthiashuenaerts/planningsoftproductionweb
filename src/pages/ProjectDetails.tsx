@@ -1208,61 +1208,124 @@ const ProjectDetails = () => {
               {partsLists.length > 0 ? <div className="space-y-4">
                   {/* Parts List Management Header */}
                   <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                          <Package className="h-5 w-5" />
-                          Parts List - {partsLists[0].file_name}
+                    <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+                          <Package className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                          <span className="truncate">{partsLists[0].file_name}</span>
                         </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleDeletePartsList(partsLists[0].id)} className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </Button>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleDeletePartsList(partsLists[0].id)} className="text-destructive hover:text-destructive h-7 sm:h-8 text-xs self-end sm:self-auto">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          Delete
+                        </Button>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
-                          <span>Unprocessed: {getStatusCounts().none}</span>
+                    <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6 pt-0">
+                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-muted/50 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-muted border border-border rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Unprocessed: <span className="font-semibold text-foreground">{getStatusCounts().none}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-                          <span>Complete: {getStatusCounts().green}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-green-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-100 border border-green-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Complete: <span className="font-semibold text-green-700">{getStatusCounts().green}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
-                          <span>In Progress: {getStatusCounts().orange}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-orange-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-orange-100 border border-orange-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">In Progress: <span className="font-semibold text-orange-700">{getStatusCounts().orange}</span></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-                          <span>Issues: {getStatusCounts().red}</span>
+                        <div className="flex items-center gap-1.5 p-1.5 sm:p-0 rounded-md bg-red-500/5 sm:bg-transparent">
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border border-red-300 rounded flex-shrink-0"></div>
+                          <span className="text-muted-foreground">Issues: <span className="font-semibold text-red-700">{getStatusCounts().red}</span></span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
                   {/* Parts List Table */}
-                  <Card className="h-screen">
-                    <CardContent className="p-0 h-full">
+                  <Card>
+                    <CardContent className="p-0">
                       {loadingParts ? <div className="flex justify-center items-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin" />
                         </div> : parts.length === 0 ? <div className="text-center py-8 text-muted-foreground">
                           No parts found in this list
-                        </div> : <div className="space-y-4">
+                        </div> : <div>
                            {/* Filter Controls */}
-                           <div className="flex items-center justify-between p-4 border-b">
-                             <div className="text-sm text-muted-foreground">
-                               Showing {sortedAndFilteredParts.length} of {parts.length} parts
+                           <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b">
+                             <div className="text-xs sm:text-sm text-muted-foreground">
+                               {sortedAndFilteredParts.length} / {parts.length} parts
                              </div>
-                             <Button variant="outline" size="sm" onClick={clearAllFilters} className="h-8">
+                             <Button variant="outline" size="sm" onClick={clearAllFilters} className="h-7 sm:h-8 text-xs">
                                Clear Filters
                              </Button>
                            </div>
+
+                           {/* Mobile Filter Row */}
+                           <div className="sm:hidden px-3 py-2 border-b space-y-2">
+                             <div className="grid grid-cols-2 gap-2">
+                               <Select value={partsFilters.status} onValueChange={value => updatePartsFilter('status', value)}>
+                                 <SelectTrigger className="h-7 text-xs">
+                                   <SelectValue placeholder="Status" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="all">All Status</SelectItem>
+                                   <SelectItem value="none">Unprocessed</SelectItem>
+                                   <SelectItem value="green">Complete</SelectItem>
+                                   <SelectItem value="orange">In Progress</SelectItem>
+                                   <SelectItem value="red">Issues</SelectItem>
+                                 </SelectContent>
+                               </Select>
+                               <Input placeholder="Materiaal..." value={partsFilters.materiaal} onChange={e => updatePartsFilter('materiaal', e.target.value)} className="h-7 text-xs" />
+                             </div>
+                             <div className="grid grid-cols-2 gap-2">
+                               <Input placeholder="Wand Naam..." value={partsFilters.wand_naam} onChange={e => updatePartsFilter('wand_naam', e.target.value)} className="h-7 text-xs" />
+                               <Input placeholder="Commentaar..." value={partsFilters.commentaar} onChange={e => updatePartsFilter('commentaar', e.target.value)} className="h-7 text-xs" />
+                             </div>
+                           </div>
+
+                           {/* Mobile Card Layout */}
+                           <div className="sm:hidden">
+                             <ScrollArea className="h-[70vh]">
+                               <div className="divide-y">
+                                 {sortedAndFilteredParts.map(part => (
+                                   <div
+                                     key={part.id}
+                                     className={`p-3 ${getBackgroundColor(part.color_status)} active:bg-muted/60 transition-colors`}
+                                     onClick={() => {
+                                       setSelectedPart(part);
+                                       setShowPartDetailDialog(true);
+                                     }}
+                                   >
+                                     <div className="flex items-start justify-between gap-2 mb-1.5">
+                                       <div className="flex-1 min-w-0">
+                                         <p className="text-xs font-semibold text-foreground truncate">{part.wand_naam || '-'}</p>
+                                         <p className="text-[11px] text-muted-foreground truncate">{part.materiaal || '-'}</p>
+                                       </div>
+                                       <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                         <ColorButton color="none" isActive={part.color_status === 'none'} onClick={() => updatePartColor(part.id, 'none')} />
+                                         <ColorButton color="green" isActive={part.color_status === 'green'} onClick={() => updatePartColor(part.id, 'green')} />
+                                         <ColorButton color="orange" isActive={part.color_status === 'orange'} onClick={() => updatePartColor(part.id, 'orange')} />
+                                         <ColorButton color="red" isActive={part.color_status === 'red'} onClick={() => updatePartColor(part.id, 'red')} />
+                                       </div>
+                                     </div>
+                                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                                       <span className="font-medium">{part.dikte || '-'}mm</span>
+                                       <span>{part.lengte && part.breedte ? `${part.lengte}×${part.breedte}` : part.lengte || part.breedte || '-'}</span>
+                                       <span>×{part.aantal || '-'}</span>
+                                       {part.workstation_name_status && <span className="ml-auto truncate max-w-[80px]">{part.workstation_name_status}</span>}
+                                     </div>
+                                     {(part.commentaar || part.commentaar_2) && (
+                                       <p className="text-[10px] text-muted-foreground mt-1 truncate">{part.commentaar || part.commentaar_2}</p>
+                                     )}
+                                   </div>
+                                 ))}
+                               </div>
+                             </ScrollArea>
+                           </div>
                            
-                           <ScrollArea className="h-full">
+                           {/* Desktop Table Layout */}
+                           <div className="hidden sm:block">
+                           <ScrollArea className="h-[80vh]">
                              <Table>
                                <TableHeader>
                                  <TableRow>
@@ -1390,6 +1453,7 @@ const ProjectDetails = () => {
                              </TableBody>
                           </Table>
                         </ScrollArea>
+                        </div>
                         </div>}
                     </CardContent>
                   </Card>
