@@ -2164,10 +2164,11 @@ const Planning = () => {
 
             {/* View Toggle */}
             <div className="mb-6">
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => setActiveView('worker')}
                   variant={activeView === 'worker' ? "default" : "outline"}
+                  size="sm"
                 >
                   <Users className="mr-2 h-4 w-4" />
                   {t('planning_worker_schedules')}
@@ -2175,6 +2176,7 @@ const Planning = () => {
                 <Button
                   onClick={() => setActiveView('workstation')}
                   variant={activeView === 'workstation' ? "default" : "outline"}
+                  size="sm"
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   {t('planning_workstation_schedules')}
@@ -2182,6 +2184,7 @@ const Planning = () => {
                 <Button
                   onClick={() => setActiveView('gantt')}
                   variant={activeView === 'gantt' ? "default" : "outline"}
+                  size="sm"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {t('planning_gantt_chart')}
