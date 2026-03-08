@@ -659,28 +659,28 @@ const PersonalTasks = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background flex">
       {!isMobile && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 p-6 max-w-none ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`flex-1 max-w-none ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'}`}>
         {/* Date Navigation Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <div className={`${isMobile ? 'mb-4' : 'mb-8'}`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{t("daily_timeline")}</h1>
-              <div className="flex items-center gap-2 mt-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600">
+              <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-foreground`}>{t("daily_timeline")}</h1>
+              <div className="flex items-center gap-2 mt-1.5 sm:mt-2 flex-wrap">
+                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                <span className="text-xs sm:text-sm text-muted-foreground">
                   {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
                 </span>
                 {!isViewingToday && (
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center gap-1.5 ml-2 sm:ml-4">
                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm text-orange-600 font-medium">
+                    <span className="text-xs text-orange-600 font-medium">
                     {isViewingTomorrow ? t('pt_tomorrow') : t('pt_future_date')}
                     </span>
                   </div>
@@ -688,39 +688,42 @@ const PersonalTasks = () => {
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className={`flex gap-2 ${isMobile ? 'flex-wrap' : ''}`}>
               <Button
                 variant={isViewingToday ? "default" : "outline"}
                 onClick={() => handleDateNavigation('today')}
-                className="flex items-center gap-2"
+                size={isMobile ? 'sm' : 'default'}
+                className={`flex items-center gap-1.5 ${isMobile ? 'text-xs flex-1' : ''}`}
               >
                 {t('pt_today')}
               </Button>
               <Button
                 variant={!isViewingToday ? "default" : "outline"}
                 onClick={() => handleDateNavigation('next')}
-                className="flex items-center gap-2"
+                size={isMobile ? 'sm' : 'default'}
+                className={`flex items-center gap-1.5 ${isMobile ? 'text-xs flex-1' : ''}`}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 {t('pt_next_workday')}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => handleDateNavigation('planning')}
-                className="flex items-center gap-2"
+                size={isMobile ? 'sm' : 'default'}
+                className={`flex items-center gap-1.5 ${isMobile ? 'text-xs w-full' : ''}`}
               >
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 {t('pt_plan_next_workday')}
               </Button>
             </div>
           </div>
           
           {!isViewingToday && (
-            <Card className="mt-4 bg-orange-50 border-orange-200">
-              <CardContent className="p-4">
+            <Card className="mt-3 sm:mt-4 bg-orange-50 border-orange-200">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 text-orange-800">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm font-medium">
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="text-xs sm:text-sm font-medium">
                     {(t('pt_viewing_planning_for') || 'You are viewing the planning for {{date}}').replace('{{date}}', format(selectedDate, 'EEEE, MMMM dd, yyyy'))}
                   </span>
                 </div>
