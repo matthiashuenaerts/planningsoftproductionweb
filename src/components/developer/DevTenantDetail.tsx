@@ -95,6 +95,21 @@ const DevTenantDetail: React.FC<DevTenantDetailProps> = ({ tenant, onBack, onSet
     },
   });
 
+  // Fetch login logs
+  const { data: loginLogs } = useQuery({
+    queryKey: ["dev", "loginLogs", tenant.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("login_logs" as any)
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+
   const toggleActive = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("tenants").update({ is_active: !tenant.is_active }).eq("id", tenant.id);
