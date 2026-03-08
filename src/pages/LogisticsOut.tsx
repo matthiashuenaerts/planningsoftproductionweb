@@ -251,27 +251,27 @@ const LogisticsOut: React.FC = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-4 md:p-6'}`}>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className={`flex flex-col gap-2 ${isMobile ? 'mb-4' : 'sm:flex-row sm:items-center sm:justify-between gap-3 mb-6'}`}>
           <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t("logistics_out_title")}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">{t("logistics_out_description")}</p>
+            <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>{t("logistics_out_title")}</h1>
+            {!isMobile && <p className="text-muted-foreground mt-1 text-sm">{t("logistics_out_description")}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="outline" className="px-3 py-1 text-xs">
+            <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'px-3 py-1 text-xs'}`}>
               {t("orders_count", { count: filteredOrders.length.toString() })}
             </Badge>
-            <Badge variant="outline" className="px-3 py-1 text-xs">
+            <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'px-3 py-1 text-xs'}`}>
               {t("events_count", { count: calendarEvents.length.toString() })}
             </Badge>
           </div>
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+        <Card className={isMobile ? 'mb-3' : 'mb-6'}>
+          <CardContent className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+            <div className={`flex ${isMobile ? 'flex-col gap-2' : 'flex-col sm:flex-row gap-3'}`}>
               <div className="flex-1 min-w-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -279,13 +279,13 @@ const LogisticsOut: React.FC = () => {
                     placeholder={t("search_projects_suppliers")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${isMobile ? 'h-9 text-sm' : ''}`}
                   />
                 </div>
               </div>
-              <div className="sm:w-48">
+              <div className={isMobile ? 'w-full' : 'sm:w-48'}>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-xs' : ''}>
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder={t("filter_status")} />
                   </SelectTrigger>
@@ -303,15 +303,15 @@ const LogisticsOut: React.FC = () => {
         </Card>
 
         {/* Calendar + Day Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          <Card className="lg:col-span-2 overflow-hidden">
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <CalendarIcon className="h-5 w-5 shrink-0" />
+        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3 md:gap-6'}`}>
+          <Card className={`${isMobile ? '' : 'lg:col-span-2'} overflow-hidden`}>
+            <CardHeader className={isMobile ? 'px-2 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <CalendarIcon className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 {t("external_processing_timeline")}
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0 overflow-hidden">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -343,20 +343,20 @@ const LogisticsOut: React.FC = () => {
           </Card>
 
           <Card className="overflow-hidden">
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
-                <Package className="h-5 w-5 shrink-0" />
+            <CardHeader className={isMobile ? 'px-3 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex flex-wrap items-center gap-1.5 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 <span className="truncate">
-                  {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : t("select_date")}
+                  {selectedDate ? format(selectedDate, isMobile ? 'MMM d, yyyy' : 'MMMM d, yyyy') : t("select_date")}
                 </span>
                 {selectedDayEvents.length > 0 && (
-                  <Badge variant="secondary">
-                    {selectedDayEvents.length} {selectedDayEvents.length === 1 ? t("event") : t("events")}
+                  <Badge variant="secondary" className={isMobile ? 'text-[10px] px-1.5' : ''}>
+                    {selectedDayEvents.length}
                   </Badge>
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 md:px-6">
+            <CardContent className={isMobile ? 'px-3 pb-3' : 'px-3 md:px-6'}>
               {selectedDayEvents.length > 0 ? (
                 <div className="space-y-3">
                   {selectedDayEvents.map((event, index) => (
@@ -425,17 +425,17 @@ const LogisticsOut: React.FC = () => {
         </div>
 
         {/* Upcoming Events */}
-        <div className="mt-6">
+        <div className={isMobile ? 'mt-3' : 'mt-6'}>
           <Card>
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <Clock className="h-5 w-5 shrink-0" />
+            <CardHeader className={isMobile ? 'px-3 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <Clock className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 {t("upcoming_external_processing_events", { count: upcomingEvents.length.toString() })}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 md:px-6">
+            <CardContent className={isMobile ? 'px-3 pb-3' : 'px-3 md:px-6'}>
               {upcomingEvents.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                <div className={`grid gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 md:gap-4'}`}>
                   {upcomingEvents.map((event, index) => (
                     <div
                       key={`${event.order.id}-${index}`}
@@ -491,16 +491,16 @@ const LogisticsOut: React.FC = () => {
         </div>
 
         {/* Orders Summary */}
-        <div className="mt-6">
+        <div className={isMobile ? 'mt-3' : 'mt-6'}>
           <Card>
-            <CardHeader className="px-3 md:px-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <Package className="h-5 w-5 shrink-0" />
+            <CardHeader className={isMobile ? 'px-3 py-2' : 'px-3 md:px-6'}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base md:text-lg'}`}>
+                <Package className={`shrink-0 ${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
                 {t("external_processing_orders_summary")}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-3 md:px-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            <CardContent className={isMobile ? 'px-3 pb-3' : 'px-3 md:px-6'}>
+              <div className={`grid gap-2 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 md:gap-4'}`}>
                 {filteredOrders.map(order => (
                   <div key={order.id} className="p-3 md:p-4 border rounded-lg bg-card">
                     <div className="flex items-center justify-between mb-2">
