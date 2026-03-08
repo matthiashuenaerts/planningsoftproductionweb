@@ -200,13 +200,13 @@ function mergeMultiLineRows(rows: TableRow[], maxGap: number = 12): TableRow[] {
 }
 
 const COLUMN_HEADER_PATTERNS: Record<string, RegExp> = {
-  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr)/i,
-  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material)/i,
-  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?)/i,
-  'unit': /^(unit|eenheid|enh|uom|me|vpe)/i,
-  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk)/i,
-  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal)/i,
-  'discount': /^(discount|korting|remise|rabat)/i,
+  'article_code': /^(art|article|code|artikelcode|artikel\s*code|artnr|art[\.\s]*nr|item\s*(?:no|nr)?|sku|ean|product\s*code|bestelnr|materiaal|mat[\.\s]*nr|réf(?:érence)?|n°\s*art|code\s*art)/i,
+  'description': /^(description|omschrijving|desc|naam|name|product|benaming|artikel\s*naam|item\s*desc|tekst|material|désignation|libellé|intitulé)/i,
+  'quantity': /^(qty|quantity|aantal|hoeveelheid|stuks|pcs|aant|besteld|geleverd|hoeveelh|order\s*qty|aant\.?|quantité|qté|qte)/i,
+  'unit': /^(unit|eenheid|enh|uom|me|vpe|unité)/i,
+  'price': /^(price|prijs|unit\s*price|eenheid|e\.?\s*prijs|stukprijs|netto\s*prijs|prijs\/eenheid|prijs\s*per|per\s*stuk|prix|p\.?\s*u\.?|prix\s*unit)/i,
+  'total': /^(total|totaal|bedrag|amount|netto\s*bedrag|regel\s*bedrag|line\s*total|subtotaal|montant|total\s*ligne)/i,
+  'discount': /^(discount|korting|remise|rabat|réduction)/i,
 };
 
 function detectColumns(rows: TableRow[]): { columns: Map<string, number>; headerRowIndex: number } {
