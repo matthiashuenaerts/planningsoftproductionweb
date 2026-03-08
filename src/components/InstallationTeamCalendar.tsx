@@ -442,6 +442,7 @@ const TeamCalendar = ({
 }) => {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const getTeamColor = (teamName: string) => {
     if (teamName?.toLowerCase().includes('groen') || teamName?.toLowerCase().includes('green')) return getColorClasses('green');
     if (teamName?.toLowerCase().includes('blauw') || teamName?.toLowerCase().includes('blue')) return getColorClasses('blue');
     if (teamName?.toLowerCase().includes('orange') || teamName?.toLowerCase().includes('oranje')) return getColorClasses('orange');
