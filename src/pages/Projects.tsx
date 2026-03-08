@@ -399,28 +399,28 @@ const Projects = () => {
       )}
       {isMobile && <Navbar />}
       
-      <div className={`flex-1 p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`flex-1 ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-8 gap-3">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{t('projects_title')}</h1>
-              <p className="text-muted-foreground mt-1">{t('projects_description')}</p>
+              <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t('projects_title')}</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 sm:mt-1">{t('projects_description')}</p>
             </div>
             
             {isAdmin && (
-              <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className="mx-0">
+              <Button size="sm" onClick={() => setIsNewProjectModalOpen(true)} className={isMobile ? 'w-full' : ''}>
                 <Plus className="mr-2 h-4 w-4" />
                 {t('new_project')}
               </Button>
             )}
           </div>
           
-          <div className="mb-8 flex gap-4 flex-col sm:flex-row">
+          <div className="mb-4 sm:mb-8 flex gap-4 flex-col sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder={t('search_projects_placeholder')}
-                className="pl-8" 
+                className="pl-8 h-9 sm:h-10 text-sm" 
                 value={searchQuery} 
                 onChange={e => setSearchQuery(e.target.value)} 
               />
@@ -428,15 +428,15 @@ const Projects = () => {
           </div>
           
           {isLoading ? <div className="flex justify-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-            </div> : filteredProjects.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleProjectClick(project.id)}>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div> : filteredProjects.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              {filteredProjects.map(project => <Card key={project.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer active:scale-[0.98]" onClick={() => handleProjectClick(project.id)}>
                   <div>
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
                         <div className="flex justify-between items-start gap-2">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-xl mb-1 break-words">{project.name}</CardTitle>
-                            <CardDescription className="truncate">{project.client}</CardDescription>
+                            <CardTitle className="text-base sm:text-xl mb-0.5 sm:mb-1 break-words leading-tight">{project.name}</CardTitle>
+                            <CardDescription className="truncate text-xs sm:text-sm">{project.client}</CardDescription>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">
                           {isAdmin && (
@@ -505,26 +505,26 @@ const Projects = () => {
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      {project.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                    <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                      {project.description && <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-3 sm:mb-4">
                           {project.description}
                         </p>}
-                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-x-6 sm:gap-y-2 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center">
-                          <Clock className="mr-1 h-4 w-4" />
+                          <Clock className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>
                             {t('start_date')}: {new Date(project.start_date).toLocaleDateString()}
                           </span>
                         </div>
                         <div className="flex items-center">
-                          <CalendarDays className="mr-1 h-4 w-4" />
+                          <CalendarDays className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span>
                             {t('installation_date')}: {new Date(project.installation_date).toLocaleDateString()}
                           </span>
                         </div>
                         {serviceDates[project.id] && serviceDates[project.id].length > 0 && (
                           <div className="flex items-center">
-                            <Wrench className="mr-1 h-4 w-4 text-orange-500" />
+                            <Wrench className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 flex-shrink-0" />
                             <span>
                               Service: {serviceDates[project.id].map(d => new Date(d).toLocaleDateString()).join(', ')}
                             </span>
@@ -559,13 +559,13 @@ const Projects = () => {
                         )}
                       </div>
                       
-                      <div className="mt-4">
-                        <div className="flex justify-between text-sm mb-1">
+                      <div className="mt-3 sm:mt-4">
+                        <div className="flex justify-between text-xs sm:text-sm mb-1">
                           <span>{t('progress')}</span>
-                          <span>{project.progress}%</span>
+                          <span className="font-medium">{project.progress}%</span>
                         </div>
-                        <div className="w-full bg-muted rounded-full h-2.5">
-                          <div className="bg-primary h-2.5 rounded-full" style={{
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{
                       width: `${project.progress}%`
                     }}></div>
                         </div>
