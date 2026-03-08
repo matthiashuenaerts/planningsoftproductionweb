@@ -61,7 +61,6 @@ export const ProductImageDisplay: React.FC<ProductImageDisplayProps> = ({ articl
     return null;
   }
 
-  const imageUrl = getImageUrl(product.image_path);
   if (!imageUrl) return null;
 
   return (
