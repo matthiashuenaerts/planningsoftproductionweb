@@ -140,8 +140,8 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
       const scanner = new QrScanner(
         videoRef.current,
-        (result) => {
-          const qrData = typeof result === 'string' ? result.trim() : String(result.data).trim();
+        (result: QrScanner.ScanResult) => {
+          const qrData = result.data?.trim() || '';
           if (qrData) {
             processQRCode(qrData);
           }
