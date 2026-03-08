@@ -502,32 +502,32 @@ const ServiceInstallation: React.FC = () => {
                 </Card>
 
                 {/* Route Schedule + Stops List */}
-                <div className="order-2 space-y-4">
+                <div className={`order-2 space-y-${isMobile ? '3' : '4'}`}>
                   {/* Route Schedule Timeline */}
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
+                    <CardHeader className={`${isMobile ? 'px-3 py-2' : 'pb-2'}`}>
+                      <CardTitle className={`${isMobile ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
+                        <Clock className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                         {t('si_route_schedule')}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2 text-sm">
+                    <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
+                      <div className={`space-y-1.5 ${isMobile ? 'text-xs' : 'text-sm'}`}>
                         {/* Departure */}
                         {routeData.departureTime && routeData.startPoint && (
-                          <div className="flex items-center gap-3 text-muted-foreground">
-                            <span className="font-mono text-xs w-12 text-right">{routeData.departureTime}</span>
-                            <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold shrink-0">S</div>
+                          <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
+                            <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{routeData.departureTime}</span>
+                            <div className={`${isMobile ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs'} rounded-full bg-green-500 text-white flex items-center justify-center font-bold shrink-0`}>S</div>
                             <span className="truncate">{(t('si_depart_from') || '').replace('{{address}}', routeData.startPoint.address)}</span>
                           </div>
                         )}
 
                         {/* Each stop */}
                         {routeData.stops.map((stop) => (
-                          <div key={stop.assignmentId} className="flex items-center gap-3">
-                            <span className="font-mono text-xs w-12 text-right">{stop.estimatedArrival || '--:--'}</span>
+                          <div key={stop.assignmentId} className="flex items-center gap-2 sm:gap-3">
+                            <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{stop.estimatedArrival || '--:--'}</span>
                             <div
-                              className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold shrink-0"
+                              className={`${isMobile ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs'} rounded-full text-white flex items-center justify-center font-bold shrink-0`}
                               style={{ backgroundColor: teamColor }}
                             >
                               {stop.serviceOrder}
@@ -536,8 +536,8 @@ const ServiceInstallation: React.FC = () => {
                               {stop.projectName}{' '}
                               <span className="text-muted-foreground">({stop.client})</span>
                             </span>
-                            <span className="text-xs text-muted-foreground shrink-0">{stop.serviceHours}h</span>
-                            {stop.estimatedDeparture && (
+                            <span className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground shrink-0`}>{stop.serviceHours}h</span>
+                            {stop.estimatedDeparture && !isMobile && (
                               <span className="text-xs text-muted-foreground shrink-0">→ {stop.estimatedDeparture}</span>
                             )}
                           </div>
@@ -545,10 +545,10 @@ const ServiceInstallation: React.FC = () => {
 
                         {/* Return home */}
                         {routeData.returnTime && routeData.startPoint && (
-                          <div className={`flex items-center gap-3 ${isOvertime ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                            <span className="font-mono text-xs w-12 text-right">{routeData.returnTime}</span>
-                            <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold shrink-0">
-                              <Home className="h-3 w-3" />
+                          <div className={`flex items-center gap-2 sm:gap-3 ${isOvertime ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                            <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{routeData.returnTime}</span>
+                            <div className={`${isMobile ? 'w-5 h-5' : 'w-6 h-6'} rounded-full bg-green-500 text-white flex items-center justify-center font-bold shrink-0`}>
+                              <Home className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
                             </div>
                             <span className="truncate">
                               {t('si_return_to_base')}
@@ -562,62 +562,62 @@ const ServiceInstallation: React.FC = () => {
 
                   {/* Stops Detail List */}
                   <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
+                    <CardHeader className={`${isMobile ? 'px-3 py-2' : 'pb-2'}`}>
+                      <CardTitle className={`${isMobile ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
+                        <MapPin className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                         {(t('si_service_stops') || '').replace('{{count}}', String(routeData.stops.length))}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <ScrollArea className={isMobile ? 'max-h-[400px]' : 'max-h-[420px]'}>
+                      <ScrollArea className={isMobile ? 'max-h-[350px]' : 'max-h-[420px]'}>
                         <div className="divide-y divide-border">
                           {routeData.stops.map((stop) => (
-                            <div key={stop.assignmentId} className="p-4 hover:bg-muted/50 transition-colors">
-                              <div className="flex items-start gap-3">
+                            <div key={stop.assignmentId} className={`${isMobile ? 'p-3' : 'p-4'} hover:bg-muted/50 transition-colors`}>
+                              <div className={`flex items-start ${isMobile ? 'gap-2.5' : 'gap-3'}`}>
                                 <div
-                                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                                  className={`flex-shrink-0 ${isMobile ? 'w-7 h-7 text-xs' : 'w-8 h-8 text-sm'} rounded-full flex items-center justify-center text-white font-bold`}
                                   style={{ backgroundColor: teamColor }}
                                 >
                                   {stop.serviceOrder}
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-semibold text-sm truncate">{stop.projectName}</h4>
+                                  <div className="flex items-center justify-between gap-1">
+                                    <h4 className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{stop.projectName}</h4>
                                     {stop.estimatedArrival && (
-                                      <Badge variant="outline" className="text-xs shrink-0 ml-2">
-                                        {stop.estimatedArrival} — {stop.estimatedDeparture}
+                                      <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'} shrink-0`}>
+                                        {stop.estimatedArrival}{!isMobile && ` — ${stop.estimatedDeparture}`}
                                       </Badge>
                                     )}
                                   </div>
-                                  <p className="text-xs text-muted-foreground">{stop.client}</p>
+                                  <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>{stop.client}</p>
 
-                                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                  <div className={`flex items-center gap-1 mt-1 ${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>
+                                    <MapPin className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} flex-shrink-0`} />
                                     <span className="truncate">{stop.address}</span>
                                   </div>
 
-                                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                                    <Clock className="h-3 w-3 flex-shrink-0" />
+                                  <div className={`flex items-center gap-1 mt-0.5 ${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>
+                                    <Clock className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} flex-shrink-0`} />
                                     <span>{stop.serviceHours}h {t('si_estimated')}</span>
                                   </div>
 
                                   {stop.serviceNotes && (
-                                    <div className="mt-2 p-2 bg-muted rounded text-xs whitespace-pre-wrap">
+                                    <div className={`mt-1.5 ${isMobile ? 'p-1.5 text-[10px]' : 'p-2 text-xs'} bg-muted rounded whitespace-pre-wrap`}>
                                       {stop.serviceNotes}
                                     </div>
                                   )}
 
                                   <Button
                                     size="sm"
-                                    className="mt-2 w-full"
+                                    className={`mt-2 w-full ${isMobile ? 'h-8 text-xs' : ''}`}
                                     onClick={() => handleStartTimeRegistration(stop)}
                                     disabled={startingTimer === stop.assignmentId}
                                   >
                                     {startingTimer === stop.assignmentId ? (
-                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                      <Loader2 className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} mr-1 animate-spin`} />
                                     ) : (
-                                      <Play className="h-4 w-4 mr-1" />
+                                      <Play className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} mr-1`} />
                                     )}
                                     {t('start_time_registration')}
                                   </Button>
