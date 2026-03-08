@@ -986,7 +986,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
   const inProgressTasks = sortTasks(tasks.filter(task => task.status === 'IN_PROGRESS' && !task.is_workstation_task));
   const todoTasks = sortTasks(tasks.filter(task => task.status === 'TODO' && !task.is_workstation_task));
   
-  const isMobile = useIsMobile();
+  
 
   return (
     <div className={isMobile ? 'space-y-3' : 'space-y-6'}>
