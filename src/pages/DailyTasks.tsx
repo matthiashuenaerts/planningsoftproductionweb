@@ -33,6 +33,7 @@ const DailyTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [projectsRefreshKey, setProjectsRefreshKey] = useState(0);
   const { toast } = useToast();
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
 
