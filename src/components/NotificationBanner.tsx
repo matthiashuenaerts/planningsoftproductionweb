@@ -125,8 +125,10 @@ const NotificationBanner = () => {
 
   return (
     <div
-      className={`fixed top-4 right-4 z-50 w-[360px] max-w-[calc(100vw-2rem)] cursor-pointer
-        ${isExiting ? 'animate-out fade-out-0 slide-out-to-right-5 duration-300' : 'animate-in fade-in-0 slide-in-from-right-5 duration-500'}
+      className={`fixed z-50 cursor-pointer
+        top-4 right-4 w-[360px] max-w-[calc(100vw-2rem)]
+        max-[767px]:top-auto max-[767px]:bottom-4 max-[767px]:left-4 max-[767px]:right-4 max-[767px]:w-auto
+        ${isExiting ? 'animate-out fade-out-0 slide-out-to-right-5 max-[767px]:slide-out-to-bottom-5 duration-300' : 'animate-in fade-in-0 slide-in-from-right-5 max-[767px]:slide-in-from-bottom-5 duration-500'}
       `}
       onClick={handleClick}
       role="alert"
