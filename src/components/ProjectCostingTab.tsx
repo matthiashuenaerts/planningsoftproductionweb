@@ -1647,17 +1647,17 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
             </div>
 
             {salesPrice > 0 && (
-              <div className={`p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`p-3 sm:p-4 rounded-lg ${profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-muted-foreground">{t('costing_profit')}</p>
-                    <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit')}</p>
+                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(profit)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t('costing_profit_margin')}</p>
-                    <p className={`text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-[10px] sm:text-sm text-muted-foreground">{t('costing_profit_margin')}</p>
+                    <p className={`text-lg sm:text-2xl font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {profitMargin.toFixed(1)}%
                     </p>
                   </div>
