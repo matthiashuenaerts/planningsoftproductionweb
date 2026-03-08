@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { AlertTriangle, Calendar, User, MapPin, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,36 +35,18 @@ export const BrokenPartDetailDialog: React.FC<BrokenPartDetailDialogProps> = ({
   };
 
   const handleOpenRushOrderForm = async () => {
-    // Convert the image to a File object if it exists
-    let attachmentFile: File | undefined = undefined;
-    
-    if (brokenPart.image_path) {
-      try {
-        const imageUrl = getImageUrl(brokenPart.image_path);
-        if (imageUrl) {
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
-          const fileName = brokenPart.image_path.split('/').pop() || 'broken-part-image.jpg';
-          attachmentFile = new File([blob], fileName, { type: blob.type });
-        }
-      } catch (error) {
-        console.error('Error loading image:', error);
-      }
-    }
-    
     setShowRushOrderForm(true);
   };
 
   const handleRushOrderSuccess = () => {
     setShowRushOrderForm(false);
     toast({
-      title: "Rush order created",
-      description: "A rush order has been created for this broken part repair.",
+      title: t('bp_rush_order_created') || "Rush order created",
+      description: t('bp_rush_order_created_desc') || "A rush order has been created for this broken part repair.",
     });
     onOpenChange(false);
   };
 
-  // Prepare initial values with attachment
   useEffect(() => {
     if (!brokenPart) return;
     
@@ -116,11 +97,10 @@ This is an urgent repair request for a broken part that is blocking production.`
 
   return (
     <>
-      {/* Rush Order Form Dialog */}
       <Dialog open={showRushOrderForm} onOpenChange={setShowRushOrderForm}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Rush Order from Broken Part</DialogTitle>
+            <DialogTitle>{t('bp_create_rush_from_broken') || 'Create Rush Order from Broken Part'}</DialogTitle>
           </DialogHeader>
           {initialRushOrderValues && (
             <NewRushOrderForm 
@@ -131,116 +111,113 @@ This is an urgent repair request for a broken part that is blocking production.`
         </DialogContent>
       </Dialog>
 
-      {/* Broken Part Detail Dialog */}
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            {t('broken_part_details')}
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left side - Image */}
-          <div className="space-y-4">
-            <h3 className="font-medium">Image</h3>
-            {imageUrl ? (
-              <div className="relative">
-                <AspectRatio ratio={4/3}>
-                  {imageError ? (
-                    <div className="flex items-center justify-center w-full h-full bg-muted rounded-lg">
-                      <AlertTriangle className="h-12 w-12 text-muted-foreground" />
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {t('broken_part_details') || 'Broken Part Details'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="font-medium">{t('bp_image') || 'Image'}</h3>
+              {imageUrl ? (
+                <div className="relative">
+                  <AspectRatio ratio={4/3}>
+                    {imageError ? (
+                      <div className="flex items-center justify-center w-full h-full bg-muted rounded-lg">
+                        <AlertTriangle className="h-12 w-12 text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <img
+                        src={imageUrl}
+                        alt={t('broken_parts') || 'Broken part'}
+                        className="object-cover w-full h-full rounded-lg"
+                        onError={() => setImageError(true)}
+                      />
+                    )}
+                  </AspectRatio>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
+                  <div className="text-center text-muted-foreground">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
+                    <p>{t('bp_no_image') || 'No image available'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-medium mb-3">{t('bp_details') || 'Details'}</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{t('bp_project') || 'Project'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {brokenPart.projects?.name || t('bp_not_specified') || 'Not specified'}
+                      </p>
                     </div>
-                  ) : (
-                    <img
-                      src={imageUrl}
-                      alt="Broken part"
-                      className="object-cover w-full h-full rounded-lg"
-                      onError={() => setImageError(true)}
-                    />
-                  )}
-                </AspectRatio>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
-                <div className="text-center text-muted-foreground">
-                  <AlertTriangle className="h-12 w-12 mx-auto mb-2" />
-                  <p>No image available</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right side - Information */}
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-medium mb-3">Details</h3>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Project</p>
-                    <p className="text-sm text-muted-foreground">
-                      {brokenPart.projects?.name || "Not specified"}
-                    </p>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Workstation</p>
-                    <p className="text-sm text-muted-foreground">
-                      {brokenPart.workstations?.name || "Not specified"}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{t('bp_workstation') || 'Workstation'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {brokenPart.workstations?.name || t('bp_not_specified') || 'Not specified'}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-3">
-                  <User className="h-4 w-4 mt-1 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Reported by</p>
-                    <p className="text-sm text-muted-foreground">
-                      {brokenPart.employees?.name}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <User className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{t('bp_reported_by') || 'Reported by'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {brokenPart.employees?.name}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-3">
-                  <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Date reported</p>
-                    <p className="text-sm text-muted-foreground">
-                      {brokenPart.created_at && format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm')}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{t('bp_date_reported') || 'Date reported'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {brokenPart.created_at && format(new Date(brokenPart.created_at), 'MMM d, yyyy HH:mm')}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div>
-              <h3 className="font-medium mb-2">Description</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {brokenPart.description}
-              </p>
-            </div>
+              <div>
+                <h3 className="font-medium mb-2">{t('bp_description') || 'Description'}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {brokenPart.description}
+                </p>
+              </div>
 
-            <div className="pt-4 border-t">
-              <Button 
-                onClick={handleOpenRushOrderForm}
-                disabled={!currentEmployee}
-                className="w-full"
-                size="lg"
-              >
-                <Zap className="mr-2 h-4 w-4" />
-                Send to Rush Order
-              </Button>
+              <div className="pt-4 border-t">
+                <Button 
+                  onClick={handleOpenRushOrderForm}
+                  disabled={!currentEmployee}
+                  className="w-full"
+                  size="lg"
+                >
+                  <Zap className="mr-2 h-4 w-4" />
+                  {t('bp_send_rush_order') || 'Send to Rush Order'}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
