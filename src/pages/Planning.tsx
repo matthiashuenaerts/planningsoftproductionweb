@@ -2062,10 +2062,10 @@ const Planning = () => {
         {isMobile && <Navbar />}
         <div 
           ref={mainContentRef}
-          className={`w-full p-4 md:p-6 overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}
+          className={`w-full p-3 md:p-6 overflow-x-hidden overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}
           style={{ height: '100vh' }}
         >
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full max-w-full">
             <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
               <div>
                 <h1 className="text-3xl font-bold">{t('planning_title')}</h1>
