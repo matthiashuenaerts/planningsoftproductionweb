@@ -2359,20 +2359,20 @@ const Planning = () => {
                     {/* Worker Schedule */}
                     {selectedWorkerSchedule && (
                       <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center justify-between">
+                        <CardHeader className={isMobile ? "p-3 pb-2" : ""}>
+                          <CardTitle className={cn("flex items-center", isMobile ? "flex-col gap-1 items-start text-sm" : "justify-between")}>
                             <div className="flex items-center">
-                              <Users className="h-5 w-5 mr-2" />
+                              <Users className={cn(isMobile ? "h-4 w-4 mr-1.5" : "h-5 w-5 mr-2")} />
                               {selectedWorkerSchedule.employee.name} - {t('planning_daily_schedule')}
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className={cn("flex items-center", isMobile ? "gap-1 flex-wrap" : "space-x-2")}>
                               {selectedWorkerSchedule.assignedWorkstations.map(ws => (
-                                <Badge key={ws} variant="outline">{ws}</Badge>
+                                <Badge key={ws} variant="outline" className={isMobile ? "text-[10px] px-1.5 py-0" : ""}>{ws}</Badge>
                               ))}
                             </div>
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className={isMobile ? "p-2" : ""}>
                           {selectedWorkerSchedule.schedule.length > 0 ? (
                             <div className="flex">
                               {/* Timeline Axis */}
