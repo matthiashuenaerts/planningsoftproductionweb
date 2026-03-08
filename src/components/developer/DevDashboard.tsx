@@ -261,12 +261,24 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
   const { data: syncLogs, refetch, isLoading } = useQuery({
     queryKey: ["dev", "dashboard", "sync-logs"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("project_sync_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      return data ?? [];
+      const [projectLogs, orderLogs] = await Promise.all([
+        supabase
+          .from("project_sync_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(15),
+        supabase
+          .from("orders_sync_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(15),
+      ]);
+      const tagged = [
+        ...(projectLogs.data ?? []).map((l: any) => ({ ...l, _sync_type: "project" })),
+        ...(orderLogs.data ?? []).map((l: any) => ({ ...l, _sync_type: "order" })),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+       .slice(0, 25);
+      return tagged;
     },
     refetchInterval: 30000,
   });
