@@ -623,13 +623,15 @@ const UnassignedProjects = ({
   
   const unassignedProjects = projects.filter(project => !assignments.some(a => a.project_id === project.id));
   
-  return <div className="mb-6">
-      <div className={cn("p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
-        <h3 className="text-lg font-medium">{t('itc_unassigned_projects', { count: String(unassignedProjects.length) })}</h3>
+  const isMobile = useIsMobile();
+
+  return <div className={isMobile ? 'mb-3' : 'mb-6'}>
+      <div className={cn("p-2 sm:p-3 rounded-t-lg", getColorClasses('unassigned').header)}>
+        <h3 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium`}>{t('itc_unassigned_projects', { count: String(unassignedProjects.length) })}</h3>
       </div>
       
-      <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-gray-300 bg-white min-h-[100px]", isOver ? "bg-gray-100" : "")}>
-        {unassignedProjects.length === 0 ? <p className="text-center text-gray-500 p-4">{t('itc_no_unassigned')}</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+      <div ref={drop} className={cn("p-2 rounded-b-lg border-b border-x border-border bg-background min-h-[60px] sm:min-h-[100px]", isOver ? "bg-muted" : "")}>
+        {unassignedProjects.length === 0 ? <p className={`text-center text-muted-foreground ${isMobile ? 'p-2 text-xs' : 'p-4'}`}>{t('itc_no_unassigned')}</p> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {unassignedProjects.map(project => {
           const truckAssignment = truckAssignments.find(ta => ta.project_id === project.id);
           const hasTeamAssignment = assignments.some(a => a.project_id === project.id);
