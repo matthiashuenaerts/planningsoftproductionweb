@@ -859,28 +859,38 @@ const Dashboard: React.FC = () => {
     [t('dashboard_completed')]: '#4ade80'
   };
   if (loading) {
-    return <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>;
+    return (
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
+        <p className="text-sm text-muted-foreground animate-pulse">{t('dashboard_loading')}...</p>
+      </div>
+    );
   }
-  return <div>
-      {currentEmployee?.role === 'admin' && <Alert className="mb-6 bg-blue-50 border border-blue-200">
-          <ShieldCheck className="h-5 w-5 text-blue-600" />
-          <AlertTitle className="text-blue-800">{t('dashboard_admin_account')}</AlertTitle>
-          <AlertDescription className="text-blue-700">
+
+  return (
+    <div className="space-y-6">
+      {currentEmployee?.role === 'admin' && (
+        <Alert className="rounded-xl border-primary/20 bg-primary/5">
+          <ShieldCheck className="h-5 w-5 text-primary" />
+          <AlertTitle className="text-foreground">{t('dashboard_admin_account')}</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
             {t('dashboard_admin_description')}
           </AlertDescription>
-        </Alert>}
+        </Alert>
+      )}
 
-      {projects.length === 0 && <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-6">
-          <p className="text-yellow-800">{t('dashboard_no_projects')}</p>
+      {projects.length === 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl">
+          <p className="text-amber-800 dark:text-amber-200">{t('dashboard_no_projects')}</p>
           <SeedDataButton />
-        </div>}
-      
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        </div>
+      )}
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard title={t('dashboard_total_projects')} value={totalProjects.toString()} footer={t('dashboard_projects_managed')} icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />} />
-        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />} />
-        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
+        <StatCard title={t('dashboard_completed_today')} value={todayCompletedCount.toString()} footer={t('dashboard_tasks_fulfilled')} icon={<CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />} />
+        {upcomingEvents.length > 0 && <StatCard title={t('dashboard_logistics_out')} value={upcomingEvents.length.toString()} valueSubtext={upcomingEvents[0] ? `${t('dashboard_next')}: ${format(new Date(upcomingEvents[0].date), 'dd/MM')}` : ''} footer={upcomingEvents.slice(0, 2).map(event => `<span style="color: ${event.type === 'return' ? '#22c55e' : '#3b82f6'}">${format(new Date(event.date), 'dd/MM')} - ${event.project_name}</span>`).join('<br>')} icon={<Users className="h-4 w-4 sm:h-5 sm:w-5 text-violet-500" />} onClick={() => navigate(createLocalizedPath('/logistics-out'))} />}
         <StatCard title={t('dashboard_truck_loading')} value={truckLoadingData.todayLoadings.length > 0 ? truckLoadingData.todayLoadings.length.toString() : truckLoadingData.daysToNext.toString()} footer={truckLoadingData.todayLoadings.length > 0 ? `${t('dashboard_loading_today')}: ${truckLoadingData.todayLoadings.map(l => l.project.name).join(', ')}` : truckLoadingData.daysToNext > 0 ? `${truckLoadingData.daysToNext} ${t('dashboard_days_to_next')}` : t('dashboard_no_upcoming')} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />} />
       </div>
       
