@@ -1958,78 +1958,42 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
 
       {/* Edit Tools */}
       {isEditMode && (
-        <div className="flex flex-wrap items-center gap-3 p-3 border-b bg-muted/30">
-          <div className="flex items-center gap-1 border-r pr-3">
-            <Button
-              onClick={() => handleToolChange('cursor')}
-              size="sm"
-              variant={activeTool === 'cursor' ? 'default' : 'ghost'}
-              title="Pan / Scroll (pen still draws)"
-            >
-              <Hand className="h-4 w-4" />
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 px-2 sm:px-3 py-1.5 sm:py-3 border-b bg-muted/30">
+          <div className="flex items-center gap-0.5 sm:gap-1 border-r pr-1.5 sm:pr-3">
+            <Button onClick={() => handleToolChange('cursor')} size="sm" variant={activeTool === 'cursor' ? 'default' : 'ghost'} title="Pan" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Hand className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('select')}
-              size="sm"
-              variant={activeTool === 'select' ? 'default' : 'ghost'}
-              title="Select"
-            >
-              <Move className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('select')} size="sm" variant={activeTool === 'select' ? 'default' : 'ghost'} title="Select" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Move className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('draw')}
-              size="sm"
-              variant={activeTool === 'draw' ? 'default' : 'ghost'}
-              title="Draw / Pencil"
-              className={activeTool === 'draw' ? 'bg-primary text-primary-foreground ring-2 ring-primary' : ''}
-            >
-              <Pencil className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('draw')} size="sm" variant={activeTool === 'draw' ? 'default' : 'ghost'} title="Draw" className={`h-7 w-7 sm:h-8 sm:w-8 p-0 ${activeTool === 'draw' ? 'bg-primary text-primary-foreground ring-2 ring-primary' : ''}`}>
+              <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('text')}
-              size="sm"
-              variant={activeTool === 'text' ? 'default' : 'ghost'}
-              title="Add Text"
-            >
-              <Type className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('text')} size="sm" variant={activeTool === 'text' ? 'default' : 'ghost'} title="Text" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Type className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('rectangle')}
-              size="sm"
-              variant={activeTool === 'rectangle' ? 'default' : 'ghost'}
-              title="Add Rectangle"
-            >
-              <Square className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('rectangle')} size="sm" variant={activeTool === 'rectangle' ? 'default' : 'ghost'} title="Rectangle" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Square className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('circle')}
-              size="sm"
-              variant={activeTool === 'circle' ? 'default' : 'ghost'}
-              title="Add Circle"
-            >
-              <Circle className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('circle')} size="sm" variant={activeTool === 'circle' ? 'default' : 'ghost'} title="Circle" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Circle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button
-              onClick={() => handleToolChange('erase')}
-              size="sm"
-              variant={activeTool === 'erase' ? 'default' : 'ghost'}
-              title="Erase"
-            >
-              <Eraser className="h-4 w-4" />
+            <Button onClick={() => handleToolChange('erase')} size="sm" variant={activeTool === 'erase' ? 'default' : 'ghost'} title="Erase" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Eraser className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
-            <label className="text-sm text-muted-foreground">Color:</label>
+          <div className="flex items-center gap-1.5 sm:gap-2 border-r pr-1.5 sm:pr-3">
+            <label className="hidden sm:inline text-sm text-muted-foreground">Color:</label>
             <Input
               type="color"
               value={drawingColor}
               onChange={(e) => setDrawingColor(e.target.value)}
-              className="w-10 h-8 p-1 cursor-pointer"
+              className="w-7 h-7 sm:w-10 sm:h-8 p-0.5 sm:p-1 cursor-pointer"
             />
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
+          <div className="hidden sm:flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Size:</label>
             <div className="w-24">
               <Slider
@@ -2043,7 +2007,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             <span className="text-sm w-6">{strokeWidth}</span>
           </div>
 
-          <div className="flex items-center gap-2 border-r pr-3">
+          <div className="hidden sm:flex items-center gap-2 border-r pr-3">
             <label className="text-sm text-muted-foreground">Font:</label>
             <Select value={fontFamily} onValueChange={setFontFamily}>
               <SelectTrigger className="w-28 h-8">
@@ -2066,31 +2030,31 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-1 border-r pr-3">
-            <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo">
-              <Undo className="h-4 w-4" />
+          <div className="flex items-center gap-0.5 sm:gap-1 border-r pr-1.5 sm:pr-3">
+            <Button onClick={undo} size="sm" variant="ghost" disabled={currentHistoryIndex <= 0} title="Undo" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Undo className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={redo} size="sm" variant="ghost" disabled={currentHistoryIndex >= currentHistory.length - 1} title="Redo">
-              <Redo className="h-4 w-4" />
+            <Button onClick={redo} size="sm" variant="ghost" disabled={currentHistoryIndex >= currentHistory.length - 1} title="Redo" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Redo className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={deleteSelected} size="sm" variant="ghost" title="Delete Selected">
-              <Trash2 className="h-4 w-4" />
+            <Button onClick={deleteSelected} size="sm" variant="ghost" title="Delete" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
-            <Button onClick={clearAnnotations} size="sm" variant="ghost" title="Clear All">
-              <RotateCcw className="h-4 w-4" />
+            <Button onClick={clearAnnotations} size="sm" variant="ghost" title="Clear All" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <Button
               onClick={() => setLineSnapEnabled(!lineSnapEnabled)}
               size="sm"
               variant={lineSnapEnabled ? 'default' : 'ghost'}
               title={lineSnapEnabled ? 'Line snap enabled' : 'Line snap disabled'}
-              className={lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+              className={`h-7 sm:h-8 px-1.5 sm:px-2 ${lineSnapEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
             >
-              <Ruler className="h-4 w-4 mr-1" />
-              <span className="text-xs">Snap</span>
+              <Ruler className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
+              <span className="hidden sm:inline text-xs">Snap</span>
             </Button>
           </div>
         </div>
