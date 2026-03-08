@@ -448,35 +448,35 @@ const ServiceInstallation: React.FC = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className={`space-y-${isMobile ? '3' : '4'}`}>
               {/* Time summary badges */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={`flex flex-wrap items-center gap-1.5 ${isMobile ? 'text-xs' : ''}`}>
                 {routeData.departureTime && (
-                  <Badge variant="default" className="gap-1 font-semibold">
+                  <Badge variant="default" className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                     🚗 {t('si_depart')}: {routeData.departureTime}
                   </Badge>
                 )}
                 {routeData.workStartTime && (
-                  <Badge variant="outline" className="gap-1">
+                  <Badge variant="outline" className={`gap-1 ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                     🏁 {t('si_first_stop')}: {routeData.workStartTime}
                   </Badge>
                 )}
-                <Badge variant="outline" className="gap-1">
-                  <Clock className="h-3 w-3" />
+                <Badge variant="outline" className={`gap-1 ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
+                  <Clock className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
                   {t('si_service')}: {totalServiceHours.toFixed(1)}h
                 </Badge>
                 {routeData.totalDrivingMinutes != null && (
-                  <Badge variant="outline" className="gap-1">
-                    <Route className="h-3 w-3" />
+                  <Badge variant="outline" className={`gap-1 ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
+                    <Route className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
                     {t('si_driving')}: {Math.round(routeData.totalDrivingMinutes)}min
                   </Badge>
                 )}
-                <Badge variant="secondary" className="gap-1 font-semibold">
+                <Badge variant="secondary" className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                   ≈ {(totalServiceHours + drivingHours).toFixed(1)}h {t('si_total')}
                 </Badge>
                 {routeData.returnTime && (
-                  <Badge variant={isOvertime ? 'destructive' : 'outline'} className="gap-1 font-semibold">
-                    <Home className="h-3 w-3" />
+                  <Badge variant={isOvertime ? 'destructive' : 'outline'} className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
+                    <Home className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
                     {t('si_return')}: {routeData.returnTime}
                     {isOvertime && ' ⚠️'}
                   </Badge>
