@@ -44,8 +44,9 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
   onShowBarcode,
   onShowOrders
 }) => {
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
