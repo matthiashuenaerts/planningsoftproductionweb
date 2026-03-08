@@ -856,15 +856,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t('npm_project_link_id')}</FormLabel>
-                    <div className="flex gap-2">
+                    <div className={cn("flex gap-2", isMobile && "flex-col")}>
                       <FormControl>
-                        <Input placeholder={t('npm_project_link_placeholder')} {...field} />
+                        <Input placeholder={t('npm_project_link_placeholder')} className={cn(isMobile && "h-9 text-sm")} {...field} />
                       </FormControl>
                       <Button
                         type="button"
                         variant="outline"
                         onClick={handleSyncProject}
                         disabled={syncing || !field.value?.trim()}
+                        className={cn(isMobile && "h-9 text-sm")}
                       >
                         {syncing ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
