@@ -912,5 +912,24 @@
   "si_estimated": "estimated",
   "si_timer_started": "Timer Started",
   "si_timer_started_desc": "Time registration started for {{name}}",
-  "si_start_return": "Start / Return"
+  "si_start_return": "Start / Return",
+
+  "bo_overdue_deliveries": "Overdue Deliveries ({{count}})",
+  "bo_no_backorders": "No backorders",
+  "bo_all_on_track": "All deliveries are on track!",
+  "bo_order_from": "Order from {{supplier}}",
+  "bo_days_overdue": "{{count}} days overdue",
+  "bo_project": "Project",
+  "bo_order_date": "Order Date",
+  "bo_expected_delivery": "Expected Delivery",
+  "bo_show_items": "Show Items",
+  "bo_hide_items": "Hide Items",
+  "bo_confirm_delivery": "Confirm Delivery",
+  "bo_loading_items": "Loading order items...",
+  "bo_no_items": "No items found for this order.",
+  "bo_description": "Description",
+  "bo_ordered": "Ordered",
+  "bo_delivered": "Delivered",
+  "bo_article_code": "Article Code",
+  "bo_ean": "EAN"
 }
