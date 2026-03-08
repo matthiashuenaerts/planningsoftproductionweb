@@ -82,53 +82,55 @@ const ServiceInstallation: React.FC = () => {
     setLoading(true);
 
     try {
-      // Find service team(s) the employee belongs to
-      const { data: teamMemberships } = await supabase
-        .from('placement_team_members' as any)
-        .select('team_id')
-        .eq('employee_id', currentEmployee.id);
+      const isPrivileged = ['admin', 'teamleader', 'developer'].includes(currentEmployee.role);
 
-      if (!teamMemberships || teamMemberships.length === 0) {
+      let targetTeams: any[] = [];
+
+      if (isPrivileged) {
+        // Admins, teamleaders, developers see ALL service teams
+        const { data: allServiceTeams } = await (supabase
+          .from('placement_teams')
+          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
+          .eq('team_type', 'service')
+          .eq('is_active', true);
+
+        targetTeams = allServiceTeams || [];
+      } else {
+        // Regular employees: only their own service team(s)
+        const { data: teamMemberships } = await supabase
+          .from('placement_team_members' as any)
+          .select('team_id')
+          .eq('employee_id', currentEmployee.id);
+
+        if (!teamMemberships || teamMemberships.length === 0) {
+          setRouteData(null);
+          setLoading(false);
+          return;
+        }
+
+        const memberTeamIds = (teamMemberships as any[]).map((m: any) => m.team_id);
+
+        const { data: serviceTeams } = await (supabase
+          .from('placement_teams')
+          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
+          .eq('team_type', 'service')
+          .eq('is_active', true)
+          .in('id', memberTeamIds);
+
+        targetTeams = serviceTeams || [];
+      }
+
+      if (targetTeams.length === 0) {
         setRouteData(null);
         setLoading(false);
         return;
       }
 
-      const memberTeamIds = (teamMemberships as any[]).map((m: any) => m.team_id);
-
-      // Find which of those are service teams
-      const { data: serviceTeams } = await (supabase
-        .from('placement_teams')
-        .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
-        .eq('team_type', 'service')
-        .eq('is_active', true)
-        .in('id', memberTeamIds);
-
-      if (!serviceTeams || serviceTeams.length === 0) {
-        // For admins/teamleaders not in a service team, show first service team's data
-        const { data: allServiceTeams } = await (supabase
-          .from('placement_teams')
-          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
-          .eq('team_type', 'service')
-          .eq('is_active', true)
-          .limit(1);
-        
-        if (!allServiceTeams || allServiceTeams.length === 0) {
-          setRouteData(null);
-          setLoading(false);
-          return;
-        }
-        // Use the first available service team for admin/teamleader view
-        serviceTeams?.push?.(...allServiceTeams);
-        if (!serviceTeams || serviceTeams.length === 0) {
-          setRouteData(null);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const team = serviceTeams![0];
-      setTeamName(team.name);
+      // Use first team for route display (color, name, start point)
+      const team = targetTeams[0];
+      setTeamName(isPrivileged && targetTeams.length > 1
+        ? targetTeams.map((t: any) => t.name).join(' / ')
+        : team.name);
       setTeamColor(team.color || '#f73b3b');
 
       // Fetch installation working hours for today
@@ -139,11 +141,12 @@ const ServiceInstallation: React.FC = () => {
       const workStartTime = installationHours?.start_time || '08:00';
       const workEndTime = installationHours?.end_time || '17:00';
 
-      // Get today's assignments for this team (sorted by service_order - the optimized order)
+      // Get today's assignments for ALL target teams
+      const allTeamIds = targetTeams.map((t: any) => t.id);
       const { data: assignments } = await supabase
         .from('project_team_assignments')
         .select('*')
-        .eq('team_id', team.id)
+        .in('team_id', allTeamIds)
         .eq('start_date', today);
 
       if (!assignments || assignments.length === 0) {
