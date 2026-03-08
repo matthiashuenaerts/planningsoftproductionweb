@@ -205,6 +205,15 @@ const Login: React.FC = () => {
         });
       }
 
+      // Log successful login
+      logLoginAttempt({
+        tenantId: row.tenant_id,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        loginMethod: "password",
+        success: true,
+      });
+
       toast({
         title: "Login successful",
         description: `Welcome, ${row.employee_name}!`,
