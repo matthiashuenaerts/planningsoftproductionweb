@@ -493,7 +493,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
           </div>
         </div>
         
-        <div className="space-y-4 md:space-y-6 min-w-0">
+        <div className={`${isMobile ? 'space-y-3' : 'space-y-4 md:space-y-6'} min-w-0`}>
           <div className="space-y-2">
             <label className="block text-sm font-medium">{t('ro_select_tasks')}</label>
             <Card>
