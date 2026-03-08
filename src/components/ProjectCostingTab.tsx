@@ -1219,56 +1219,100 @@ export const ProjectCostingTab: React.FC<ProjectCostingTabProps> = ({ projectId 
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
           {costingSummary.orderItems.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('supplier')}</TableHead>
-                  <TableHead>{t('article_code')}</TableHead>
-                  <TableHead>{t('description')}</TableHead>
-                  <TableHead className="text-right">{t('quantity')}</TableHead>
-                  <TableHead className="text-right">{t('costing_unit_price')}</TableHead>
-                  <TableHead className="text-right">{t('total')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile card layout */}
+              <div className="sm:hidden space-y-2">
                 {costingSummary.orderItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Badge variant="outline">{item.supplier}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{item.articleCode || '-'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{item.description}</TableCell>
-                    <TableCell className="text-right">{item.quantity}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="relative w-24 ml-auto">
-                        <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <div key={item.id} className="p-2.5 border rounded-lg bg-muted/30">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0 flex-1">
+                        <Badge variant="outline" className="text-[10px] mb-1">{item.supplier}</Badge>
+                        <p className="text-xs font-medium line-clamp-2">{item.description}</p>
+                        {item.articleCode && <p className="text-[10px] text-muted-foreground mt-0.5">{item.articleCode}</p>}
+                      </div>
+                      <span className="text-xs font-bold flex-shrink-0">{formatCurrency(item.totalPrice)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] text-muted-foreground">×{item.quantity}</span>
+                      <div className="relative w-20 ml-auto">
+                        <Euro className="absolute left-1.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 text-muted-foreground" />
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
                           value={item.unitPrice || ''}
                           onChange={(e) => updateOrderItemPrice(item.id, parseFloat(e.target.value) || 0)}
-                          className="h-8 pl-6 text-right text-sm"
+                          className="h-6 pl-5 text-right text-[10px]"
                           placeholder="0.00"
                         />
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/50 font-bold">
-                  <TableCell colSpan={5}>{t('costing_total_materials')}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-col items-end">
-                      <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
-                      <span className="text-xs text-muted-foreground font-normal">
-                        + {margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
-                      </span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  </div>
+                ))}
+                <div className="p-2.5 bg-muted/50 rounded-lg font-bold text-xs flex justify-between">
+                  <span>{t('costing_total_materials')}</span>
+                  <div className="text-right">
+                    <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
+                    <span className="block text-[10px] text-muted-foreground font-normal">
+                      +{margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('supplier')}</TableHead>
+                      <TableHead>{t('article_code')}</TableHead>
+                      <TableHead>{t('description')}</TableHead>
+                      <TableHead className="text-right">{t('quantity')}</TableHead>
+                      <TableHead className="text-right">{t('costing_unit_price')}</TableHead>
+                      <TableHead className="text-right">{t('total')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {costingSummary.orderItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Badge variant="outline">{item.supplier}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{item.articleCode || '-'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{item.description}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="relative w-24 ml-auto">
+                            <Euro className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.unitPrice || ''}
+                              onChange={(e) => updateOrderItemPrice(item.id, parseFloat(e.target.value) || 0)}
+                              className="h-8 pl-6 text-right text-sm"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={5}>{t('costing_total_materials')}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span>{formatCurrency(costingSummary.totalOrderCost)}</span>
+                          <span className="text-xs text-muted-foreground font-normal">
+                            + {margins.orderMaterials}% = {formatCurrency(costingSummary.totalOrderCost * (1 + margins.orderMaterials / 100))}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <p className="text-muted-foreground text-center py-4">{t('costing_no_orders')}</p>
           )}
