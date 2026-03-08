@@ -126,6 +126,7 @@ function App() {
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/pdf-editor" element={<P><PDFEditorFullscreen /></P>} />
+                  <Route path="/onedrive-callback" element={<OneDriveCallback />} />
                   <Route path="/migrate-auth" element={<P><MigrateAuth /></P>} />
 
                   {/* ── Tenant routes: /:tenant/... ────── */}
