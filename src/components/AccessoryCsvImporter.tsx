@@ -386,7 +386,7 @@ const AccessoryCsvImporter: React.FC<AccessoryCsvImporterProps> = ({ projectId, 
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/settings?tab=csv-import')}
+                onClick={() => navigate(`/${tenant}/${lang}/settings?tab=csv-import`)}
               >
                 <Settings className="h-4 w-4 mr-1" />
                 Configure
