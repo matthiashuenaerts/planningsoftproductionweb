@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,6 @@ import {
   Filter,
   Trash2,
   Camera,
-  ChevronLeft,
-  ChevronRight,
   ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +70,7 @@ const MobileOrderCard = ({
   getStatusBadge,
   formatDate,
   createLocalizedPath,
+  t,
 }: any) => {
   const navigate = useNavigate();
 
@@ -89,19 +88,18 @@ const MobileOrderCard = ({
           </div>
         </div>
         <div className="flex gap-4 text-xs text-muted-foreground">
-          <span>Ordered: {formatDate(order.order_date)}</span>
-          <span>Due: {formatDate(order.expected_delivery)}</span>
+          <span>{t('ord_ordered')}: {formatDate(order.order_date)}</span>
+          <span>{t('ord_due')}: {formatDate(order.expected_delivery)}</span>
         </div>
       </div>
 
-      {/* Action buttons row */}
       <div className="flex border-t divide-x">
         {order.status === 'pending' && (
           <button
             className="flex-1 py-2 text-xs text-green-600 hover:bg-muted/50 flex items-center justify-center gap-1"
             onClick={(e) => { e.stopPropagation(); onConfirmDelivery(order); }}
           >
-            <Camera className="h-3 w-3" /> Confirm
+            <Camera className="h-3 w-3" /> {t('ord_confirm')}
           </button>
         )}
         {order.project_id && (
@@ -109,14 +107,14 @@ const MobileOrderCard = ({
             className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
             onClick={(e) => { e.stopPropagation(); onViewProjectOrders(order.project_id); }}
           >
-            <FileText className="h-3 w-3" /> Project
+            <FileText className="h-3 w-3" /> {t('ord_project')}
           </button>
         )}
         <button
           className="flex-1 py-2 text-xs text-primary hover:bg-muted/50 flex items-center justify-center gap-1"
           onClick={(e) => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${order.project_id}`)); }}
         >
-          <ExternalLink className="h-3 w-3" /> Details
+          <ExternalLink className="h-3 w-3" /> {t('ord_details')}
         </button>
         {isAdminOrTeamleader && (
           <div className="flex-1 flex items-center justify-center">
@@ -125,26 +123,25 @@ const MobileOrderCard = ({
               onChange={(e) => { e.stopPropagation(); onUpdateStatus(order.id, e.target.value); }}
               className="text-xs border-0 bg-transparent w-full text-center py-2"
             >
-              <option value="pending">Pending</option>
-              <option value="delivered">Delivered</option>
-              <option value="delayed">Delayed</option>
-              <option value="canceled">Canceled</option>
+              <option value="pending">{t('ord_pending')}</option>
+              <option value="delivered">{t('ord_delivered')}</option>
+              <option value="delayed">{t('ord_delayed')}</option>
+              <option value="canceled">{t('ord_canceled')}</option>
             </select>
           </div>
         )}
       </div>
 
-      {/* Expanded content */}
       {isExpanded && (
         <div className="border-t p-4 bg-muted/30 space-y-4">
           <div>
-            <h4 className="font-medium text-sm mb-2">Order Items</h4>
+            <h4 className="font-medium text-sm mb-2">{t('ord_order_items')}</h4>
             {!orderItems ? (
               <div className="flex justify-center p-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
               </div>
             ) : orderItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No items in this order.</p>
+              <p className="text-sm text-muted-foreground">{t('ord_no_items')}</p>
             ) : (
               <div className="space-y-2">
                 {orderItems.map((item: OrderItem) => (
@@ -161,7 +158,7 @@ const MobileOrderCard = ({
           </div>
           <div>
             <div className="flex justify-between items-center mb-2">
-              <h4 className="font-medium text-sm">Attachments</h4>
+              <h4 className="font-medium text-sm">{t('ord_attachments')}</h4>
               <OrderAttachmentUploader
                 orderId={order.id}
                 onUploadSuccess={() => onAttachmentUploadSuccess(order.id)}
@@ -192,7 +189,7 @@ const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
-  const { createLocalizedPath } = useLanguage();
+  const { t, createLocalizedPath } = useLanguage();
   
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<(Order & { project_name: string })[]>([]);
@@ -206,9 +203,10 @@ const Orders: React.FC = () => {
   const [showImportStockModal, setShowImportStockModal] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(ORDERS_PER_PAGE);
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
+  const sentinelRef = useRef<HTMLDivElement>(null);
   
   const isAdminOrTeamleader = currentEmployee?.role === 'admin' || currentEmployee?.role === 'teamleader';
   const canDeleteOrder = currentEmployee?.role && ['admin', 'manager', 'preparater', 'teamleader'].includes(currentEmployee.role);
@@ -226,19 +224,19 @@ const Orders: React.FC = () => {
       
       const ordersWithProjectNames = await Promise.all(
         ordersToDisplay.map(async (order) => {
-          let projectName = "STOCK Order";
+          let projectName = t('ord_stock_order');
           if (order.project_id) {
             try {
               const project = await projectService.getById(order.project_id);
               if (project) projectName = project.name;
-            } catch { projectName = "Unknown Project"; }
+            } catch { projectName = t('ord_unknown_project'); }
           }
           return { ...order, project_name: projectName };
         })
       );
       setOrders(ordersWithProjectNames);
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed to load orders: ${error.message}`, variant: "destructive" });
+      toast({ title: t('itc_error'), description: `Failed to load orders: ${error.message}`, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -256,7 +254,7 @@ const Orders: React.FC = () => {
         const attachments = await orderService.getOrderAttachments(orderId);
         setOrderAttachments(prev => ({ ...prev, [orderId]: attachments }));
       } catch (error: any) {
-        toast({ title: "Error", description: `Failed to load order details: ${error.message}`, variant: "destructive" });
+        toast({ title: t('itc_error'), description: `Failed to load order details: ${error.message}`, variant: "destructive" });
       }
     }
   };
@@ -268,10 +266,10 @@ const Orders: React.FC = () => {
   
   const getStatusBadge = (status: Order['status']) => {
     switch (status) {
-      case 'pending': return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">Pending</Badge>;
-      case 'delivered': return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">Delivered</Badge>;
-      case 'canceled': return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 text-xs">Canceled</Badge>;
-      case 'delayed': return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">Delayed</Badge>;
+      case 'pending': return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">{t('ord_pending')}</Badge>;
+      case 'delivered': return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">{t('ord_delivered')}</Badge>;
+      case 'canceled': return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 text-xs">{t('ord_canceled')}</Badge>;
+      case 'delayed': return <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">{t('ord_delayed')}</Badge>;
       default: return <Badge variant="outline" className="text-xs">{status}</Badge>;
     }
   };
@@ -282,7 +280,7 @@ const Orders: React.FC = () => {
       setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
       toast({ title: "Success", description: `Order status updated to ${newStatus}` });
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed to update order status: ${error.message}`, variant: "destructive" });
+      toast({ title: t('itc_error'), description: `Failed to update order status: ${error.message}`, variant: "destructive" });
     }
   };
   
@@ -315,7 +313,7 @@ const Orders: React.FC = () => {
       if (expandedOrder === orderId) setExpandedOrder(null);
       toast({ title: "Success", description: "Order deleted successfully" });
     } catch (error: any) {
-      toast({ title: "Error", description: `Failed to delete order: ${error.message}`, variant: "destructive" });
+      toast({ title: t('itc_error'), description: `Failed to delete order: ${error.message}`, variant: "destructive" });
     }
   };
 
@@ -344,15 +342,32 @@ const Orders: React.FC = () => {
       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     }), [orders, searchTerm, statusFilter, orderTypeFilter, sortOrder]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * ORDERS_PER_PAGE;
-    return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
-  }, [filteredOrders, currentPage]);
+  // Infinite scroll: show only visibleCount items
+  const displayedOrders = useMemo(() => filteredOrders.slice(0, visibleCount), [filteredOrders, visibleCount]);
+  const hasMore = visibleCount < filteredOrders.length;
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, orderTypeFilter, sortOrder]);
+  // Reset visible count when filters change
+  useEffect(() => { setVisibleCount(ORDERS_PER_PAGE); }, [searchTerm, statusFilter, orderTypeFilter, sortOrder]);
+
+  // IntersectionObserver for infinite scroll
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + ORDERS_PER_PAGE, filteredOrders.length));
+  }, [filteredOrders.length]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          loadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   if (loading) {
     return (
@@ -365,26 +380,6 @@ const Orders: React.FC = () => {
       </div>
     );
   }
-
-  const PaginationControls = () => {
-    if (totalPages <= 1) return null;
-    return (
-      <div className="flex items-center justify-between pt-4">
-        <p className="text-sm text-muted-foreground">
-          {((currentPage - 1) * ORDERS_PER_PAGE) + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium">{currentPage} / {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  };
   
   return (
     <div className="flex min-h-screen">
@@ -393,12 +388,12 @@ const Orders: React.FC = () => {
       <div className={`w-full ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'} overflow-x-hidden`}>
         <div className="w-full max-w-full">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
-            <h1 className="text-xl md:text-2xl font-bold">All Orders</h1>
+            <h1 className="text-xl md:text-2xl font-bold">{t('ord_all_orders')}</h1>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search orders..." 
+                  placeholder={t('ord_search_placeholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 w-full"
@@ -406,7 +401,7 @@ const Orders: React.FC = () => {
               </div>
               <Button onClick={handleImportStockOrder} variant="outline" size={isMobile ? "sm" : "default"}>
                 <Package className="mr-2 h-4 w-4" />
-                Import STOCK Order
+                {t('ord_import_stock')}
               </Button>
             </div>
           </div>
@@ -415,28 +410,28 @@ const Orders: React.FC = () => {
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters:</span>
+              <span className="text-sm font-medium">{t('ord_filters')}</span>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-32 md:w-40 h-9">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={t('ord_all_status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="delayed">Delayed</SelectItem>
-                <SelectItem value="canceled">Canceled</SelectItem>
+                <SelectItem value="all">{t('ord_all_status')}</SelectItem>
+                <SelectItem value="pending">{t('ord_pending')}</SelectItem>
+                <SelectItem value="delivered">{t('ord_delivered')}</SelectItem>
+                <SelectItem value="delayed">{t('ord_delayed')}</SelectItem>
+                <SelectItem value="canceled">{t('ord_canceled')}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
               <SelectTrigger className="w-32 md:w-40 h-9">
-                <SelectValue placeholder="All Types" />
+                <SelectValue placeholder={t('ord_all_types')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="standard">Standard</SelectItem>
-                <SelectItem value="semi-finished">Semi-finished</SelectItem>
+                <SelectItem value="all">{t('ord_all_types')}</SelectItem>
+                <SelectItem value="standard">{t('ord_standard')}</SelectItem>
+                <SelectItem value="semi-finished">{t('ord_semi_finished')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -444,12 +439,12 @@ const Orders: React.FC = () => {
           <Card>
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-base md:text-lg">All Orders</CardTitle>
-                <span className="text-sm text-muted-foreground">{filteredOrders.length} orders</span>
+                <CardTitle className="text-base md:text-lg">{t('ord_all_orders')}</CardTitle>
+                <span className="text-sm text-muted-foreground">{t('ord_orders_count', { count: String(filteredOrders.length) })}</span>
               </div>
             </CardHeader>
             <CardContent className="px-2 md:px-6">
-              {paginatedOrders.length > 0 ? (
+              {displayedOrders.length > 0 ? (
                 <>
                   {/* Desktop table view */}
                   {!isMobile ? (
@@ -458,21 +453,21 @@ const Orders: React.FC = () => {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[40px]"></TableHead>
-                            <TableHead className="w-[25%]">Project</TableHead>
-                            <TableHead className="w-[18%]">Supplier</TableHead>
-                            <TableHead className="w-[12%]">Order Date</TableHead>
+                            <TableHead className="w-[25%]">{t('ord_project')}</TableHead>
+                            <TableHead className="w-[18%]">{t('ord_supplier')}</TableHead>
+                            <TableHead className="w-[12%]">{t('ord_order_date')}</TableHead>
                             <TableHead className="w-[14%]">
                               <button className="flex items-center gap-1 hover:text-primary" onClick={handleSortToggle}>
-                                Expected Delivery
+                                {t('ord_expected_delivery')}
                                 <ArrowUpDown className="h-4 w-4" />
                               </button>
                             </TableHead>
-                            <TableHead className="w-[10%]">Status</TableHead>
-                            <TableHead className="w-[21%] text-right">Actions</TableHead>
+                            <TableHead className="w-[10%]">{t('ord_status')}</TableHead>
+                            <TableHead className="w-[21%] text-right">{t('ord_actions')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {paginatedOrders.map((order) => (
+                          {displayedOrders.map((order) => (
                             <React.Fragment key={order.id}>
                               <TableRow className="cursor-pointer hover:bg-muted/50">
                                 <TableCell className="p-1">
@@ -500,13 +495,13 @@ const Orders: React.FC = () => {
                                     {order.status === 'pending' && (
                                       <Button variant="ghost" size="sm" onClick={() => handleConfirmDelivery(order)} className="text-green-600 hover:text-green-700 h-8 px-2">
                                         <Camera className="h-4 w-4" />
-                                        <span className="sr-only">Confirm Delivery</span>
+                                        <span className="sr-only">{t('ord_confirm_delivery')}</span>
                                       </Button>
                                     )}
                                     {order.project_id && (
                                       <Button variant="ghost" size="sm" onClick={() => handleViewProjectOrders(order.project_id)} className="h-8 px-2">
                                         <FileText className="h-4 w-4" />
-                                        <span className="sr-only">View Project Orders</span>
+                                        <span className="sr-only">{t('ord_view_project_orders')}</span>
                                       </Button>
                                     )}
                                     {canDeleteOrder && (
@@ -514,20 +509,20 @@ const Orders: React.FC = () => {
                                         <AlertDialogTrigger asChild>
                                           <Button variant="ghost" size="sm" className="h-8 px-2">
                                             <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete Order</span>
+                                            <span className="sr-only">{t('ord_delete_order')}</span>
                                           </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
                                           <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                                            <AlertDialogTitle>{t('ord_delete_order')}</AlertDialogTitle>
                                             <AlertDialogDescription>
-                                              Are you sure you want to delete this order? This action cannot be undone.
+                                              {t('ord_delete_order_confirm')}
                                             </AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                                             <AlertDialogAction onClick={() => handleDeleteOrder(order.id)} className="bg-red-600 hover:bg-red-700">
-                                              Delete
+                                              {t('ord_delete')}
                                             </AlertDialogAction>
                                           </AlertDialogFooter>
                                         </AlertDialogContent>
@@ -539,10 +534,10 @@ const Orders: React.FC = () => {
                                         onChange={(e) => updateOrderStatus(order.id, e.target.value as Order['status'])}
                                         className="p-1 text-xs rounded border border-border bg-background h-8"
                                       >
-                                        <option value="pending">Pending</option>
-                                        <option value="delivered">Delivered</option>
-                                        <option value="delayed">Delayed</option>
-                                        <option value="canceled">Canceled</option>
+                                        <option value="pending">{t('ord_pending')}</option>
+                                        <option value="delivered">{t('ord_delivered')}</option>
+                                        <option value="delayed">{t('ord_delayed')}</option>
+                                        <option value="canceled">{t('ord_canceled')}</option>
                                       </select>
                                     )}
                                   </div>
@@ -554,20 +549,20 @@ const Orders: React.FC = () => {
                                   <TableCell colSpan={7} className="p-0">
                                     <div className="bg-muted/30 p-4">
                                       <div className="mb-4">
-                                        <h4 className="font-medium mb-2">Order Items</h4>
+                                        <h4 className="font-medium mb-2">{t('ord_order_items')}</h4>
                                         {!orderItems[order.id] ? (
                                           <div className="flex justify-center p-4">
                                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
                                           </div>
                                         ) : orderItems[order.id].length === 0 ? (
-                                          <p className="text-sm text-muted-foreground">No items in this order.</p>
+                                          <p className="text-sm text-muted-foreground">{t('ord_no_items')}</p>
                                         ) : (
                                           <Table>
                                             <TableHeader>
                                               <TableRow>
-                                                <TableHead>Article Code</TableHead>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead className="text-right">Quantity</TableHead>
+                                                <TableHead>{t('ord_article_code')}</TableHead>
+                                                <TableHead>{t('ord_description')}</TableHead>
+                                                <TableHead className="text-right">{t('ord_quantity')}</TableHead>
                                               </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -585,7 +580,7 @@ const Orders: React.FC = () => {
                                       
                                       <div className="mt-4">
                                         <div className="flex justify-between items-center mb-2">
-                                          <h4 className="font-medium">Attachments</h4>
+                                          <h4 className="font-medium">{t('ord_attachments')}</h4>
                                           <OrderAttachmentUploader 
                                             orderId={order.id}
                                             onUploadSuccess={() => handleAttachmentUploadSuccess(order.id)}
@@ -598,7 +593,7 @@ const Orders: React.FC = () => {
                                           </div>
                                         ) : orderAttachments[order.id]?.length === 0 ? (
                                           <div className="flex items-center justify-between">
-                                            <p className="text-sm text-muted-foreground">No attachments for this order.</p>
+                                            <p className="text-sm text-muted-foreground">{t('ord_no_attachments')}</p>
                                             <OrderAttachmentUploader 
                                               orderId={order.id}
                                               onUploadSuccess={() => handleAttachmentUploadSuccess(order.id)}
@@ -630,7 +625,7 @@ const Orders: React.FC = () => {
                   ) : (
                     /* Mobile card view */
                     <div className="space-y-3">
-                      {paginatedOrders.map((order) => (
+                      {displayedOrders.map((order) => (
                         <MobileOrderCard
                           key={order.id}
                           order={order}
@@ -648,19 +643,27 @@ const Orders: React.FC = () => {
                           getStatusBadge={getStatusBadge}
                           formatDate={formatDate}
                           createLocalizedPath={createLocalizedPath}
+                          t={t}
                         />
                       ))}
                     </div>
                   )}
-                  <PaginationControls />
+
+                  {/* Infinite scroll sentinel */}
+                  <div ref={sentinelRef} className="h-4" />
+                  {hasMore && (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  )}
                 </>
               ) : searchTerm || statusFilter !== 'all' || orderTypeFilter !== 'all' ? (
                 <div className="p-6 text-center bg-muted/30 rounded-lg border border-dashed border-border">
-                  <p className="text-muted-foreground">No orders found matching the current filters.</p>
+                  <p className="text-muted-foreground">{t('ord_no_orders_filters')}</p>
                 </div>
               ) : (
                 <div className="p-6 text-center bg-muted/30 rounded-lg border border-dashed border-border">
-                  <p className="text-muted-foreground">No orders found.</p>
+                  <p className="text-muted-foreground">{t('ord_no_orders')}</p>
                 </div>
               )}
             </CardContent>
