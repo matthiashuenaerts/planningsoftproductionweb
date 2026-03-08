@@ -877,7 +877,12 @@ export const AccessoriesInlineView = ({ projectId }: AccessoriesInlineViewProps)
                     <TableCell>{accessory.stock_location || '-'}</TableCell>
                     <TableCell>
                       {editingStatusAccessoryId === accessory.id ? (
-                        <Popover>
+                        <Popover
+                          defaultOpen
+                          onOpenChange={(open) => {
+                            if (!open) setEditingStatusAccessoryId(null);
+                          }}
+                        >
                           <PopoverTrigger asChild>
                             <Button variant="outline" size="sm">
                               {accessory.status.replace('_', ' ').toUpperCase()}
