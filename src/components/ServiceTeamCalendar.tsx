@@ -68,6 +68,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
   const [projects, setProjects] = useState<ServiceProject[]>([]);
