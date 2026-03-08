@@ -473,6 +473,7 @@ const Floorplan: React.FC = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       
+                      let lastX = 0, lastY = 0;
                       const handleMouseMove = (moveE: MouseEvent) => {
                         if (!imageRef.current) return;
                         
@@ -480,15 +481,18 @@ const Floorplan: React.FC = () => {
                         const x = ((moveE.clientX - imageRect.left) / imageRect.width) * 100;
                         const y = ((moveE.clientY - imageRect.top) / imageRect.height) * 100;
                         
-                        const clampedX = Math.max(0, Math.min(100, x));
-                        const clampedY = Math.max(0, Math.min(100, y));
+                        lastX = Math.max(0, Math.min(100, x));
+                        lastY = Math.max(0, Math.min(100, y));
                         
-                        handleWorkstationPositionChange(workstation.id, clampedX, clampedY);
+                        handleWorkstationPositionChange(workstation.id, lastX, lastY);
                       };
                       
                       const handleMouseUp = () => {
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
+                        if (lastX && lastY) {
+                          saveWorkstationPosition(workstation.id, lastX, lastY);
+                        }
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
