@@ -274,6 +274,18 @@ const Floorplan: React.FC = () => {
   }, []);
 
   const handleWorkstationPositionChange = async (workstationId: string, x: number, y: number) => {
+    // Optimistically update local state so the dot moves visually
+    setWorkstationPositions(prev => {
+      const existing = prev.find(p => p.workstation_id === workstationId);
+      if (existing) {
+        return prev.map(p => p.workstation_id === workstationId ? { ...p, x_position: x, y_position: y } : p);
+      }
+      return [...prev, { id: workstationId, workstation_id: workstationId, x_position: x, y_position: y, buffer_x_position: x + 3, buffer_y_position: y + 5, created_at: '', updated_at: '' }];
+    });
+  };
+
+  // Save to DB only on mouse up (debounced)
+  const saveWorkstationPosition = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateWorkstationPosition(workstationId, x, y);
     } catch (error) {
@@ -283,6 +295,17 @@ const Floorplan: React.FC = () => {
   };
 
   const handleBufferPositionChange = async (workstationId: string, x: number, y: number) => {
+    // Optimistically update local state
+    setWorkstationPositions(prev => {
+      const existing = prev.find(p => p.workstation_id === workstationId);
+      if (existing) {
+        return prev.map(p => p.workstation_id === workstationId ? { ...p, buffer_x_position: x, buffer_y_position: y } : p);
+      }
+      return prev;
+    });
+  };
+
+  const saveBufferPosition = async (workstationId: string, x: number, y: number) => {
     try {
       await floorplanService.updateBufferPosition(workstationId, x, y);
     } catch (error) {
