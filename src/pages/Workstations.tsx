@@ -409,43 +409,43 @@ const Workstations: React.FC = () => {
 
       {/* Workstation Tasks Dialog */}
       <Dialog open={!!showWorkstationTasks} onOpenChange={() => setShowWorkstationTasks(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[80vh] p-3 sm:p-6">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-sm sm:text-lg leading-tight">
               {t('workstation_tasks_for', { name: selectedWorkstationForTasks?.name })}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm">
               {t('workstation_tasks_desc')}
             </DialogDescription>
           </DialogHeader>
           
           <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-4 pr-4">
+            <div className="space-y-3 sm:space-y-4 pr-2 sm:pr-4">
               {loadingTasks ? <div className="flex justify-center p-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div> : workstationTasks.length === 0 ? <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                   <p className="text-gray-500">{t('no_workstation_tasks')}</p>
                   <p className="text-sm text-gray-400">{t('add_tasks_in_settings')}</p>
-                </div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {workstationTasks.map(task => <Card key={task.id} className="h-fit">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="space-y-2 sm:space-y-3">
                           <div>
-                            <h3 className="font-medium text-lg">{selectedWorkstationForTasks?.name}</h3>
-                            <p className="text-slate-950 text-xl font-bold">{task.task_name}</p>
+                            <h3 className="font-medium text-sm sm:text-lg">{selectedWorkstationForTasks?.name}</h3>
+                            <p className="text-foreground text-base sm:text-xl font-bold">{task.task_name}</p>
                           </div>
                           
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
                             {getPriorityBadge(task.priority)}
                             {task.duration && <Badge variant="outline">{task.duration}h</Badge>}
                           </div>
 
-                          {task.description && <p className="text-sm text-muted-foreground">{task.description}</p>}
+                          {task.description && <p className="text-xs sm:text-sm text-muted-foreground">{task.description}</p>}
 
                           <div className="flex gap-2 pt-2 border-t">
-                            <Button size="sm" onClick={() => handleStartWorkstationTask(task)} className="flex-1">
-                              <Play className="h-4 w-4 mr-1" />
+                            <Button size="sm" onClick={() => handleStartWorkstationTask(task)} className="flex-1 text-xs sm:text-sm">
+                              <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                               {t('start_task')}
                             </Button>
                           </div>
