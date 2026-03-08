@@ -853,30 +853,67 @@ export async function parsePDFForOrder(
   let items: ParsedOrderItem[] = [];
 
   if (tableData.length > 0) {
+    console.log('Table data sample:', JSON.stringify(tableData.slice(0, 3)));
     items = tableData.map(row => {
       let description = row['description'] || '';
       let article_code = row['article_code'] || '';
+      let ean = row['ean'] || '';
       const quantity = parseQuantityValue(row['quantity']) || 1;
       const unit_price = parsePriceValue(row['price']);
-      const total_price = parsePriceValue(row['total']);
+      const total_price = parsePriceValue(row['total'] || row['subtotal']);
       const unit = row['unit'] || extractUnitFromLine(row['quantity'] || '') || undefined;
       const discount = parsePriceValue(row['discount']);
 
+      // If we have an EAN column value but no article_code, check if description has embedded code
+      if (!article_code && ean) {
+        // EAN is the barcode; try to extract the real article code from description
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        } else {
+          // Use EAN as article code fallback
+          article_code = ean;
+        }
+      }
+
+      // If article_code column captured what looks like an EAN (13 digits), move it
+      if (article_code && /^\d{12,13}$/.test(article_code.trim()) && !ean) {
+        ean = article_code.trim();
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        }
+      }
+
       if (!description && article_code) description = article_code;
       if ((!article_code || article_code.length > 30) && description) {
-        const extracted = extractArticleCodeFromLine(description);
-        if (extracted) article_code = extracted;
+        const embeddedCode = extractEmbeddedArticleCode(description);
+        if (embeddedCode) {
+          article_code = embeddedCode.code;
+          description = embeddedCode.remainingDescription;
+        } else {
+          const extracted = extractArticleCodeFromLine(description);
+          if (extracted) article_code = extracted;
+        }
+      }
+
+      // Clean description: remove the article code if it's at the start
+      if (article_code && description.startsWith(article_code)) {
+        description = description.substring(article_code.length).trim();
       }
 
       // Determine match confidence by checking against products DB
       let matchConfidence: 'exact' | 'partial' | 'none' = 'none';
-      if (article_code) {
-        const acLower = article_code.toLowerCase();
-        if (products.some(p => p.article_code?.toLowerCase() === acLower)) matchConfidence = 'exact';
-        else if (materials.some(m => m.sku?.toLowerCase() === acLower)) matchConfidence = 'exact';
+      const codesToCheck = [article_code, ean].filter(Boolean);
+      for (const code of codesToCheck) {
+        const codeLower = code.toLowerCase();
+        if (products.some(p => p.article_code?.toLowerCase() === codeLower)) { matchConfidence = 'exact'; break; }
+        if (materials.some(m => m.sku?.toLowerCase() === codeLower)) { matchConfidence = 'exact'; break; }
       }
 
-      return { description, quantity, article_code, unit_price, total_price, unit, discount, matchConfidence };
+      return { description, quantity, article_code, ean: ean || undefined, unit_price, total_price, unit, discount, matchConfidence };
     }).filter(item => item.description || item.article_code);
   }
 
