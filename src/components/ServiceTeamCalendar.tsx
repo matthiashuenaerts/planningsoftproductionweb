@@ -264,11 +264,11 @@ const ServiceTeamCalendar: React.FC = () => {
 
       const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
       const unrecognizedAddresses = geocodedProjects
-        .filter(p => p.coords === null && p.fullAddress !== 'No address')
+        .filter(p => p.coords === null && p.fullAddress !== t('svc_no_address'))
         .map(p => `${p.name}: ${p.fullAddress}`);
       geocodedProjects
-        .filter(p => p.fullAddress === 'No address')
-        .forEach(p => unrecognizedAddresses.push(`${p.name}: No address set`));
+        .filter(p => p.fullAddress === t('svc_no_address'))
+        .forEach(p => unrecognizedAddresses.push(`${p.name}: ${t('svc_no_address_set')}`));
       
       if (projectsWithCoords.length < 2) {
         toast({ title: 'Warning', description: 'Could not geocode enough addresses. Using postal code fallback.' });
