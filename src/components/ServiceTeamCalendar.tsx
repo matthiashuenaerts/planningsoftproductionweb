@@ -84,6 +84,7 @@ const ServiceTeamCalendar: React.FC = () => {
     geometry: [number, number][];
     startPoint?: { lat: number; lng: number; address: string };
     totalDrivingMinutes?: number;
+    unrecognizedAddresses?: string[];
   }>>({});
 
   const weekDays = eachDayOfInterval({
@@ -220,6 +221,13 @@ const ServiceTeamCalendar: React.FC = () => {
       );
 
       const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
+      const unrecognizedAddresses = geocodedProjects
+        .filter(p => p.coords === null && p.fullAddress !== 'No address')
+        .map(p => `${p.name}: ${p.fullAddress}`);
+      // Also include projects with no address at all
+      geocodedProjects
+        .filter(p => p.fullAddress === 'No address')
+        .forEach(p => unrecognizedAddresses.push(`${p.name}: No address set`));
       
       if (projectsWithCoords.length < 2) {
         // Fallback to postal code heuristic if geocoding fails
@@ -228,7 +236,7 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
-      // Build OSRM coordinates string: start + all projects
+      // Build OSRM coordinates string: start + all projects + start again (return home)
       const coordinates: string[] = [];
       if (startCoords) {
         coordinates.push(`${startCoords.lng},${startCoords.lat}`);
@@ -236,9 +244,13 @@ const ServiceTeamCalendar: React.FC = () => {
       projectsWithCoords.forEach(p => {
         coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
       });
+      // Add start again as destination for return trip
+      if (startCoords) {
+        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
+      }
 
-      // Use OSRM Trip API for Travelling Salesman optimization
-      const sourceParam = startCoords ? '&source=first' : '';
+      // Use OSRM Trip API - roundtrip with source=first and destination=last (return home)
+      const sourceParam = startCoords ? '&source=first&destination=last' : '';
       const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false${sourceParam}&roundtrip=false`;
       
       const osrmResp = await fetch(osrmUrl);
@@ -253,10 +265,12 @@ const ServiceTeamCalendar: React.FC = () => {
       const trip = osrmData.trips[0];
       const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
       
-      // Map OSRM waypoint order back to projects (skip index 0 if start point was included)
+      // Map OSRM waypoint order back to projects
+      // Skip first (start) and last (return home) if start point was included
       const offset = startCoords ? 1 : 0;
-      const orderedProjects = waypointOrder
-        .filter((_: number, i: number) => i >= offset)
+      const endOffset = startCoords ? 1 : 0; // last coordinate is return-to-start
+      const projectWaypoints = waypointOrder.slice(offset, waypointOrder.length - endOffset);
+      const orderedProjects = projectWaypoints
         .map((wpIdx: number) => {
           const projectIdx = wpIdx - offset;
           return projectsWithCoords[projectIdx];
@@ -298,10 +312,14 @@ const ServiceTeamCalendar: React.FC = () => {
           geometry: routeGeometry,
           startPoint: startPt,
           totalDrivingMinutes,
+          unrecognizedAddresses,
         }
       }));
 
-      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops based on real road distances` });
+      const warningMsg = unrecognizedAddresses.length > 0 
+        ? ` (${unrecognizedAddresses.length} address(es) not recognized)` 
+        : '';
+      toast({ title: 'Route Optimized', description: `Optimized route for ${orderedProjects.length} stops with return home${warningMsg}` });
       loadData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -353,6 +371,7 @@ const ServiceTeamCalendar: React.FC = () => {
   };
 
   const [mapDrivingMinutes, setMapDrivingMinutes] = useState<number | undefined>();
+  const [mapUnrecognized, setMapUnrecognized] = useState<string[]>([]);
 
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
@@ -363,6 +382,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapRouteGeometry(route.geometry);
     setMapStartPoint(route.startPoint);
     setMapDrivingMinutes(route.totalDrivingMinutes);
+    setMapUnrecognized(route.unrecognizedAddresses || []);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
@@ -666,6 +686,7 @@ const ServiceTeamCalendar: React.FC = () => {
         dateLabel={mapDateLabel}
         startPoint={mapStartPoint}
         totalDrivingMinutes={mapDrivingMinutes}
+        unrecognizedAddresses={mapUnrecognized}
       />
     </div>
   );

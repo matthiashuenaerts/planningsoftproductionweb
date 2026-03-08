@@ -6,8 +6,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
-import { Clock, Route as RouteIcon } from 'lucide-react';
+import { Clock, Route as RouteIcon, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export interface RouteWaypoint {
@@ -29,6 +30,7 @@ interface RouteMapDialogProps {
   dateLabel: string;
   startPoint?: { lat: number; lng: number; address: string };
   totalDrivingMinutes?: number;
+  unrecognizedAddresses?: string[];
 }
 
 const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
@@ -40,31 +42,39 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
   dateLabel,
   startPoint,
   totalDrivingMinutes,
+  unrecognizedAddresses,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const initedRef = useRef(false);
 
   const totalServiceHours = waypoints.reduce((sum, wp) => sum + (wp.serviceHours || 0), 0);
   const drivingHours = totalDrivingMinutes ? Math.round(totalDrivingMinutes) / 60 : 0;
   const totalHours = totalServiceHours + drivingHours;
 
+  // Initialize map once when dialog opens
   useEffect(() => {
-    if (!open || !mapContainerRef.current) return;
-
-    // Delay to ensure dialog DOM is fully rendered
-    const timer = setTimeout(() => {
-      if (!mapContainerRef.current) return;
-
-      // Clean up previous map
+    if (!open) {
+      // Cleanup when dialog closes
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      initedRef.current = false;
+      return;
+    }
+
+    // Don't re-init if already done
+    if (initedRef.current) return;
+
+    const timer = setTimeout(() => {
+      if (!mapContainerRef.current || initedRef.current) return;
 
       const map = L.map(mapContainerRef.current, {
         zoomControl: true,
       }).setView([50.85, 4.35], 9);
       mapRef.current = map;
+      initedRef.current = true;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
@@ -72,7 +82,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
 
       const allPoints: L.LatLngExpression[] = [];
 
-      // Add start point marker
+      // Add start/end point marker (green)
       if (startPoint) {
         const startIcon = L.divIcon({
           html: `<div style="background:#22c55e;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">S</div>`,
@@ -82,7 +92,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
         });
         L.marker([startPoint.lat, startPoint.lng], { icon: startIcon })
           .addTo(map)
-          .bindPopup(`<strong>Start</strong><br/>${startPoint.address}`);
+          .bindPopup(`<strong>Start / Return</strong><br/>${startPoint.address}`);
         allPoints.push([startPoint.lat, startPoint.lng]);
       }
 
@@ -121,26 +131,40 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
       // Fix tile rendering after dialog animation
       setTimeout(() => map.invalidateSize(), 300);
       setTimeout(() => map.invalidateSize(), 600);
-    }, 250);
+      setTimeout(() => map.invalidateSize(), 1000);
+    }, 350);
 
     return () => {
       clearTimeout(timer);
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
     };
-  }, [open, waypoints, routeGeometry, startPoint]);
+  }, [open]); // Only depend on open, not on data props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] [&_.leaflet-pane]:z-[1] [&_.leaflet-top]:z-[2] [&_.leaflet-bottom]:z-[2]">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
             Route — {teamName} — {dateLabel}
           </DialogTitle>
+          <DialogDescription>
+            Optimized driving route with return to start
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Unrecognized addresses warning */}
+          {unrecognizedAddresses && unrecognizedAddresses.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-destructive">Unrecognized addresses:</p>
+                <ul className="mt-1 list-disc list-inside text-muted-foreground">
+                  {unrecognizedAddresses.map((addr, i) => (
+                    <li key={i}>{addr}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           {/* Time summary */}
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Badge variant="outline" className="gap-1">
@@ -164,7 +188,7 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 rounded-full bg-green-500 text-white text-xs flex items-center justify-center font-bold">S</div>
-              <span>Start</span>
+              <span>Start / Return</span>
             </div>
             {waypoints.map((wp) => (
               <div key={wp.order} className="flex items-center gap-1">
