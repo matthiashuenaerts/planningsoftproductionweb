@@ -251,27 +251,27 @@ const LogisticsOut: React.FC = () => {
         </div>
       )}
       {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-4 md:p-6'}`}>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className={`flex flex-col gap-2 ${isMobile ? 'mb-4' : 'sm:flex-row sm:items-center sm:justify-between gap-3 mb-6'}`}>
           <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t("logistics_out_title")}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">{t("logistics_out_description")}</p>
+            <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>{t("logistics_out_title")}</h1>
+            {!isMobile && <p className="text-muted-foreground mt-1 text-sm">{t("logistics_out_description")}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="outline" className="px-3 py-1 text-xs">
+            <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'px-3 py-1 text-xs'}`}>
               {t("orders_count", { count: filteredOrders.length.toString() })}
             </Badge>
-            <Badge variant="outline" className="px-3 py-1 text-xs">
+            <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-2 py-0.5' : 'px-3 py-1 text-xs'}`}>
               {t("events_count", { count: calendarEvents.length.toString() })}
             </Badge>
           </div>
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+        <Card className={isMobile ? 'mb-3' : 'mb-6'}>
+          <CardContent className={isMobile ? 'p-2.5' : 'p-3 md:p-4'}>
+            <div className={`flex ${isMobile ? 'flex-col gap-2' : 'flex-col sm:flex-row gap-3'}`}>
               <div className="flex-1 min-w-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -279,13 +279,13 @@ const LogisticsOut: React.FC = () => {
                     placeholder={t("search_projects_suppliers")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${isMobile ? 'h-9 text-sm' : ''}`}
                   />
                 </div>
               </div>
-              <div className="sm:w-48">
+              <div className={isMobile ? 'w-full' : 'sm:w-48'}>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className={isMobile ? 'h-9 text-xs' : ''}>
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder={t("filter_status")} />
                   </SelectTrigger>
