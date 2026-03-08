@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Image as ImageIcon } from 'lucide-react';
 import { ImageModal } from '@/components/ui/image-modal';
 import { supabase } from '@/integrations/supabase/client';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ProductImageDisplayProps {
   articleCode: string;
