@@ -441,9 +441,10 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0"
                   disabled={isSending}
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-64">
