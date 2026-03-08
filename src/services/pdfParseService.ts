@@ -553,8 +553,8 @@ function extractTotals(text: string): { subtotal?: number; vatAmount?: number; v
 
 function extractPaymentTerms(text: string): string | undefined {
   const patterns = [
-    /(?:betaal(?:termijn|conditie|voorwaarden)|payment\s*(?:terms?|conditions?)|betalingsvoorwaarden)[:\s]*([^\n]+)/gi,
-    /(?:betaling\s*binnen|payment\s*within|net\s*)\s*(\d+)\s*(?:dagen|days)/gi,
+    /(?:betaal(?:termijn|conditie|voorwaarden)|payment\s*(?:terms?|conditions?)|betalingsvoorwaarden|conditions?\s*de\s*paiement|modalités?\s*de\s*paiement)[:\s]*([^\n]+)/gi,
+    /(?:betaling\s*binnen|payment\s*within|net\s*|paiement\s*(?:à|sous)\s*)\s*(\d+)\s*(?:dagen|days|jours)/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
@@ -566,7 +566,7 @@ function extractPaymentTerms(text: string): string | undefined {
 
 function extractDeliveryAddress(text: string): string | undefined {
   const patterns = [
-    /(?:aflever\s*adres|delivery\s*address|bezorg\s*adres|ship\s*to|levering\s*aan)[:\s]*\n?((?:[^\n]+\n?){1,4})/gi,
+    /(?:aflever\s*adres|delivery\s*address|bezorg\s*adres|ship\s*to|levering\s*aan|adresse\s*(?:de\s*)?livraison|livrer\s*à)[:\s]*\n?((?:[^\n]+\n?){1,4})/gi,
   ];
   for (const p of patterns) {
     p.lastIndex = 0;
