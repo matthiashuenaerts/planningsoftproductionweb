@@ -269,25 +269,21 @@ const EnhancedDailyTimeline: React.FC<EnhancedDailyTimelineProps> = ({
                     }}
                   />
                   
-                  <CardHeader className={`relative z-10 ${isSmallTask ? 'py-3 pb-2' : 'pb-3'}`}>
-                    <div className="flex justify-between items-start gap-3">
+                  <CardHeader className={`relative z-10 ${isSmallTask ? 'py-2 sm:py-3 pb-1 sm:pb-2' : 'pb-2 sm:pb-3'} ${isMobile ? 'px-3' : ''}`}>
+                    <div className="flex justify-between items-start gap-2 sm:gap-3">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className={`${isSmallTask ? 'text-base' : 'text-lg'} leading-tight mb-1`}>
-                          {truncateTitle(task.title, isSmallTask ? 40 : 60)}
+                        <CardTitle className={`${isSmallTask ? 'text-sm sm:text-base' : 'text-base sm:text-lg'} leading-tight mb-0.5 sm:mb-1`}>
+                          {truncateTitle(task.title, isMobile ? 30 : isSmallTask ? 40 : 60)}
                         </CardTitle>
-                        <CardDescription className="text-sm font-medium text-blue-600 mb-2">
-                          {task.project_name && task.project_name !== 'No Project' ? task.project_name : 'No Project Assigned'}
-                          {task.project_id && (
-                            <span className="text-xs text-gray-400 ml-2">
-                              (ID: {task.project_id.substring(0, 8)}...)
-                            </span>
-                          )}
+                        <CardDescription className="text-xs sm:text-sm font-medium text-blue-600 mb-1 sm:mb-2">
+                          {task.project_name && task.project_name !== 'No Project' ? task.project_name : (t('no_project_assigned') || 'No Project Assigned')}
                         </CardDescription>
                         
                         {/* Time range */}
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
+                        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+                          <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                           <span>{formatTime(task.start_time)} - {formatTime(task.end_time)}</span>
+                        </div>
                           {task.workstation && (
                             <>
                               {/* Additional workstation info can be added here */}
