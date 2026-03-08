@@ -2062,19 +2062,19 @@ const Planning = () => {
         {isMobile && <Navbar />}
         <div 
           ref={mainContentRef}
-          className={`w-full p-4 md:p-6 overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}
+          className={`w-full p-3 md:p-6 overflow-x-hidden overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}
           style={{ height: '100vh' }}
         >
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+          <div className="w-full max-w-full">
+            <div className="flex flex-col gap-4 mb-6">
               <div>
-                <h1 className="text-3xl font-bold">{t('planning_title')}</h1>
-                <p className="text-slate-600 mt-1">
+                <h1 className="text-2xl md:text-3xl font-bold">{t('planning_title')}</h1>
+                <p className="text-muted-foreground mt-1 text-sm md:text-base">
                   {t('planning_description')}
                 </p>
               </div>
               
-              <div className="flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4">
+              <div className="flex flex-wrap items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -2109,10 +2109,11 @@ const Planning = () => {
                 </Button>
                 
                 {isAdmin && (
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => setShowStandardTaskAssignment(true)}
                       variant="outline"
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <Settings className="mr-2 h-4 w-4" />
@@ -2121,6 +2122,7 @@ const Planning = () => {
                     <Button
                       onClick={() => setShowSchedulingMethodDialog(true)}
                       disabled={generatingSchedule || isSelectedDateHoliday()}
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <Zap className="mr-2 h-4 w-4" />
@@ -2130,6 +2132,7 @@ const Planning = () => {
                       onClick={generateTomorrowSchedule}
                       disabled={generatingSchedule || !checkTodayHasSchedules() || !isNextWorkingDay()}
                       variant="secondary"
+                      size="sm"
                       className="whitespace-nowrap"
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
@@ -2164,10 +2167,11 @@ const Planning = () => {
 
             {/* View Toggle */}
             <div className="mb-6">
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => setActiveView('worker')}
                   variant={activeView === 'worker' ? "default" : "outline"}
+                  size="sm"
                 >
                   <Users className="mr-2 h-4 w-4" />
                   {t('planning_worker_schedules')}
@@ -2175,6 +2179,7 @@ const Planning = () => {
                 <Button
                   onClick={() => setActiveView('workstation')}
                   variant={activeView === 'workstation' ? "default" : "outline"}
+                  size="sm"
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   {t('planning_workstation_schedules')}
@@ -2182,6 +2187,7 @@ const Planning = () => {
                 <Button
                   onClick={() => setActiveView('gantt')}
                   variant={activeView === 'gantt' ? "default" : "outline"}
+                  size="sm"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {t('planning_gantt_chart')}
