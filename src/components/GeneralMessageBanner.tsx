@@ -90,32 +90,34 @@ const GeneralMessageBanner: React.FC = () => {
   if (!messages?.length) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] pointer-events-none">
-      <div className="pointer-events-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-lg mx-4 space-y-3">
         {messages.map((msg) => {
           const config = typeConfig[msg.message_type] || typeConfig.info;
           return (
             <div
               key={msg.id}
               className={cn(
-                "flex items-start gap-2.5 px-4 py-2.5 border-b",
+                "rounded-xl border shadow-2xl p-5",
                 config.bg,
                 config.border,
                 config.text
               )}
             >
-              <div className="mt-0.5">{config.icon}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold leading-tight">{msg.title}</p>
-                <p className="text-xs opacity-80 mt-0.5 break-words">{msg.message}</p>
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">{config.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold leading-tight">{msg.title}</p>
+                  <p className="text-xs opacity-80 mt-1.5 break-words whitespace-pre-wrap">{msg.message}</p>
+                </div>
+                <button
+                  onClick={() => handleDismiss(msg.id)}
+                  className="mt-0.5 p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex-shrink-0"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                onClick={() => handleDismiss(msg.id)}
-                className="mt-0.5 p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex-shrink-0"
-                aria-label="Dismiss"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
             </div>
           );
         })}
