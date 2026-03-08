@@ -337,8 +337,8 @@ const BrokenPartForm = () => {
     <Card className="w-full">
       <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="project">Project</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="project" className="text-xs sm:text-sm">Project</Label>
             <Select
               value={formData.project_id}
               onValueChange={(value) => setFormData({...formData, project_id: value})}
