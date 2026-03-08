@@ -353,7 +353,7 @@ export const ProjectChatInline: React.FC<ProjectChatInlineProps> = ({
           )}
         </ScrollArea>
         
-        <div className="border-t pt-4 mt-4">
+        <div className="border-t pt-2.5 sm:pt-4 mt-2.5 sm:mt-4">
           {/* Reply indicator */}
           {replyToMessage && (
             <div className="flex items-center gap-2 p-2 bg-muted/50 rounded mb-2 border-l-2 border-primary">
