@@ -841,12 +841,16 @@ const ImportStockOrderModal: React.FC<ImportStockOrderModalProps> = ({ onClose, 
                 </div>
 
                 <div className="bg-muted/50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">How PDF Import Works</h4>
+                  <h4 className="font-medium mb-2">What Gets Extracted</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Upload an order confirmation or invoice PDF</li>
-                    <li>• The system extracts text and matches against your products/materials</li>
-                    <li>• Supplier, dates, and item details are auto-filled when detected</li>
-                    <li>• Review and adjust the extracted data before importing</li>
+                    <li>• <strong>Supplier</strong> — auto-matched against your database</li>
+                    <li>• <strong>Order/Invoice/Reference numbers</strong> and customer ID</li>
+                    <li>• <strong>Dates</strong> — order date, delivery date (incl. named months)</li>
+                    <li>• <strong>Line items</strong> — article codes, descriptions, quantities, units, prices</li>
+                    <li>• <strong>Financials</strong> — subtotal, VAT/BTW, discounts, shipping, total</li>
+                    <li>• <strong>Contact & delivery info</strong> — address, phone, email</li>
+                    <li>• <strong>Payment terms</strong> and conditions</li>
+                    <li>• Supports European number formats (1.234,56) and multi-page tables</li>
                   </ul>
                 </div>
               </div>
