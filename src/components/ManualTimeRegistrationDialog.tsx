@@ -349,12 +349,14 @@ export const ManualTimeRegistrationDialog: React.FC<ManualTimeRegistrationDialog
             />
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className={`flex gap-2 ${isMobile ? 'pt-2' : 'pt-4'}`}>
+            <Button type="button" variant="outline" size={isMobile ? 'sm' : 'default'} onClick={() => onOpenChange(false)} className={isMobile ? 'flex-1' : ''}>
               {t("cancel")}
             </Button>
-            <Button type="submit" disabled={createTimeRegistrationMutation.isPending}>
+            <Button type="submit" size={isMobile ? 'sm' : 'default'} disabled={createTimeRegistrationMutation.isPending} className={isMobile ? 'flex-1' : ''}>
               {createTimeRegistrationMutation.isPending ? t("creating") : t("create")}
+            </Button>
+          </div>
             </Button>
           </div>
         </form>
