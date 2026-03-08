@@ -560,8 +560,8 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
         </div>
       </div>
       
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isSubmitting} className="bg-red-600 hover:bg-red-700">
+      <div className={`flex ${isMobile ? 'pt-2' : ''} justify-end`}>
+        <Button type="submit" disabled={isSubmitting} className={`bg-red-600 hover:bg-red-700 ${isMobile ? 'w-full' : ''}`}>
           {isSubmitting ? t('ro_creating') : t('ro_create_rush_order')}
         </Button>
       </div>
