@@ -123,9 +123,9 @@ const WorkstationGanttChart = forwardRef<WorkstationGanttChartRef, WorkstationGa
   const scrollRef = useRef<HTMLDivElement>(null);
   const realtimeChannelRef = useRef<any>(null);
 
-  const rowHeight = 60;
-  const headerHeight = 80;
-  const workstationLabelWidth = 250;
+  const rowHeight = isMobile ? 48 : 60;
+  const headerHeight = isMobile ? 50 : 80;
+  const workstationLabelWidth = isMobile ? 100 : 250;
 
   // Day-based scale
   const scale = useMemo(() => {
