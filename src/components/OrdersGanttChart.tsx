@@ -592,10 +592,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   }, [teams, projects, loading]);
 
   // Calculate project bar position and width to match calendar grid exactly
-  const getProjectPosition = (project: Project, teamName: string) => {
+  const getProjectPosition = (project: Project, teamName: string, teamId?: string) => {
     const teamAssignments = project.project_team_assignments || [];
-    // Prefer assignment that matches the team row
-    const matchedAssignment = teamAssignments.find((a) => mapTeamToCategory(a.team, teams) === teamName) || teamAssignments[0];
+    // Prefer assignment that matches the team row by team_id, then by name
+    const matchedAssignment = 
+      (teamId ? teamAssignments.find((a) => a.team_id === teamId) : null) ||
+      teamAssignments.find((a) => mapTeamToCategory(a.team, teams) === teamName) || 
+      teamAssignments[0];
     if (!matchedAssignment?.start_date || !matchedAssignment?.duration) return null;
 
     const startDate = parseYMD(matchedAssignment.start_date);
