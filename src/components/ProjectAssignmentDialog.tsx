@@ -295,20 +295,28 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         return;
       }
 
-      // Check if a team assignment already exists for this project
-      const { data: existingAssignment, error: checkError } = await supabase
+      // Check if a team assignment already exists for this project + specific team
+      // Use currentTeamId to scope to the specific assignment being edited
+      let existingQuery = supabase
         .from('project_team_assignments')
         .select('id')
-        .eq('project_id', projectId)
-        .maybeSingle();
+        .eq('project_id', projectId);
+      
+      if (currentTeamId) {
+        existingQuery = existingQuery.eq('team_id', currentTeamId);
+      }
+      
+      const { data: existingAssignments, error: checkError } = await existingQuery;
 
       if (checkError) {
         console.error('Check assignment error:', checkError);
         throw checkError;
       }
 
+      const existingAssignment = existingAssignments && existingAssignments.length > 0 ? existingAssignments[0] : null;
+
       if (existingAssignment) {
-        console.log('Updating existing project team assignment...');
+        console.log('Updating existing project team assignment...', existingAssignment.id);
         const { error: assignmentError } = await supabase
           .from('project_team_assignments')
           .update({
@@ -317,7 +325,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             start_date: startDate,
             duration: duration,
           })
-          .eq('project_id', projectId);
+          .eq('id', existingAssignment.id);
 
         if (assignmentError) {
           console.error('Assignment update error:', assignmentError);
