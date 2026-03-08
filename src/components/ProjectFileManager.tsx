@@ -331,8 +331,18 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
         throw error;
       }
 
-      // Create a download link and trigger it
-      const url = URL.createObjectURL(data);
+      let blob: Blob = data;
+
+      // For PDF files, overlay annotations if they exist
+      if (fileName.toLowerCase().endsWith('.pdf')) {
+        const rawBytes = await data.arrayBuffer();
+        const annotatedBytes = await generateAnnotatedPdf(projectId, fileName, rawBytes);
+        if (annotatedBytes) {
+          blob = new Blob([annotatedBytes], { type: 'application/pdf' });
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
