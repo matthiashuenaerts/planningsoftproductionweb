@@ -1131,45 +1131,46 @@ const ProjectDetails = () => {
                 <p className="text-muted-foreground text-xs sm:text-sm">{t('client_label')}: {project?.client}</p>
               </div>
               
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent md:overflow-visible md:flex-wrap">
-                <Button variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')} className="flex-shrink-0">
-                  <Home className="mr-2 h-4 w-4" /> {t('home')}
+              <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide md:overflow-visible md:flex-wrap">
+                <Button size="sm" variant={activeTab === 'home' ? 'default' : 'outline'} onClick={() => setActiveTab('home')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Home className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('home')}
                 </Button>
-                <Button variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn("flex-shrink-0", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : "")}>
-                  <Package className="mr-2 h-4 w-4" /> 
+                <Button size="sm" variant={activeTab === 'orders' ? 'default' : 'outline'} onClick={() => setActiveTab('orders')} className={cn("flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3", activeTab === 'orders' ? '' : undeliveredItemsCount > 0 ? "bg-red-500 text-white hover:bg-red-600" : allOrdersDelivered ? "bg-green-500 text-white hover:bg-green-600" : "")}>
+                  <Package className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> 
                   {t('orders')}
-                  {undeliveredItemsCount > 0 && <span className="ml-2 bg-white text-red-500 px-2 py-1 rounded-full text-xs font-bold">
+                  {undeliveredItemsCount > 0 && <span className="ml-1 sm:ml-2 bg-white text-red-500 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold">
                       {undeliveredItemsCount}
                     </span>}
                 </Button>
-                <Button variant={activeTab === 'parts' ? 'default' : 'outline'} onClick={() => setActiveTab('parts')} className="flex-shrink-0">
-                  <List className="mr-2 h-4 w-4" /> {t('parts_list')}
+                <Button size="sm" variant={activeTab === 'parts' ? 'default' : 'outline'} onClick={() => setActiveTab('parts')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <List className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('parts_list')}
                 </Button>
-                <Button variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')} className="flex-shrink-0">
-                  <Settings className="mr-2 h-4 w-4" /> {t('accessories')}
+                <Button size="sm" variant={activeTab === 'accessories' ? 'default' : 'outline'} onClick={() => setActiveTab('accessories')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Settings className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('accessories')}
                 </Button>
-                <Button variant={activeTab === 'chat' ? 'default' : 'outline'} onClick={() => setActiveTab('chat')} className="relative flex-shrink-0">
-                  <MessageCircle className="mr-2 h-4 w-4" /> 
+                <Button size="sm" variant={activeTab === 'chat' ? 'default' : 'outline'} onClick={() => setActiveTab('chat')} className="relative flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <MessageCircle className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> 
                   Chat
                   {unreadChatCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
                       {unreadChatCount > 99 ? '99+' : unreadChatCount}
                     </span>
                   )}
                 </Button>
-                <Button variant={activeTab === 'files' ? 'default' : 'outline'} onClick={() => setActiveTab('files')} className="flex-shrink-0">
-                  <FileText className="mr-2 h-4 w-4" /> {t('files')}
+                <Button size="sm" variant={activeTab === 'files' ? 'default' : 'outline'} onClick={() => setActiveTab('files')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <FileText className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('files')}
                 </Button>
-                <Button variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')} className="flex-shrink-0">
-                  <Folder className="mr-2 h-4 w-4" /> {t('onedrive')}
+                <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'outline'} onClick={() => setActiveTab('onedrive')} className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3">
+                  <Folder className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
                   {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
                     <Button
+                      size="sm"
                       variant={activeTab === 'costing' ? 'default' : 'outline'}
                       onClick={() => setActiveTab('costing')}
-                      className="flex-shrink-0"
+                      className="flex-shrink-0 h-8 text-xs sm:text-sm px-2.5 sm:px-3"
                     >
-                      <DollarSign className="mr-2 h-4 w-4" /> Costing
+                      <DollarSign className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Costing
                     </Button>
                   )}
 
