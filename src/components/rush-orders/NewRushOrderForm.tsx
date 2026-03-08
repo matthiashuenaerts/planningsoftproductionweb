@@ -60,6 +60,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
+  const isMobile = useIsMobile();
   
   const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
   const [stream, setStream] = useState<MediaStream | null>(null);
