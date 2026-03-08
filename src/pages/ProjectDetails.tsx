@@ -1783,11 +1783,11 @@ const ProjectDetails = () => {
                 </CardContent>
               </Card>
               
-              <Card className="lg:col-span-2 overflow-hidden">
-                <CardHeader className="py-3 sm:py-[15px] px-3 sm:px-6">
-                  <CardTitle className="text-base sm:text-2xl">{t('project_tasks')}</CardTitle>
+              <Card className="lg:col-span-2 overflow-hidden rounded-2xl border-border/60">
+                <CardHeader className="py-3 sm:py-4 px-3 sm:px-5">
+                  <CardTitle className="text-sm sm:text-base font-semibold">{t('project_tasks')}</CardTitle>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-6">
+                <CardContent className="px-3 sm:px-5">
                   <Tabs defaultValue="todo">
                     <TabsList className="mb-3 sm:mb-4 w-full sm:w-auto">
                       <TabsTrigger value="todo" className="text-xs sm:text-sm flex-1 sm:flex-initial">{t('open_tasks_tab', {
