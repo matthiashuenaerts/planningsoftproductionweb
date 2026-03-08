@@ -766,35 +766,35 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   return (
     <div className={cn('flex flex-col bg-background h-full', className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
-              <ChevronLeft className="h-5 w-5" />
+      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} ${isMobile ? 'px-3 py-2' : 'px-6 py-4'} border-b bg-card sticky top-0 z-20`}>
+        <div className={`flex items-center ${isMobile ? 'justify-between' : 'gap-4'}`}>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className={isMobile ? 'h-8 w-8' : ''} onClick={goToPreviousWeek}>
+              <ChevronLeft className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             </Button>
-            <div className="text-2xl font-semibold min-w-[250px] text-center">
+            <div className={`${isMobile ? 'text-sm' : 'text-2xl'} font-semibold ${isMobile ? 'min-w-[140px]' : 'min-w-[250px]'} text-center`}>
               {format(dateRange[0], 'd', { locale: nl })} - {format(dateRange[dateRange.length - 1], 'd MMM yyyy', { locale: nl })}
             </div>
-            <Button variant="ghost" size="icon" onClick={goToNextWeek}>
-              <ChevronRight className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className={isMobile ? 'h-8 w-8' : ''} onClick={goToNextWeek}>
+              <ChevronRight className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
             </Button>
           </div>
 
-          <Button variant="outline" size="sm" onClick={goToToday}>
-            <Calendar className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" className={isMobile ? 'h-7 text-xs px-2' : ''} onClick={goToToday}>
+            <Calendar className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-4 w-4 mr-2'}`} />
             Vandaag
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{weeksToShow} weken</span>
+          <span className={`${isMobile ? 'text-xs' : 'text-sm'} text-muted-foreground`}>{weeksToShow} weken</span>
           <input
             type="range"
             min="1"
             max="8"
             value={weeksToShow}
             onChange={(e) => setWeeksToShow(Number(e.target.value))}
-            className="w-32"
+            className={isMobile ? 'w-20' : 'w-32'}
           />
         </div>
       </div>
