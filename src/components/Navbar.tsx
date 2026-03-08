@@ -278,7 +278,7 @@ const Navbar = () => {
             <Menu className="h-5 w-5" />
           </Button>
         </DrawerTrigger>
-        <DrawerContent className="h-full w-[280px] mt-0 rounded-none">
+        <DrawerContent className="h-full w-[240px] mt-0 rounded-none">
           <NavbarContent onItemClick={() => setDrawerOpen(false)} />
         </DrawerContent>
       </Drawer>;
