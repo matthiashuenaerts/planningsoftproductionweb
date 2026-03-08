@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
 import { workingHoursService } from '@/services/workingHoursService';

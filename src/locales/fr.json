@@ -1370,5 +1370,25 @@
   "nt_share_remove_failed": "Échec de la suppression du partage",
   "nt_no_employees": "Aucun employé disponible pour le partage",
   "nt_shared_with_all": "Cet élément est partagé avec tous les employés disponibles",
-  "nt_done": "Terminé"
+  "nt_done": "Terminé",
+
+  "si_title": "Service Installation",
+  "si_no_stops_today": "Aucun Arrêt de Service Aujourd'hui",
+  "si_no_stops_desc": "Vous n'avez aucune installation de service prévue pour aujourd'hui.",
+  "si_depart": "Départ",
+  "si_first_stop": "Premier arrêt",
+  "si_service": "Service",
+  "si_driving": "Conduite",
+  "si_total": "total",
+  "si_return": "Retour",
+  "si_optimized_route": "Route Optimisée",
+  "si_route_schedule": "Horaire de Route",
+  "si_depart_from": "Départ de {{address}}",
+  "si_return_to_base": "Retour à la base",
+  "si_exceeds_end_of_day": "dépasse {{time}} fin de journée",
+  "si_service_stops": "Arrêts de Service ({{count}})",
+  "si_estimated": "estimé",
+  "si_timer_started": "Minuterie Démarrée",
+  "si_timer_started_desc": "Enregistrement du temps démarré pour {{name}}",
+  "si_start_return": "Départ / Retour"
 }
