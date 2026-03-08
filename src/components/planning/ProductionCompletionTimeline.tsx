@@ -7,6 +7,8 @@ import { AlertTriangle, CheckCircle2, Flag, Clock, ChevronLeft, ChevronRight, Fl
 import { format, addDays, startOfDay, differenceInDays, isWeekend, isSameDay, isValid } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { useLanguage } from '@/context/LanguageContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import TestRushProjectDialog from './TestRushProjectDialog';
 
 export interface ProjectCompletionData {
@@ -31,12 +33,13 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
   lastProductionStepName
 }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [weekOffset, setWeekOffset] = useState(0);
   const [showTestDialog, setShowTestDialog] = useState(false);
 
   const timelineStart = useMemo(() => addDays(startOfDay(new Date()), weekOffset * 7), [weekOffset]);
-  const daysToShow = 21;
-  const dayWidth = 32;
+  const daysToShow = isMobile ? 14 : 21;
+  const dayWidth = isMobile ? 28 : 32;
 
   const timelineDays = useMemo(() => {
     const days: Date[] = [];
@@ -44,7 +47,7 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
       days.push(addDays(timelineStart, i));
     }
     return days;
-  }, [timelineStart]);
+  }, [timelineStart, daysToShow]);
 
   const sortedProjects = useMemo(() => {
     return [...projectCompletions]
@@ -71,6 +74,15 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
       case 'at_risk': return <Badge className="bg-yellow-100 text-yellow-800 text-[10px] px-1 py-0">{t('timeline_at_risk')}</Badge>;
       case 'overdue': return <Badge className="bg-red-100 text-red-800 text-[10px] px-1 py-0">{t('timeline_overdue')}</Badge>;
       default: return <Badge variant="secondary" className="text-[10px] px-1 py-0">?</Badge>;
+    }
+  };
+
+  const getStatusLabel = (status: ProjectCompletionData['status']) => {
+    switch (status) {
+      case 'on_track': return 'OK';
+      case 'at_risk': return '⚠';
+      case 'overdue': return '✗';
+      default: return '?';
     }
   };
 
@@ -122,46 +134,86 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
 
   return (
     <div className="space-y-2">
-      {/* Compact header with stats */}
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5">
-          <Flag className="h-3 w-3 text-primary" />
-          <span className="font-medium">{t('timeline_production_deadline')}</span>
-          <span className="text-muted-foreground">({lastProductionStepName})</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-green-600 font-medium">{stats.onTrack} ✓</span>
-          <span className="text-yellow-600 font-medium">{stats.atRisk} ⚠</span>
-          <span className="text-red-600 font-medium">{stats.overdue} ✗</span>
-          <span className="text-muted-foreground">{stats.pending} ?</span>
-          
-          {/* Week navigation */}
-          <div className="flex items-center gap-0.5 ml-2 border-l pl-2">
-            <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w - 1)}>
-              <ChevronLeft className="h-3 w-3" />
-            </Button>
-            {weekOffset !== 0 && (
-              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setWeekOffset(0)}>
-                {t('timeline_today')}
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w + 1)}>
-              <ChevronRight className="h-3 w-3" />
+      {/* Header with stats */}
+      {isMobile ? (
+        <div className="space-y-1.5">
+          {/* Title row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 min-w-0">
+              <Flag className="h-3 w-3 text-primary shrink-0" />
+              <span className="font-medium text-[11px] truncate">{t('timeline_production_deadline')}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-1.5 text-[10px] shrink-0"
+              onClick={() => setShowTestDialog(true)}
+            >
+              <FlaskConical className="h-3 w-3" />
             </Button>
           </div>
-
-          {/* Test Rush Project button */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-[10px] ml-1"
-            onClick={() => setShowTestDialog(true)}
-          >
-            <FlaskConical className="h-3 w-3 mr-1" />
-            {t('timeline_test_project')}
-          </Button>
+          {/* Stats + nav row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="text-green-600 font-medium">{stats.onTrack}✓</span>
+              <span className="text-yellow-600 font-medium">{stats.atRisk}⚠</span>
+              <span className="text-red-600 font-medium">{stats.overdue}✗</span>
+              <span className="text-muted-foreground">{stats.pending}?</span>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setWeekOffset(w => w - 1)}>
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              {weekOffset !== 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-1 text-[9px]" onClick={() => setWeekOffset(0)}>
+                  {t('timeline_today')}
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setWeekOffset(w => w + 1)}>
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5">
+            <Flag className="h-3 w-3 text-primary" />
+            <span className="font-medium">{t('timeline_production_deadline')}</span>
+            <span className="text-muted-foreground">({lastProductionStepName})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-green-600 font-medium">{stats.onTrack} ✓</span>
+            <span className="text-yellow-600 font-medium">{stats.atRisk} ⚠</span>
+            <span className="text-red-600 font-medium">{stats.overdue} ✗</span>
+            <span className="text-muted-foreground">{stats.pending} ?</span>
+            
+            <div className="flex items-center gap-0.5 ml-2 border-l pl-2">
+              <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w - 1)}>
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              {weekOffset !== 0 && (
+                <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => setWeekOffset(0)}>
+                  {t('timeline_today')}
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => setWeekOffset(w => w + 1)}>
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[10px] ml-1"
+              onClick={() => setShowTestDialog(true)}
+            >
+              <FlaskConical className="h-3 w-3 mr-1" />
+              {t('timeline_test_project')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Compact timeline */}
       <ScrollArea className="w-full">
@@ -174,13 +226,18 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
               return (
                 <div
                   key={index}
-                  className={`flex-shrink-0 text-center py-0.5 border-r ${
+                  className={cn(
+                    "flex-shrink-0 text-center border-r",
+                    isMobile ? "py-0.5" : "py-0.5",
                     isToday ? 'bg-primary/10 font-bold' : isWeekendDay ? 'bg-muted/30' : ''
-                  }`}
+                  )}
                   style={{ width: `${dayWidth}px` }}
                 >
-                  <div>{format(day, 'EEE', { locale: nl }).slice(0, 2)}</div>
-                  <div className={isToday ? 'text-primary' : 'text-muted-foreground'}>
+                  <div className={cn(isMobile && "text-[9px]")}>{format(day, 'EEE', { locale: nl }).slice(0, 2)}</div>
+                  <div className={cn(
+                    isToday ? 'text-primary' : 'text-muted-foreground',
+                    isMobile && "text-[9px]"
+                  )}>
                     {format(day, 'dd')}
                   </div>
                 </div>
@@ -208,7 +265,7 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
               if (!isInView) return null;
 
               return (
-                <div key={project.projectId} className="h-6 relative flex items-center border-b border-muted/30">
+                <div key={project.projectId} className={cn("relative flex items-center border-b border-muted/30", isMobile ? "h-5" : "h-6")}>
                   {completionPos !== null && completionPos >= 0 && (
                     <>
                       <TooltipProvider>
@@ -242,11 +299,23 @@ const ProductionCompletionTimeline: React.FC<ProductionCompletionTimelineProps> 
                           className="absolute flex items-center gap-0.5 z-20 cursor-pointer"
                           style={{ left: `${installPos * dayWidth + dayWidth / 2 - 2}px` }}
                         >
-                          <Flag className="h-3 w-3 text-primary" />
-                          <span className="text-[9px] font-medium truncate max-w-16">
-                            {project.projectName.slice(0, 8)}
+                          <Flag className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3", "text-primary")} />
+                          <span className={cn("font-medium truncate", isMobile ? "text-[8px] max-w-12" : "text-[9px] max-w-16")}>
+                            {project.projectName.slice(0, isMobile ? 7 : 8)}
                           </span>
-                          {getStatusBadge(project.status)}
+                          {isMobile ? (
+                            <span className={cn(
+                              "text-[8px] font-bold",
+                              project.status === 'on_track' && "text-green-600",
+                              project.status === 'at_risk' && "text-yellow-600",
+                              project.status === 'overdue' && "text-red-600",
+                              project.status === 'pending' && "text-muted-foreground"
+                            )}>
+                              {getStatusLabel(project.status)}
+                            </span>
+                          ) : (
+                            getStatusBadge(project.status)
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs max-w-60">
