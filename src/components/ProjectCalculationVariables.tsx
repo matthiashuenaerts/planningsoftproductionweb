@@ -117,15 +117,19 @@ const ProjectCalculationVariablesComponent: React.FC<ProjectCalculationVariables
         }
       }
 
-      // Delete excluded tasks
+      // Delete excluded tasks — batch to avoid PostgREST URL length limits
       if (excludedTaskIds.length > 0 && phaseIds.length > 0) {
-        const { error } = await supabase
-          .from('tasks')
-          .delete()
-          .in('standard_task_id', excludedTaskIds)
-          .in('phase_id', phaseIds);
+        const BATCH_SIZE = 20;
+        for (let i = 0; i < excludedTaskIds.length; i += BATCH_SIZE) {
+          const batch = excludedTaskIds.slice(i, i + BATCH_SIZE);
+          const { error } = await supabase
+            .from('tasks')
+            .delete()
+            .in('standard_task_id', batch)
+            .in('phase_id', phaseIds);
 
-        if (error) console.error('Failed to delete excluded tasks:', error);
+          if (error) console.error('Failed to delete excluded tasks batch:', error);
+        }
       }
 
       // Find tasks to unlock
