@@ -1136,13 +1136,16 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 />
               </div>
 
-              <div className="border rounded-md p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">{t('npm_project_tasks')}</h3>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="route-select" className="text-sm whitespace-nowrap">{t('npm_production_route')}</Label>
+              <div className={cn("border rounded-lg", isMobile ? "p-2.5" : "p-4")}>
+                <div className={cn(
+                  "mb-3",
+                  isMobile ? "flex flex-col gap-2" : "flex items-center justify-between mb-4"
+                )}>
+                  <h3 className="font-medium text-sm">{t('npm_project_tasks')}</h3>
+                  <div className={cn("flex items-center gap-2", isMobile && "w-full")}>
+                    <Label htmlFor="route-select" className="text-xs whitespace-nowrap">{t('npm_production_route')}</Label>
                     <Select value={selectedRouteId} onValueChange={handleRouteChange}>
-                      <SelectTrigger id="route-select" className="w-[200px]">
+                      <SelectTrigger id="route-select" className={cn(isMobile ? "flex-1 h-9 text-sm" : "w-[200px]")}>
                         <SelectValue placeholder={t('npm_all_tasks')} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1161,24 +1164,33 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto pr-2">
+                  <div className={cn(
+                    "space-y-1.5 mb-3 overflow-y-auto pr-1",
+                    isMobile ? "max-h-[200px]" : "max-h-[300px] pr-2"
+                  )}>
                     {tasks.map((task, index) => (
-                      <div key={index} className="flex items-center space-x-2">
+                      <div key={index} className={cn(
+                        "flex items-center gap-2",
+                        isMobile ? "rounded-lg bg-muted/30 p-2" : "space-x-2"
+                      )}>
                         <Checkbox 
                           id={`task-${index}`} 
                           checked={task.selected} 
                           onCheckedChange={() => handleToggleTask(index)} 
                         />
-                        <label htmlFor={`task-${index}`} className="text-sm flex-1 flex flex-wrap items-center">
-                          <span className="mr-1">{task.id} - {task.name}</span>
-                          {task.workstation && <span className="text-muted-foreground mr-2">({task.workstation})</span>}
+                        <label htmlFor={`task-${index}`} className={cn(
+                          "flex-1 flex flex-wrap items-center gap-1 min-w-0",
+                          isMobile ? "text-xs" : "text-sm"
+                        )}>
+                          <span className="break-words">{task.id} - {task.name}</span>
+                          {task.workstation && <span className="text-muted-foreground">({task.workstation})</span>}
                           {task.duration && (
-                            <span className="text-xs bg-muted px-2 py-0.5 rounded-full mr-2">
+                            <span className="text-[10px] sm:text-xs bg-muted px-1.5 py-0.5 rounded-full">
                               {task.duration} min
                             </span>
                           )}
                           {task.day_counter !== undefined && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] sm:text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                               -{task.day_counter} days
                             </span>
                           )}
@@ -1187,35 +1199,40 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                           type="button" 
                           variant="ghost" 
                           size="icon" 
+                          className={cn(isMobile && "h-7 w-7")}
                           onClick={() => handleRemoveTask(index)}
                         >
-                          <Trash className="h-4 w-4" />
+                          <Trash className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     ))}
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 gap-2 mt-2">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t('npm_new_task_placeholder')}
-                      value={newTaskName}
-                      onChange={(e) => setNewTaskName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder={t('npm_workstation_placeholder')}
-                      value={newTaskWorkstation}
-                      onChange={(e) => setNewTaskWorkstation(e.target.value)}
-                      className="flex-1"
-                    />
+                <div className="mt-2">
+                  <div className={cn("flex gap-2", isMobile && "flex-col")}>
+                    <div className={cn("flex gap-2", isMobile ? "w-full" : "flex-1")}>
+                      <Input
+                        placeholder={t('npm_new_task_placeholder')}
+                        value={newTaskName}
+                        onChange={(e) => setNewTaskName(e.target.value)}
+                        className={cn("flex-1", isMobile && "h-9 text-sm")}
+                      />
+                      <Input
+                        placeholder={t('npm_workstation_placeholder')}
+                        value={newTaskWorkstation}
+                        onChange={(e) => setNewTaskWorkstation(e.target.value)}
+                        className={cn("flex-1", isMobile && "h-9 text-sm")}
+                      />
+                    </div>
                     <Button 
                       type="button" 
-                      size="icon" 
+                      size={isMobile ? "sm" : "icon"}
+                      className={cn(isMobile && "h-9 w-full")}
                       onClick={handleAddCustomTask}
                     >
                       <Plus className="h-4 w-4" />
+                      {isMobile && <span className="ml-1">{t('npm_new_task_placeholder')}</span>}
                     </Button>
                   </div>
                 </div>
