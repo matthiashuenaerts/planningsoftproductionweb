@@ -288,31 +288,52 @@ const SyncLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string; slug:
             const syncDetails: any[] = details?.sync_details ?? [];
             const errorDetails: string[] = details?.error_details ?? [];
             const hasErrors = (log.error_count ?? 0) > 0;
+            const updatedProjects = syncDetails.filter((d: any) => d.status === 'updated');
+            const errorProjects = syncDetails.filter((d: any) => d.status === 'error');
 
             return (
               <div key={log.id} className="bg-white/5 rounded-md border border-white/10">
                 <button
-                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/5 rounded-md"
+                  className="w-full flex items-start justify-between px-3 py-2 text-left hover:bg-white/5 rounded-md"
                   onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2">
                     {hasErrors ? (
-                      <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                      <XCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                     ) : (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
                     )}
-                    <div>
+                    <div className="space-y-0.5">
                       <p className="text-sm text-white">
                         {log.synced_count ?? 0} synced · {log.error_count ?? 0} errors
                         {details?.total_projects != null && <span className="text-slate-400"> / {details.total_projects} total</span>}
                       </p>
+                      {updatedProjects.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {updatedProjects.map((d: any, i: number) => (
+                            <Badge key={i} className="text-[10px] bg-blue-600/30 text-blue-300 font-normal">
+                              {d.project_name || d.project_link_id}
+                              {d.changes && ` (${(d.changes as string[]).join(', ')})`}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {errorProjects.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {errorProjects.map((d: any, i: number) => (
+                            <Badge key={i} className="text-[10px] bg-red-600/30 text-red-300 font-normal">
+                              ✗ {d.project_name || d.project_link_id}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-xs text-slate-400">
                         {getTenantName(log.tenant_id)} · {log.created_at ? formatDistanceToNow(new Date(log.created_at), { addSuffix: true }) : ""}
                         {details?.automated ? " · automated" : " · manual"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {hasErrors && <Badge className="text-[10px] bg-red-600/40">{log.error_count} errors</Badge>}
                     {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                   </div>
