@@ -10,14 +10,15 @@ const BrokenPartsSummaryPage: React.FC = () => {
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background overflow-hidden">
       {!isMobile && (
-        <div className="w-64 h-full">
+        <div className="w-64 h-full flex-shrink-0">
           <Navbar />
         </div>
       )}
-      <div className={`flex-1 overflow-auto ${isMobile ? 'w-full' : 'ml-0'}`}>
-        <div className="container mx-auto px-4 py-6">
+      {isMobile && <Navbar />}
+      <div className={`flex-1 overflow-auto min-w-0 ${isMobile ? 'pt-16' : ''}`}>
+        <div className={`${isMobile ? 'px-3 py-4' : 'container mx-auto px-4 py-6'}`}>
           <BrokenPartsSummary />
         </div>
       </div>

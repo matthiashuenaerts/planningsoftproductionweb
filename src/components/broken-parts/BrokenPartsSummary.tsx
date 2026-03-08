@@ -254,33 +254,35 @@ const BrokenPartsSummary: React.FC = () => {
         
         <TabsContent value="table">
           <Card>
-            <CardHeader>
-              <CardTitle>Detailed Broken Parts Data</CardTitle>
-              <CardDescription>Complete listing of all broken parts in the selected time period</CardDescription>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-sm sm:text-base">Detailed Broken Parts Data</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Complete listing of all broken parts in the selected time period</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Workstation</TableHead>
-                    <TableHead>Reported By</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.length === 0 ? <TableRow>
-                      <TableCell colSpan={5} className="text-center">No data available for the selected filters</TableCell>
-                    </TableRow> : filteredData.map(part => <TableRow key={part.id}>
-                        <TableCell>{part.created_at ? format(new Date(part.created_at), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                        <TableCell>{part.projects?.name || 'N/A'}</TableCell>
-                        <TableCell>{part.workstations?.name || 'N/A'}</TableCell>
-                        <TableCell>{part.employees?.name || 'N/A'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{part.description}</TableCell>
-                      </TableRow>)}
-                </TableBody>
-              </Table>
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Date</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Project</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Workstation</TableHead>
+                      <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Reported By</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.length === 0 ? <TableRow>
+                        <TableCell colSpan={5} className="text-center text-xs sm:text-sm">No data available for the selected filters</TableCell>
+                      </TableRow> : filteredData.map(part => <TableRow key={part.id}>
+                          <TableCell className="text-xs sm:text-sm whitespace-nowrap">{part.created_at ? format(new Date(part.created_at), 'MMM dd, yyyy') : 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm">{part.projects?.name || 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{part.workstations?.name || 'N/A'}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{part.employees?.name || 'N/A'}</TableCell>
+                          <TableCell className="max-w-[120px] sm:max-w-xs truncate text-xs sm:text-sm">{part.description}</TableCell>
+                        </TableRow>)}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
