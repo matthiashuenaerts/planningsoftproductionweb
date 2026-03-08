@@ -108,6 +108,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     createLocalizedPath
   } = useLanguage();
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
   
   // Query active time registration for current employee
   const { data: activeRegistration } = useQuery({
