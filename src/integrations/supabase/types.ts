@@ -1738,6 +1738,7 @@ export type Database = {
           display_order: number
           id: string
           image_url: string | null
+          is_global: boolean
           is_published: boolean
           tags: string[] | null
           tenant_id: string
@@ -1753,6 +1754,7 @@ export type Database = {
           display_order?: number
           id?: string
           image_url?: string | null
+          is_global?: boolean
           is_published?: boolean
           tags?: string[] | null
           tenant_id?: string
@@ -1768,6 +1770,7 @@ export type Database = {
           display_order?: number
           id?: string
           image_url?: string | null
+          is_global?: boolean
           is_published?: boolean
           tags?: string[] | null
           tenant_id?: string
@@ -1806,6 +1809,7 @@ export type Database = {
           display_order: number
           id: string
           is_active: boolean
+          is_global: boolean
           name: string
           tenant_id: string
           updated_at: string
@@ -1816,6 +1820,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_active?: boolean
+          is_global?: boolean
           name: string
           tenant_id?: string
           updated_at?: string
@@ -1826,6 +1831,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_active?: boolean
+          is_global?: boolean
           name?: string
           tenant_id?: string
           updated_at?: string
