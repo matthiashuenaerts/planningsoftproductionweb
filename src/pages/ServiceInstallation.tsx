@@ -308,63 +308,74 @@ const ServiceInstallation: React.FC = () => {
       mapInstanceRef.current = null;
     }
 
-    const map = L.map(mapRef.current, { zoomControl: true }).setView([50.85, 4.35], 9);
-    mapInstanceRef.current = map;
+    // Small delay to ensure container has rendered dimensions
+    const initTimer = setTimeout(() => {
+      if (!mapRef.current) return;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(map);
+      const map = L.map(mapRef.current, { zoomControl: true }).setView([50.85, 4.35], 9);
+      mapInstanceRef.current = map;
 
-    const bounds = L.latLngBounds([]);
-
-    // Add start point
-    if (routeData.startPoint) {
-      const startIcon = L.divIcon({
-        html: `<div style="background:${teamColor};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏠</div>`,
-        className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      });
-      L.marker([routeData.startPoint.lat, routeData.startPoint.lng], { icon: startIcon })
-        .addTo(map)
-        .bindPopup(`<strong>Start / Return</strong><br/>${routeData.startPoint.address}${routeData.departureTime ? `<br/>🚗 Depart: ${routeData.departureTime}` : ''}${routeData.returnTime ? `<br/>🏠 Return: ${routeData.returnTime}` : ''}`);
-      bounds.extend([routeData.startPoint.lat, routeData.startPoint.lng]);
-    }
-
-    // Add stop markers with arrival times
-    routeData.stops.forEach((stop) => {
-      if (!stop.lat || !stop.lng) return;
-      const icon = L.divIcon({
-        html: `<div style="background:${teamColor};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${stop.serviceOrder}</div>`,
-        className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      });
-      L.marker([stop.lat, stop.lng], { icon })
-        .addTo(map)
-        .bindPopup(`<strong>#${stop.serviceOrder} — ${stop.projectName}</strong><br/>${stop.client}<br/>${stop.address}${stop.estimatedArrival ? `<br/>🕐 Arrive: ${stop.estimatedArrival}` : ''}${stop.estimatedDeparture ? ` — Leave: ${stop.estimatedDeparture}` : ''}${stop.serviceHours ? `<br/>🔧 ${stop.serviceHours}h service` : ''}`);
-      bounds.extend([stop.lat, stop.lng]);
-    });
-
-    // Draw route
-    if (routeData.geometry.length > 0) {
-      L.polyline(routeData.geometry, {
-        color: teamColor,
-        weight: 4,
-        opacity: 0.8,
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
       }).addTo(map);
-    }
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
+      const bounds = L.latLngBounds([]);
 
-    // Force map to recalculate size after layout settles
-    setTimeout(() => map.invalidateSize(), 100);
-    setTimeout(() => map.invalidateSize(), 300);
-    setTimeout(() => map.invalidateSize(), 600);
+      // Add start point
+      if (routeData.startPoint) {
+        const startIcon = L.divIcon({
+          html: `<div style="background:${teamColor};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏠</div>`,
+          className: '',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+        L.marker([routeData.startPoint.lat, routeData.startPoint.lng], { icon: startIcon })
+          .addTo(map)
+          .bindPopup(`<strong>Start / Return</strong><br/>${routeData.startPoint.address}${routeData.departureTime ? `<br/>🚗 Depart: ${routeData.departureTime}` : ''}${routeData.returnTime ? `<br/>🏠 Return: ${routeData.returnTime}` : ''}`);
+        bounds.extend([routeData.startPoint.lat, routeData.startPoint.lng]);
+      }
+
+      // Add stop markers with arrival times
+      routeData.stops.forEach((stop) => {
+        if (!stop.lat || !stop.lng) return;
+        const icon = L.divIcon({
+          html: `<div style="background:${teamColor};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${stop.serviceOrder}</div>`,
+          className: '',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+        L.marker([stop.lat, stop.lng], { icon })
+          .addTo(map)
+          .bindPopup(`<strong>#${stop.serviceOrder} — ${stop.projectName}</strong><br/>${stop.client}<br/>${stop.address}${stop.estimatedArrival ? `<br/>🕐 Arrive: ${stop.estimatedArrival}` : ''}${stop.estimatedDeparture ? ` — Leave: ${stop.estimatedDeparture}` : ''}${stop.serviceHours ? `<br/>🔧 ${stop.serviceHours}h service` : ''}`);
+        bounds.extend([stop.lat, stop.lng]);
+      });
+
+      // Draw route
+      if (routeData.geometry.length > 0) {
+        L.polyline(routeData.geometry, {
+          color: teamColor,
+          weight: 4,
+          opacity: 0.8,
+        }).addTo(map);
+      }
+
+      // Invalidate size first, then fit bounds
+      map.invalidateSize();
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+
+      // Additional invalidateSize calls for late layout shifts
+      setTimeout(() => {
+        map.invalidateSize();
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+      }, 300);
+      setTimeout(() => map.invalidateSize(), 800);
+    }, 200);
 
     return () => {
+      clearTimeout(initTimer);
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
