@@ -1375,9 +1375,9 @@ const TimeRegistrations = () => {
                         {registration.employees?.name || t("unknown_employee")}
                       </TableCell>
                       <TableCell>
-                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : t("unknown_project"))}
+                        {registration.tasks?.phases?.projects?.name || (registration.workstation_tasks?.workstations ? `${t("workstation_prefix")}${registration.workstation_tasks.workstations.name}` : (registration.project_name || t("unknown_project")))}
                       </TableCell>
-                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || t("unknown_task")}</TableCell>
+                      <TableCell>{registration.tasks?.title || registration.workstation_tasks?.task_name || (registration.service_assignment_id ? '🔧 Service' : t("unknown_task"))}</TableCell>
                       <TableCell>{formatDateTime(registration.start_time)}</TableCell>
                       <TableCell>
                         {registration.end_time ? formatDateTime(registration.end_time) : '-'}
