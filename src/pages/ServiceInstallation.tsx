@@ -359,6 +359,11 @@ const ServiceInstallation: React.FC = () => {
       map.fitBounds(bounds, { padding: [40, 40] });
     }
 
+    // Force map to recalculate size after layout settles
+    setTimeout(() => map.invalidateSize(), 100);
+    setTimeout(() => map.invalidateSize(), 300);
+    setTimeout(() => map.invalidateSize(), 600);
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
