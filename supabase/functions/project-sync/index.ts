@@ -125,6 +125,9 @@ async function syncProject(
             if (orderData.order.plaatsingsdatum) {
               rawPlacementDate = orderData.order.plaatsingsdatum;
             }
+            if (orderData.order.adres) {
+              rawAddress = orderData.order.adres;
+            }
             if (Array.isArray(orderData.order.planning) && orderData.order.planning.length > 0) {
               const p = orderData.order.planning[0];
               planningStartRaw = p.datum_start || p.start_date || null;
