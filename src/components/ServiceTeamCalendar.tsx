@@ -57,10 +57,12 @@ interface ServiceAssignment {
   project_id: string;
   team: string;
   team_id?: string;
-  start_date: string;
+  start_date: string | null;
   duration: number;
   service_hours?: number;
   service_order?: number;
+  service_possible_week?: string;
+  service_notes?: string;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
