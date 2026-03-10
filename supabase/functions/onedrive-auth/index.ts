@@ -49,8 +49,11 @@ serve(async (req) => {
     if (action === "exchange-code") {
       const { code, redirectUri, codeVerifier, clientId } = await req.json();
       
+      console.log("exchange-code called", { redirectUri, hasCode: !!code, hasCodeVerifier: !!codeVerifier, hasClientId: !!clientId, hasFallback: !!FALLBACK_CLIENT_ID });
+
       const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
       if (!microsoftClientId) {
+        console.error("No Microsoft Client ID available");
         return new Response(
           JSON.stringify({ error: "Microsoft Client ID not configured" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -72,12 +75,14 @@ serve(async (req) => {
       const tokens = await tokenResponse.json();
 
       if (tokens.error) {
+        console.error("Microsoft token exchange error:", tokens.error, tokens.error_description);
         return new Response(
           JSON.stringify({ error: tokens.error_description || tokens.error }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
+      console.log("Token exchange successful");
       return new Response(
         JSON.stringify({
           access_token: tokens.access_token,
