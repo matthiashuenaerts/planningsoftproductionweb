@@ -217,11 +217,46 @@ async function syncProject(
 
     console.log(`Project ${project.name}: changes detected: ${changes.join(', ')}`);
 
-    // Update project installation date if changed
+    // Parse address if available
+    const addressFields: Record<string, string | null> = {};
+    if (rawAddress) {
+      const adres = rawAddress.trim();
+      const commaIdx = adres.indexOf(',');
+      if (commaIdx > 0) {
+        const streetPart = adres.substring(0, commaIdx).trim();
+        const cityPart = adres.substring(commaIdx + 1).trim();
+        const streetMatch = streetPart.match(/^(.+?)\s+(\d+\S*)$/);
+        if (streetMatch) {
+          addressFields.address_street = streetMatch[1];
+          addressFields.address_number = streetMatch[2];
+        } else {
+          addressFields.address_street = streetPart;
+        }
+        const cityMatch = cityPart.match(/^(\d+)\s+(.+)$/);
+        if (cityMatch) {
+          addressFields.address_postal_code = cityMatch[1];
+          addressFields.address_city = cityMatch[2];
+        } else {
+          addressFields.address_city = cityPart;
+        }
+      } else {
+        addressFields.address_street = adres;
+      }
+    }
+
+    // Update project installation date and address if changed
+    const projectUpdate: Record<string, any> = { updated_at: new Date().toISOString() };
     if (dateChanged && normalizedExternal) {
+      projectUpdate.installation_date = normalizedExternal;
+    }
+    if (Object.keys(addressFields).length > 0) {
+      Object.assign(projectUpdate, addressFields);
+      if (!changes.includes('address')) changes.push('address');
+    }
+    if (Object.keys(projectUpdate).length > 1) {
       const { error: updateProjectError } = await supabase
         .from('projects')
-        .update({ installation_date: normalizedExternal, updated_at: new Date().toISOString() })
+        .update(projectUpdate)
         .eq('id', project.id);
       if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
     }
