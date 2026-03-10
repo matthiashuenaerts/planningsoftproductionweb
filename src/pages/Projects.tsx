@@ -38,7 +38,6 @@ const Projects = () => {
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
-  const [afterSalesProject, setAfterSalesProject] = useState<{ id: string; name: string } | null>(null);
   const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
 
 
