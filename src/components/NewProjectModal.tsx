@@ -500,6 +500,40 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 }
               }
 
+              // Parse address from synced data (format: "Streetname Nr, PostalCode City")
+              if (order.adres) {
+                try {
+                  const adres = order.adres.trim();
+                  const commaIdx = adres.indexOf(',');
+                  if (commaIdx > 0) {
+                    const streetPart = adres.substring(0, commaIdx).trim();
+                    const cityPart = adres.substring(commaIdx + 1).trim();
+
+                    // Extract street and number (last word-group that starts with a digit)
+                    const streetMatch = streetPart.match(/^(.+?)\s+(\d+\S*)$/);
+                    if (streetMatch) {
+                      form.setValue('address_street', streetMatch[1]);
+                      form.setValue('address_number', streetMatch[2]);
+                    } else {
+                      form.setValue('address_street', streetPart);
+                    }
+
+                    // Extract postal code and city (first word-group of digits, rest is city)
+                    const cityMatch = cityPart.match(/^(\d+)\s+(.+)$/);
+                    if (cityMatch) {
+                      form.setValue('address_postal_code', cityMatch[1]);
+                      form.setValue('address_city', cityMatch[2]);
+                    } else {
+                      form.setValue('address_city', cityPart);
+                    }
+                  } else {
+                    form.setValue('address_street', adres);
+                  }
+                } catch (e) {
+                  console.warn('Could not parse address:', order.adres, e);
+                }
+              }
+
               toast({ title: t('npm_project_synced'), description: t('npm_data_loaded', { name: order.klant || linkId }) });
             } else {
               toast({ title: t('npm_no_data'), description: t('npm_no_data_found'), variant: 'destructive' });
