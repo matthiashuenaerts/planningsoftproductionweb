@@ -476,10 +476,6 @@ const Projects = () => {
                                 <Package className="mr-2 h-4 w-4" />
                                 {t('orders')}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setAfterSalesProject({ id: project.id, name: project.name }); }}>
-                                <HeadphonesIcon className="mr-2 h-4 w-4" />
-                                After Sales Service
-                              </DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={e => { e.stopPropagation(); setProjectToDelete(project.id); }}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 {t('delete_project')}
