@@ -36,6 +36,8 @@ const OneDriveCallback: React.FC = () => {
       const clientId = sessionStorage.getItem('onedrive_client_id');
 
       try {
+        console.log('OneDrive callback: exchanging code', { redirectUri, hasCode: !!code, hasCodeVerifier: !!codeVerifier, hasClientId: !!clientId });
+        
         const { data, error: fnError } = await supabase.functions.invoke(
           'onedrive-auth?action=exchange-code',
           {
@@ -43,7 +45,11 @@ const OneDriveCallback: React.FC = () => {
           }
         );
 
+        console.log('OneDrive callback response:', { data, error: fnError });
+
         if (fnError) throw fnError;
+        
+        if (data?.error) throw new Error(data.error);
 
         const tokens = {
           access_token: data.access_token,
