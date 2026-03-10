@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PartDetailDialog } from '@/components/PartDetailDialog';
 import { ProjectCostingTab } from '@/components/ProjectCostingTab';
+import AfterSalesTab from '@/components/AfterSalesTab';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
