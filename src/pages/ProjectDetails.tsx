@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin, DollarSign, Printer } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarDays, Clock, Package, FileText, Folder, Plus, List, Settings, Barcode, TrendingUp, TrendingDown, Edit3, Save, X, Home, Camera, Paperclip, Trash2, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Loader2, Circle, Eye, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MapPin, DollarSign, Printer, HeadphonesIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, Task, taskService } from '@/services/dataService';
 import { timeRegistrationService } from '@/services/timeRegistrationService';
@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PartDetailDialog } from '@/components/PartDetailDialog';
 import { ProjectCostingTab } from '@/components/ProjectCostingTab';
+import AfterSalesTab from '@/components/AfterSalesTab';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -1170,6 +1171,9 @@ const ProjectDetails = () => {
                 <Button size="sm" variant={activeTab === 'files' ? 'default' : 'ghost'} onClick={() => setActiveTab('files')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'files' && 'text-muted-foreground hover:text-foreground')}>
                   <FileText className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('files')}
                 </Button>
+                <Button size="sm" variant={activeTab === 'aftersales' ? 'default' : 'ghost'} onClick={() => setActiveTab('aftersales')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'aftersales' && 'text-muted-foreground hover:text-foreground')}>
+                  <HeadphonesIcon className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('as_tab_label')}
+                </Button>
                 <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
                   <Folder className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
@@ -1203,7 +1207,7 @@ const ProjectDetails = () => {
             ))}
           </div>
 
-          {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
+          {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'aftersales' ? <AfterSalesTab projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
               {partsLists.length > 0 ? <div className="space-y-4">
                   {/* Parts List Management Header */}
                   <Card>
