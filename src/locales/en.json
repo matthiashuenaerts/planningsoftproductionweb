@@ -1265,5 +1265,12 @@
   "as_updated": "After sales service has been updated.",
   "as_deleted": "After sales service has been deleted.",
   "as_confirm_delete": "Are you sure you want to delete this service?",
-  "as_unknown_team": "Unknown Team"
+  "as_unknown_team": "Unknown Team",
+  "as_possible_week": "Possible Week",
+  "as_possible_week_placeholder": "e.g. Week 24, June...",
+  "as_no_date": "No date yet",
+  "as_no_team": "No team assigned",
+  "as_still_to_plan": "Still to Plan",
+  "as_still_to_plan_desc": "After sales services that still need to be scheduled",
+  "as_unplanned": "Unplanned"
 }

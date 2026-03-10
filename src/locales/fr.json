@@ -1743,5 +1743,12 @@
   "as_updated": "Le service après-vente a été mis à jour.",
   "as_deleted": "Le service après-vente a été supprimé.",
   "as_confirm_delete": "Êtes-vous sûr de vouloir supprimer ce service ?",
-  "as_unknown_team": "Équipe inconnue"
+  "as_unknown_team": "Équipe inconnue",
+  "as_possible_week": "Semaine possible",
+  "as_possible_week_placeholder": "ex. Semaine 24, Juin...",
+  "as_no_date": "Pas encore de date",
+  "as_no_team": "Aucune équipe assignée",
+  "as_still_to_plan": "Encore à planifier",
+  "as_still_to_plan_desc": "Services après-vente qui doivent encore être planifiés",
+  "as_unplanned": "Non planifié"
 }
