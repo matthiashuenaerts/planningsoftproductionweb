@@ -4250,7 +4250,8 @@ export type Database = {
           service_hours: number | null
           service_notes: string | null
           service_order: number | null
-          start_date: string
+          service_possible_week: string | null
+          start_date: string | null
           team: string
           team_id: string | null
           tenant_id: string
@@ -4264,7 +4265,8 @@ export type Database = {
           service_hours?: number | null
           service_notes?: string | null
           service_order?: number | null
-          start_date: string
+          service_possible_week?: string | null
+          start_date?: string | null
           team: string
           team_id?: string | null
           tenant_id?: string
@@ -4278,7 +4280,8 @@ export type Database = {
           service_hours?: number | null
           service_notes?: string | null
           service_order?: number | null
-          start_date?: string
+          service_possible_week?: string | null
+          start_date?: string | null
           team?: string
           team_id?: string | null
           tenant_id?: string
