@@ -18,7 +18,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
-import AfterSalesServiceDialog from '@/components/AfterSalesServiceDialog';
+
 
 const Projects = () => {
   const navigate = useNavigate();
