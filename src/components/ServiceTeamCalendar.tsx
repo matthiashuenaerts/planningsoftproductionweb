@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X, Search, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X, Search, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,10 +57,12 @@ interface ServiceAssignment {
   project_id: string;
   team: string;
   team_id?: string;
-  start_date: string;
+  start_date: string | null;
   duration: number;
   service_hours?: number;
   service_order?: number;
+  service_possible_week?: string;
+  service_notes?: string;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
@@ -739,6 +741,84 @@ const ServiceTeamCalendar: React.FC = () => {
           </Card>
         );
       })}
+
+      {/* Still to Plan Section */}
+      {(() => {
+        const unplanned = assignments.filter(a => !a.start_date || !a.team_id);
+        if (unplanned.length === 0) return null;
+        return (
+          <Card className="border-orange-300 dark:border-orange-700">
+            <CardHeader className={cn("pb-3", isMobile && "p-3 pb-2")}>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-orange-500" />
+                <CardTitle className={isMobile ? "text-sm" : "text-lg"}>{t('as_still_to_plan')}</CardTitle>
+                <Badge variant="secondary" className="text-xs">{unplanned.length}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('as_still_to_plan_desc')}</p>
+            </CardHeader>
+            <CardContent className={isMobile ? "p-2 pt-0" : ""}>
+              <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3")}>
+                {unplanned.map(a => {
+                  const project = projects.find(p => p.id === a.project_id);
+                  if (!project) return null;
+                  const team = serviceTeams.find(t => t.id === a.team_id);
+                  return (
+                    <div
+                      key={a.id}
+                      className={cn(
+                        "border border-orange-200 dark:border-orange-800 rounded-lg cursor-pointer hover:bg-accent/50 transition-colors",
+                        isMobile ? "p-2 text-[11px]" : "p-3 text-xs"
+                      )}
+                      onClick={() => navigate(`/projects/${project.id}`)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium truncate flex-1">{project.name}</span>
+                        <button
+                          className="text-destructive hover:text-destructive/80 ml-1"
+                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(a.id); }}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="text-muted-foreground truncate">{project.client}</div>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {team ? (
+                          <Badge variant="outline" className="text-[10px] gap-1">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
+                            {team.name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-600 dark:text-orange-400">
+                            {t('as_no_team')}
+                          </Badge>
+                        )}
+                        {!a.start_date && (
+                          <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-600 dark:text-orange-400">
+                            {t('as_no_date')}
+                          </Badge>
+                        )}
+                        {a.service_possible_week && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            📅 {a.service_possible_week}
+                          </Badge>
+                        )}
+                        {a.service_hours && (
+                          <Badge variant="outline" className="text-[10px] gap-0.5">
+                            <Clock className="h-2.5 w-2.5" />{a.service_hours}h
+                          </Badge>
+                        )}
+                      </div>
+                      {a.service_notes && (
+                        <p className="text-muted-foreground mt-1 line-clamp-2">{a.service_notes.split('\nTodos:')[0].trim()}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Assign Project Dialog */}
       <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {

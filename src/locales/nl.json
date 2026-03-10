@@ -1743,5 +1743,12 @@
   "as_updated": "Naservice is bijgewerkt.",
   "as_deleted": "Naservice is verwijderd.",
   "as_confirm_delete": "Weet je zeker dat je deze service wilt verwijderen?",
-  "as_unknown_team": "Onbekend Team"
+  "as_unknown_team": "Onbekend Team",
+  "as_possible_week": "Mogelijke Week",
+  "as_possible_week_placeholder": "bv. Week 24, Juni...",
+  "as_no_date": "Nog geen datum",
+  "as_no_team": "Geen team toegewezen",
+  "as_still_to_plan": "Nog In te Plannen",
+  "as_still_to_plan_desc": "Naservices die nog ingepland moeten worden",
+  "as_unplanned": "Ongepland"
 }
