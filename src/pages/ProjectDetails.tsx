@@ -1170,6 +1170,9 @@ const ProjectDetails = () => {
                 <Button size="sm" variant={activeTab === 'files' ? 'default' : 'ghost'} onClick={() => setActiveTab('files')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'files' && 'text-muted-foreground hover:text-foreground')}>
                   <FileText className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('files')}
                 </Button>
+                <Button size="sm" variant={activeTab === 'aftersales' ? 'default' : 'ghost'} onClick={() => setActiveTab('aftersales')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'aftersales' && 'text-muted-foreground hover:text-foreground')}>
+                  <HeadphonesIcon className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('as_tab_label')}
+                </Button>
                 <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
                   <Folder className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
