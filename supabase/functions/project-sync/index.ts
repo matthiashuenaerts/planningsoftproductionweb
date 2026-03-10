@@ -103,6 +103,7 @@ async function syncProject(
     let planningStartRaw: string | null = null;
     let planningEndRaw: string | null = null;
     let planningTeams: string[] = [];
+    let rawAddress: string | null = null;
 
     const queryResponse = await fetch(
       `${externalDbConfig.baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
