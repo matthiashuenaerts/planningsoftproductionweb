@@ -19,6 +19,7 @@ interface PlacementTeam {
   id: string;
   name: string;
   color: string;
+  team_type?: string;
 }
 
 interface TruckOption {
@@ -60,6 +61,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [trucks, setTrucks] = useState<TruckOption[]>([]);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
   const [installationDate, setInstallationDate] = useState<string>('');
+  const [serviceHours, setServiceHours] = useState<number>(2);
 
   useEffect(() => {
     if (isOpen) {
@@ -78,6 +80,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       setEmployeesOnHoliday(new Set());
       setSelectedTruckId('');
       setInstallationDate('');
+      setServiceHours(2);
       
       // Fetch all data
       fetchTeams();
@@ -87,6 +90,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       fetchTrucks();
       fetchTruckAssignment();
       fetchInstallationDate();
+      fetchServiceHours();
     }
   }, [isOpen, projectId, currentTeamId, currentStartDate, currentDuration]);
 
@@ -95,6 +99,19 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       fetchTeamMembers(selectedTeamId);
     }
   }, [selectedTeamId]);
+
+  const fetchServiceHours = async () => {
+    if (!currentTeamId) return;
+    const { data } = await supabase
+      .from('project_team_assignments')
+      .select('service_hours')
+      .eq('project_id', projectId)
+      .eq('team_id', currentTeamId)
+      .maybeSingle();
+    if (data && (data as any).service_hours) {
+      setServiceHours((data as any).service_hours);
+    }
+  };
 
   const fetchInstallationDate = async () => {
     const { data, error } = await supabase
@@ -113,9 +130,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const fetchTeams = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from('placement_teams')
-      .select('id, name, color')
+      .select('id, name, color, team_type') as any)
       .eq('is_active', true)
       .order('name');
 
@@ -317,14 +334,16 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       if (existingAssignment) {
         console.log('Updating existing project team assignment...', existingAssignment.id);
+        const isService = teams.find(t => t.id === selectedTeamId)?.team_type === 'service';
         const { error: assignmentError } = await supabase
           .from('project_team_assignments')
           .update({
             team_id: selectedTeamId,
             team: selectedTeam.name,
             start_date: startDate,
-            duration: duration,
-          })
+            duration: isService ? 1 : duration,
+            ...(isService ? { service_hours: serviceHours } : { service_hours: null }),
+          } as any)
           .eq('id', existingAssignment.id);
 
         if (assignmentError) {
@@ -333,6 +352,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         }
       } else {
         console.log('Creating new project team assignment...');
+        const isService = teams.find(t => t.id === selectedTeamId)?.team_type === 'service';
         const { error: insertError } = await supabase
           .from('project_team_assignments')
           .insert({
@@ -340,8 +360,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             team_id: selectedTeamId,
             team: selectedTeam.name,
             start_date: startDate,
-            duration: duration,
-          });
+            duration: isService ? 1 : duration,
+            ...(isService ? { service_hours: serviceHours } : {}),
+          } as any);
 
         if (insertError) {
           console.error('Assignment insert error:', insertError);
@@ -638,16 +659,31 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="duration">Duration (days)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min="1"
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
-              />
-            </div>
+            {teams.find(t => t.id === selectedTeamId)?.team_type === 'service' ? (
+              <div className="space-y-2">
+                <Label htmlFor="serviceHours">Service Hours</Label>
+                <Input
+                  id="serviceHours"
+                  type="number"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={serviceHours}
+                  onChange={(e) => setServiceHours(parseFloat(e.target.value) || 1)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration (days)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={duration}
+                  onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>

@@ -100,9 +100,9 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
       
       const { data: assignmentsData } = await query.order('created_at', { ascending: true });
       
-      // Filter: only show entries that have service_notes (after sales) or are from service teams
+      // Filter: only show entries that have service_notes (actual service tickets), not just any service team assignment
       const filtered = (assignmentsData || []).filter((a: any) => 
-        teamIds.includes(a.team_id) || a.team_id === null
+        a.service_notes != null || a.team_id === null
       );
       setAssignments(filtered as ServiceAssignment[]);
     } catch (error) {
