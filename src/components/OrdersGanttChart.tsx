@@ -129,7 +129,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectsError || !projectsData) return;
 
     const projectIds = projectsData.map(p => p.id).filter(Boolean);
-    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
