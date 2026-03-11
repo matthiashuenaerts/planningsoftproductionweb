@@ -1044,6 +1044,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               project.employeesOnHoliday?.has(emp.id)
                             );
 
+                            // Check if this is a service ticket (has service_notes on any assignment)
+                            const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+
                             // Decide where to place the outside label so it never creates extra horizontal scroll
                             const dayWidthPx = position.totalDays > 0 ? containerWidth / position.totalDays : 0;
                             const barStartPx = dayWidthPx * position.left;
