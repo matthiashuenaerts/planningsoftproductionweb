@@ -677,6 +677,16 @@ const InstallationTeamCalendar = ({
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const [pageScrollPosition, setPageScrollPosition] = useState(0);
   const [teamCollapsedStates, setTeamCollapsedStates] = useState<Record<string, boolean>>({});
+  
+  // Service hours dialog state
+  const [serviceHoursDialog, setServiceHoursDialog] = useState<{
+    open: boolean;
+    projectId: string;
+    team: string;
+    teamId: string;
+    startDate: string;
+    hours: number;
+  }>({ open: false, projectId: '', team: '', teamId: '', startDate: '', hours: 2 });
   const {
     toast
   } = useToast();
