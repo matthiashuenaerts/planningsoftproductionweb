@@ -758,7 +758,9 @@ const Dashboard: React.FC = () => {
               .in('id', serviceProjectIds);
             const projectNameMap = new Map((serviceProjectsData || []).map(p => [p.id, p.name]));
             
-            const newServiceAssignments: ServiceAssignment[] = serviceData.map(s => {
+            const newServiceAssignments: ServiceAssignment[] = serviceData
+              .filter(s => s.service_notes) // Only include actual service tickets
+              .map(s => {
               const team = serviceTeamMap.get(s.team_id || '');
               // Calculate loading date: one workday before start_date
               const serviceDate = new Date(s.start_date);
