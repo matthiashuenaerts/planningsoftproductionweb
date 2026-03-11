@@ -580,7 +580,7 @@ const ServiceInstallation: React.FC = () => {
                   </Card>
 
                   {/* Stops Detail List */}
-                  <Card>
+                  <Card className="overflow-hidden">
                     <CardHeader className={`${isMobile ? 'px-3 py-2' : 'pb-2'}`}>
                       <CardTitle className={`${isMobile ? 'text-sm' : 'text-base'} flex items-center gap-2`}>
                         <MapPin className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
@@ -588,7 +588,7 @@ const ServiceInstallation: React.FC = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <ScrollArea className={isMobile ? 'max-h-[350px]' : 'max-h-[420px]'}>
+                      <ScrollArea className={isMobile ? 'h-[calc(100vh-380px)]' : 'h-[calc(100vh-400px)]'}>
                         <div className="divide-y divide-border">
                           {routeData.stops.map((stop) => (
                             <div key={stop.assignmentId} className={`${isMobile ? 'p-3' : 'p-4'} hover:bg-muted/50 transition-colors`}>
