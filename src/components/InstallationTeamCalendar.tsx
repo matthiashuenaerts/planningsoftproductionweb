@@ -37,6 +37,7 @@ interface Assignment {
   team_id?: string;
   start_date: string;
   duration: number;
+  service_hours?: number | null;
   created_at?: string;
   updated_at?: string;
 }

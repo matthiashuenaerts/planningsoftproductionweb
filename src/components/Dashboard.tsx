@@ -37,6 +37,8 @@ interface LoadingAssignment {
     allCharged: boolean;
   };
   teamColor?: string;
+  teamType?: string; // 'service' or 'conventional'
+  serviceHours?: number | null;
   truck?: {
     id: string;
     name: string;
@@ -52,6 +54,7 @@ interface ServiceAssignment {
   start_date: string;
   service_hours: number | null;
   service_notes: string | null;
+  loading_date?: string; // calculated: one workday before start_date
 }
 
 const Dashboard: React.FC = () => {
