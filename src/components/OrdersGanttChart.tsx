@@ -1153,8 +1153,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    </div>
 
                                    {/* Project label */}
-                                   <div className="px-2 text-xs text-white font-medium truncate flex-1">
-                                     <div className="truncate">{projectLabel}</div>
+                                   <div className="px-2 text-xs text-white font-medium truncate flex-1 flex items-center gap-1">
+                                     {isServiceTicket && <Wrench className="h-3 w-3 shrink-0" />}
+                                     <span className="truncate">{projectLabel}</span>
                                    </div>
                                  </div>
 
