@@ -319,14 +319,16 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
 
       if (existingAssignment) {
         console.log('Updating existing project team assignment...', existingAssignment.id);
+        const isService = teams.find(t => t.id === selectedTeamId)?.team_type === 'service';
         const { error: assignmentError } = await supabase
           .from('project_team_assignments')
           .update({
             team_id: selectedTeamId,
             team: selectedTeam.name,
             start_date: startDate,
-            duration: duration,
-          })
+            duration: isService ? 1 : duration,
+            ...(isService ? { service_hours: serviceHours } : { service_hours: null }),
+          } as any)
           .eq('id', existingAssignment.id);
 
         if (assignmentError) {
