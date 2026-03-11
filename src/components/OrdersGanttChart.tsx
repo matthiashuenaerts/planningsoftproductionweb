@@ -1118,7 +1118,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                       opacity: isDraggingThisProject ? 0.7 : 1,
                                       transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
                                     }}
-                                    title={`${projectLabel}${isServiceTicket ? ' 🔧 Service' : ''}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
+                                    title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                    onMouseDown={(e) => {
                                      // Only start drag from the bar body, not from resize handles
                                      if (!(e.target as HTMLElement).closest('[data-resize-handle]')) {
