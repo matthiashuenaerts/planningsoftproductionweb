@@ -817,10 +817,16 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Get service assignments for a specific date
+  // Get service assignments for a specific date (service happening on this date)
   const getServiceAssignmentsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return serviceAssignments.filter(sa => sa.start_date === dateStr);
+  };
+
+  // Get service loadings for a specific date (truck loading one day before service)
+  const getServiceLoadingsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return serviceAssignments.filter(sa => sa.loading_date === dateStr);
   };
 
   // Get project color for visual distinction
