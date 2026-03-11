@@ -35,6 +35,7 @@ interface Project {
     team_id: string | null;
     start_date: string;
     duration: number;
+    service_notes?: string | null;
   }>;
   employees?: Employee[];
   employeesOnHoliday?: Set<string>;
