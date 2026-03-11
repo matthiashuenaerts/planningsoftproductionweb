@@ -760,6 +760,9 @@ const Dashboard: React.FC = () => {
             
             const newServiceAssignments: ServiceAssignment[] = serviceData.map(s => {
               const team = serviceTeamMap.get(s.team_id || '');
+              // Calculate loading date: one workday before start_date
+              const serviceDate = new Date(s.start_date);
+              const serviceLoadingDate = getPreviousWorkday(serviceDate, holidaysList);
               return {
                 id: s.id,
                 project_id: s.project_id,
@@ -769,6 +772,7 @@ const Dashboard: React.FC = () => {
                 start_date: s.start_date,
                 service_hours: s.service_hours,
                 service_notes: s.service_notes,
+                loading_date: format(serviceLoadingDate, 'yyyy-MM-dd'),
               };
             });
             
