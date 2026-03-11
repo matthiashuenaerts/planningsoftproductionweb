@@ -6,13 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { CalendarDays, Truck, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { CalendarDays, Truck, ExternalLink, ChevronDown, ChevronUp, Wrench } from 'lucide-react';
 import { useDrag, useDrop } from 'react-dnd';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
@@ -35,6 +37,7 @@ interface Assignment {
   team_id?: string;
   start_date: string;
   duration: number;
+  service_hours?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -245,7 +248,15 @@ const ProjectItem = ({
               </Button>
             </div>
             
-            {team && assignment && <div className="mb-2">
+            {/* Show service hours badge if it's a service assignment */}
+            {assignment?.service_hours && <div className="mb-1">
+                <Badge variant="outline" className="text-xs gap-1">
+                  <Wrench className="h-3 w-3" />
+                  {assignment.service_hours}h
+                </Badge>
+              </div>}
+            
+            {team && assignment && !assignment.service_hours && <div className="mb-2">
                 <DurationSelector value={assignment.duration} onChange={handleDurationChange} />
               </div>}
             
@@ -657,6 +668,7 @@ interface Team {
   color: string;
   external_team_names: string[];
   is_active: boolean;
+  team_type?: string;
 }
 
 const InstallationTeamCalendar = ({
@@ -674,6 +686,16 @@ const InstallationTeamCalendar = ({
   const [scrollPositions, setScrollPositions] = useState<Record<string, number>>({});
   const [pageScrollPosition, setPageScrollPosition] = useState(0);
   const [teamCollapsedStates, setTeamCollapsedStates] = useState<Record<string, boolean>>({});
+  
+  // Service hours dialog state
+  const [serviceHoursDialog, setServiceHoursDialog] = useState<{
+    open: boolean;
+    projectId: string;
+    team: string;
+    teamId: string;
+    startDate: string;
+    hours: number;
+  }>({ open: false, projectId: '', team: '', teamId: '', startDate: '', hours: 2 });
   const {
     toast
   } = useToast();
@@ -707,7 +729,7 @@ const InstallationTeamCalendar = ({
         error: teamsError
       } = await supabase
         .from('placement_teams')
-        .select('*')
+        .select('*, team_type')
         .eq('is_active', true)
         .order('name', { ascending: true });
       
@@ -800,6 +822,24 @@ const InstallationTeamCalendar = ({
     try {
       storePageScrollPosition();
       
+      // Check if target team is a service team
+      const targetTeam = teamId ? teams.find(t => t.id === teamId) : null;
+      const isServiceTeam = targetTeam?.team_type === 'service';
+      
+      // If dropping onto a service team, show hours dialog instead of immediate assignment
+      if (isServiceTeam && teamId && team) {
+        setServiceHoursDialog({
+          open: true,
+          projectId,
+          team,
+          teamId,
+          startDate: newStartDate || format(new Date(), 'yyyy-MM-dd'),
+          hours: 2
+        });
+        restorePageScrollPosition();
+        return;
+      }
+      
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
@@ -839,11 +879,17 @@ const InstallationTeamCalendar = ({
           restorePageScrollPosition();
         }
       } else {
+        // Moving to a regular team - set duration=1 (full day), clear service_hours
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          const updateData: Partial<Assignment> = { team, team_id: teamId };
+          const updateData: any = { team, team_id: teamId, service_hours: null };
           if (newStartDate) {
             updateData.start_date = newStartDate;
+          }
+          // If coming from a service team, reset duration to 1 day
+          const previousTeam = existingAssignment.team_id ? teams.find(t => t.id === existingAssignment.team_id) : null;
+          if (previousTeam?.team_type === 'service') {
+            updateData.duration = 1;
           }
           
           const { error } = await supabase
@@ -859,8 +905,9 @@ const InstallationTeamCalendar = ({
           };
           setAssignments(updatedAssignments);
 
+          const effectiveDuration = updateData.duration || existingAssignment.duration;
           const startDate = new Date(updateData.start_date || existingAssignment.start_date);
-          const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
+          const installationDate = addBusinessDays(startDate, effectiveDuration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           const startDateStr = format(startDate, 'yyyy-MM-dd');
 
@@ -923,6 +970,56 @@ const InstallationTeamCalendar = ({
         description: t('itc_error_assignment'),
         variant: "destructive"
       });
+    }
+  };
+
+  // Handle service hours confirmation from dialog
+  const handleServiceHoursConfirm = async () => {
+    const { projectId, team, teamId, startDate, hours } = serviceHoursDialog;
+    try {
+      storePageScrollPosition();
+      const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+      
+      if (existingAssignmentIndex >= 0) {
+        const existingAssignment = assignments[existingAssignmentIndex];
+        const updateData: any = { 
+          team, team_id: teamId, start_date: startDate,
+          duration: 1, service_hours: hours 
+        };
+        
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update(updateData)
+          .eq('id', existingAssignment.id);
+        if (error) throw error;
+        
+        const updatedAssignments = [...assignments];
+        updatedAssignments[existingAssignmentIndex] = { ...existingAssignment, ...updateData };
+        setAssignments(updatedAssignments);
+      } else {
+        const newAssignment = {
+          project_id: projectId, team, team_id: teamId,
+          start_date: startDate, duration: 1, service_hours: hours
+        };
+        
+        const { data, error } = await supabase
+          .from('project_team_assignments')
+          .insert([newAssignment])
+          .select();
+        if (error) throw error;
+        setAssignments([...assignments, data[0]]);
+      }
+      
+      toast({
+        title: t('itc_team_assigned'),
+        description: `${team} - ${hours}h`
+      });
+      
+      setServiceHoursDialog(prev => ({ ...prev, open: false }));
+      restorePageScrollPosition();
+    } catch (error) {
+      console.error('Error assigning service team:', error);
+      toast({ title: t('itc_error'), description: t('itc_error_assignment'), variant: "destructive" });
     }
   };
 
@@ -1148,6 +1245,46 @@ const InstallationTeamCalendar = ({
           );
         })}
       </CardContent>
+
+      {/* Service Hours Dialog */}
+      <Dialog open={serviceHoursDialog.open} onOpenChange={(open) => setServiceHoursDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              {t('itc_service_hours_title') || 'Service Assignment'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              {t('itc_service_hours_desc') || 'How many hours will this service take?'}
+            </p>
+            <div className="space-y-2">
+              <Label>{t('itc_hours') || 'Hours'}</Label>
+              <Input
+                type="number"
+                min="0.5"
+                max="24"
+                step="0.5"
+                value={serviceHoursDialog.hours}
+                onChange={(e) => setServiceHoursDialog(prev => ({ ...prev, hours: parseFloat(e.target.value) || 1 }))}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {t('itc_service_team') || 'Team'}: {serviceHoursDialog.team}<br/>
+              {t('itc_date') || 'Date'}: {serviceHoursDialog.startDate && format(new Date(serviceHoursDialog.startDate), 'MMM d, yyyy')}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServiceHoursDialog(prev => ({ ...prev, open: false }))}>
+              {t('itc_cancel') || 'Cancel'}
+            </Button>
+            <Button onClick={handleServiceHoursConfirm}>
+              {t('itc_confirm') || 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -37,6 +37,8 @@ interface LoadingAssignment {
     allCharged: boolean;
   };
   teamColor?: string;
+  teamType?: string; // 'service' or 'conventional'
+  serviceHours?: number | null;
   truck?: {
     id: string;
     name: string;
@@ -52,6 +54,7 @@ interface ServiceAssignment {
   start_date: string;
   service_hours: number | null;
   service_notes: string | null;
+  loading_date?: string; // calculated: one workday before start_date
 }
 
 const Dashboard: React.FC = () => {
@@ -757,6 +760,9 @@ const Dashboard: React.FC = () => {
             
             const newServiceAssignments: ServiceAssignment[] = serviceData.map(s => {
               const team = serviceTeamMap.get(s.team_id || '');
+              // Calculate loading date: one workday before start_date
+              const serviceDate = new Date(s.start_date);
+              const serviceLoadingDate = getPreviousWorkday(serviceDate, holidaysList);
               return {
                 id: s.id,
                 project_id: s.project_id,
@@ -766,6 +772,7 @@ const Dashboard: React.FC = () => {
                 start_date: s.start_date,
                 service_hours: s.service_hours,
                 service_notes: s.service_notes,
+                loading_date: format(serviceLoadingDate, 'yyyy-MM-dd'),
               };
             });
             
@@ -810,10 +817,16 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Get service assignments for a specific date
+  // Get service assignments for a specific date (service happening on this date)
   const getServiceAssignmentsForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return serviceAssignments.filter(sa => sa.start_date === dateStr);
+  };
+
+  // Get service loadings for a specific date (truck loading one day before service)
+  const getServiceLoadingsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return serviceAssignments.filter(sa => sa.loading_date === dateStr);
   };
 
   // Get project color for visual distinction
@@ -923,6 +936,7 @@ const Dashboard: React.FC = () => {
           }, (_, i) => addDays(weekStartDate, i)).map((date, index) => {
             const dayAssignments = getAssignmentsForDate(date);
             const dayServiceAssignments = getServiceAssignmentsForDate(date);
+            const dayServiceLoadings = getServiceLoadingsForDate(date);
             const isCurrentDay = isToday(date);
             return <div key={index} className={cn("min-h-[80px] sm:min-h-[120px] border rounded-xl p-1.5 sm:p-2 transition-colors", isCurrentDay ? "border-primary/50 bg-primary/5 shadow-sm" : "border-border/60 hover:border-border")}>
                   <div className={cn("text-center text-xs sm:text-sm font-medium mb-1 sm:mb-2", isCurrentDay ? "text-primary" : "text-muted-foreground")}>
@@ -931,6 +945,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   
                   <div className="space-y-1">
+                    {/* Regular installation loadings */}
                     {dayAssignments.map((assignment, idx) => {
                   const isManuallyAdjusted = manualOverrides[assignment.project.id] !== undefined;
                   const isCharged = assignment.orderStatus?.allCharged;
@@ -945,6 +960,12 @@ const Dashboard: React.FC = () => {
                               ↻
                             </div>}
                           
+                          {/* Type badge: Installation */}
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Truck className="h-3 w-3 shrink-0 text-amber-600" />
+                            <span className="text-[10px] font-semibold text-amber-700">{t('dashboard_loading_label') || 'Loading'}</span>
+                          </div>
+                          
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
                             {assignment.truck && <span className="mr-1">🚛 {assignment.truck.name}</span>}
@@ -954,7 +975,32 @@ const Dashboard: React.FC = () => {
                         </div>;
                 })}
 
-                    {/* Service installations */}
+                    {/* Service truck loadings (one day before service) */}
+                    {dayServiceLoadings.map((sa) => (
+                      <div
+                        key={`service-load-${sa.id}`}
+                        className="p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{
+                          backgroundColor: `${sa.team_color}15`,
+                          borderColor: `${sa.team_color}60`,
+                          borderLeftWidth: '3px',
+                          borderLeftColor: sa.team_color,
+                        }}
+                        onClick={() => navigate(createLocalizedPath(`/projects/${sa.project_id}`))}
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <Truck className="h-3 w-3 shrink-0 text-purple-600" />
+                          <span className="text-[10px] font-semibold text-purple-700">{t('dashboard_service_loading') || 'Service Load'}</span>
+                        </div>
+                        <div className="font-medium break-words whitespace-normal leading-tight">{sa.project_name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          <Wrench className="h-2.5 w-2.5 inline mr-0.5" />
+                          {sa.team_name} {sa.service_hours ? `• ${sa.service_hours}h` : ''}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Service installations (on the service date) */}
                     {dayServiceAssignments.map((sa) => (
                       <div
                         key={`service-${sa.id}`}
