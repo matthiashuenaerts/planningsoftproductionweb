@@ -962,12 +962,6 @@ const Dashboard: React.FC = () => {
                               ↻
                             </div>}
                           
-                          {/* Type badge: Installation */}
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <Truck className="h-3 w-3 shrink-0 text-amber-600" />
-                            <span className="text-[10px] font-semibold text-amber-700">{t('dashboard_loading_label') || 'Loading'}</span>
-                          </div>
-                          
                           <div className="font-medium break-words whitespace-normal leading-tight">{assignment.project.name}</div>
                           <div className="text-xs text-gray-500">
                             {assignment.truck && <span className="mr-1">🚛 {assignment.truck.name}</span>}
@@ -977,23 +971,18 @@ const Dashboard: React.FC = () => {
                         </div>;
                 })}
 
-                    {/* Service truck loadings (one day before service) */}
+                    {/* Service loadings (one day before service) - only for actual service tickets */}
                     {dayServiceLoadings.map((sa) => (
                       <div
                         key={`service-load-${sa.id}`}
-                        className="p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity"
+                        className="p-1 rounded text-xs border-l-[3px] border cursor-pointer hover:opacity-80 transition-opacity"
                         style={{
                           backgroundColor: `${sa.team_color}15`,
                           borderColor: `${sa.team_color}60`,
-                          borderLeftWidth: '3px',
-                          borderLeftColor: sa.team_color,
+                          borderLeftColor: 'hsl(var(--destructive))',
                         }}
                         onClick={() => navigate(createLocalizedPath(`/projects/${sa.project_id}`))}
                       >
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <Truck className="h-3 w-3 shrink-0 text-purple-600" />
-                          <span className="text-[10px] font-semibold text-purple-700">{t('dashboard_service_loading') || 'Service Load'}</span>
-                        </div>
                         <div className="font-medium break-words whitespace-normal leading-tight">{sa.project_name}</div>
                         <div className="text-[10px] text-muted-foreground">
                           <Wrench className="h-2.5 w-2.5 inline mr-0.5" />
