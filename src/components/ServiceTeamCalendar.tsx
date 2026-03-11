@@ -727,12 +727,15 @@ const ServiceTeamCalendar: React.FC = () => {
                                 )}
                                 {project.name}
                               </span>
-                              <button
-                                className="text-destructive hover:text-destructive/80 ml-1"
-                                onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <Edit3 className="h-3 w-3 text-muted-foreground" />
+                                <button
+                                  className="text-destructive hover:text-destructive/80"
+                                  onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
                             <div className="text-muted-foreground truncate">{project.client}</div>
                             <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
