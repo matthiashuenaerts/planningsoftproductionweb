@@ -19,6 +19,7 @@ interface PlacementTeam {
   id: string;
   name: string;
   color: string;
+  team_type?: string;
 }
 
 interface TruckOption {
