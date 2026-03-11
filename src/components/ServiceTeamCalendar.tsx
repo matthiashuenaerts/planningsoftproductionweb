@@ -83,6 +83,16 @@ const ServiceTeamCalendar: React.FC = () => {
   const [assignHours, setAssignHours] = useState<number>(2);
   const [assignDescription, setAssignDescription] = useState('');
   const [assignTodos, setAssignTodos] = useState<string[]>(['']);
+  // Edit ticket dialog state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<ServiceAssignment | null>(null);
+  const [editTeamId, setEditTeamId] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editHours, setEditHours] = useState(2);
+  const [editDescription, setEditDescription] = useState('');
+  const [editTodos, setEditTodos] = useState<string[]>(['']);
+  const [editPossibleWeek, setEditPossibleWeek] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [mapWaypoints, setMapWaypoints] = useState<RouteWaypoint[]>([]);
