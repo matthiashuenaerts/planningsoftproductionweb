@@ -964,6 +964,56 @@ const InstallationTeamCalendar = ({
     }
   };
 
+  // Handle service hours confirmation from dialog
+  const handleServiceHoursConfirm = async () => {
+    const { projectId, team, teamId, startDate, hours } = serviceHoursDialog;
+    try {
+      storePageScrollPosition();
+      const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+      
+      if (existingAssignmentIndex >= 0) {
+        const existingAssignment = assignments[existingAssignmentIndex];
+        const updateData: any = { 
+          team, team_id: teamId, start_date: startDate,
+          duration: 1, service_hours: hours 
+        };
+        
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update(updateData)
+          .eq('id', existingAssignment.id);
+        if (error) throw error;
+        
+        const updatedAssignments = [...assignments];
+        updatedAssignments[existingAssignmentIndex] = { ...existingAssignment, ...updateData };
+        setAssignments(updatedAssignments);
+      } else {
+        const newAssignment = {
+          project_id: projectId, team, team_id: teamId,
+          start_date: startDate, duration: 1, service_hours: hours
+        };
+        
+        const { data, error } = await supabase
+          .from('project_team_assignments')
+          .insert([newAssignment])
+          .select();
+        if (error) throw error;
+        setAssignments([...assignments, data[0]]);
+      }
+      
+      toast({
+        title: t('itc_team_assigned'),
+        description: `${team} - ${hours}h`
+      });
+      
+      setServiceHoursDialog(prev => ({ ...prev, open: false }));
+      restorePageScrollPosition();
+    } catch (error) {
+      console.error('Error assigning service team:', error);
+      toast({ title: t('itc_error'), description: t('itc_error_assignment'), variant: "destructive" });
+    }
+  };
+
   const handleDurationChange = async (assignmentId: string, newDuration: number) => {
     try {
       storePageScrollPosition();
