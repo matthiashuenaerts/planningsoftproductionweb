@@ -3,7 +3,7 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceI
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, GripVertical } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, GripVertical, Wrench } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ interface Project {
     team_id: string | null;
     start_date: string;
     duration: number;
+    service_notes?: string | null;
   }>;
   employees?: Employee[];
   employeesOnHoliday?: Set<string>;
@@ -128,15 +129,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectsError || !projectsData) return;
 
     const projectIds = projectsData.map(p => p.id).filter(Boolean);
-    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
-        .select('project_id, team, team_id, start_date, duration')
+        .select('project_id, team, team_id, start_date, duration, service_notes')
         .in('project_id', projectIds as string[]);
       if (assignments) {
         assignmentsByProject = assignments.reduce((acc: any, a: any) => {
-          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
           return acc;
         }, {});
       }
@@ -329,18 +330,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
         // Fetch team assignments for all projects and merge locally
         const projectIds = (projectsData || []).map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, team_id, start_date, duration')
+            .select('project_id, team, team_id, start_date, duration, service_notes')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
-          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
+          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
             return acc;
-          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>);
         }
 
         const mergedProjects = (projectsData || []).map((p: any) => ({
@@ -1043,6 +1044,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               project.employeesOnHoliday?.has(emp.id)
                             );
 
+                            // Check if this is a service ticket (has service_notes on any assignment)
+                            const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+
                             // Decide where to place the outside label so it never creates extra horizontal scroll
                             const dayWidthPx = position.totalDays > 0 ? containerWidth / position.totalDays : 0;
                             const barStartPx = dayWidthPx * position.left;
@@ -1097,17 +1101,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                  {/* Project bar */}
                                  <div
                                    className={cn(
-                                     "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
-                                     isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
-                                     isResizingThisProject && 'ring-2 ring-white/50'
-                                   )}
-                                   style={{
-                                     width: `${Math.max(20, effectiveWidth)}px`,
-                                     backgroundColor: hasEmployeeOnHoliday ? '#ef4444' : teamColor,
-                                     opacity: isDraggingThisProject ? 0.7 : 1,
-                                     transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
-                                   }}
-                                   title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
+                                      "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
+                                      isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
+                                      isResizingThisProject && 'ring-2 ring-white/50',
+                                      isServiceTicket && 'border-l-[3px] border-l-destructive'
+                                    )}
+                                    style={{
+                                      width: `${Math.max(20, effectiveWidth)}px`,
+                                      backgroundColor: hasEmployeeOnHoliday ? '#ef4444' : teamColor,
+                                      opacity: isDraggingThisProject ? 0.7 : 1,
+                                      transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
+                                    }}
+                                    title={`${projectLabel}${isServiceTicket ? ' 🔧 Service' : ''}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                    onMouseDown={(e) => {
                                      // Only start drag from the bar body, not from resize handles
                                      if (!(e.target as HTMLElement).closest('[data-resize-handle]')) {
@@ -1149,8 +1154,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                    </div>
 
                                    {/* Project label */}
-                                   <div className="px-2 text-xs text-white font-medium truncate flex-1">
-                                     <div className="truncate">{projectLabel}</div>
+                                   <div className="px-2 text-xs text-white font-medium truncate flex-1 flex items-center gap-1">
+                                     {isServiceTicket && <Wrench className="h-3 w-3 shrink-0" />}
+                                     <span className="truncate">{projectLabel}</span>
                                    </div>
                                  </div>
 
