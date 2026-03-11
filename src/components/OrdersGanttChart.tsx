@@ -330,18 +330,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
         // Fetch team assignments for all projects and merge locally
         const projectIds = (projectsData || []).map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>> = {};
+        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, team_id, start_date, duration')
+            .select('project_id, team, team_id, start_date, duration, service_notes')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
-          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>, a: any) => {
+          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration });
+            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
             return acc;
-          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number }>>);
+          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>);
         }
 
         const mergedProjects = (projectsData || []).map((p: any) => ({
