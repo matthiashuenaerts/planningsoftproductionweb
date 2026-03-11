@@ -337,6 +337,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
         }
       } else {
         console.log('Creating new project team assignment...');
+        const isService = teams.find(t => t.id === selectedTeamId)?.team_type === 'service';
         const { error: insertError } = await supabase
           .from('project_team_assignments')
           .insert({
@@ -344,8 +345,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
             team_id: selectedTeamId,
             team: selectedTeam.name,
             start_date: startDate,
-            duration: duration,
-          });
+            duration: isService ? 1 : duration,
+            ...(isService ? { service_hours: serviceHours } : {}),
+          } as any);
 
         if (insertError) {
           console.error('Assignment insert error:', insertError);
