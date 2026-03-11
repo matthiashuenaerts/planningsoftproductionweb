@@ -659,6 +659,7 @@ interface Team {
   color: string;
   external_team_names: string[];
   is_active: boolean;
+  team_type?: string;
 }
 
 const InstallationTeamCalendar = ({
