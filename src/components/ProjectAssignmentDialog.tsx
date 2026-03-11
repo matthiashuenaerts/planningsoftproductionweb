@@ -115,9 +115,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   };
 
   const fetchTeams = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from('placement_teams')
-      .select('id, name, color')
+      .select('id, name, color, team_type') as any)
       .eq('is_active', true)
       .order('name');
 
