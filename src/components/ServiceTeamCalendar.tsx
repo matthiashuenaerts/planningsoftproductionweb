@@ -716,7 +716,7 @@ const ServiceTeamCalendar: React.FC = () => {
                               isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs"
                             )}
                             style={{ borderLeftColor: team.color, borderLeftWidth: '3px' }}
-                            onClick={() => navigate(`/projects/${project.id}`)}
+                            onClick={() => openEditDialog(project.assignment)}
                           >
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="font-medium truncate flex-1">
