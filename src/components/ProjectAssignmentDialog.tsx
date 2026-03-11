@@ -113,6 +113,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   };
 
+  const fetchInstallationDate = async () => {
     const { data, error } = await supabase
       .from('projects')
       .select('installation_date')
