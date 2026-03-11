@@ -644,16 +644,31 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="duration">Duration (days)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min="1"
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
-              />
-            </div>
+            {teams.find(t => t.id === selectedTeamId)?.team_type === 'service' ? (
+              <div className="space-y-2">
+                <Label htmlFor="serviceHours">Service Hours</Label>
+                <Input
+                  id="serviceHours"
+                  type="number"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={serviceHours}
+                  onChange={(e) => setServiceHours(parseFloat(e.target.value) || 1)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duration (days)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={duration}
+                  onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
