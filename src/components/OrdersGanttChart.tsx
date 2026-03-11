@@ -994,23 +994,29 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                     height: '28px',
                                   }}
                                 >
-                                  <div
-                                    className="h-7 px-3 rounded flex items-center bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors"
-                                    onClick={() => {
-                                      setSelectedProject({
-                                        id: project.id,
-                                        name: project.name,
-                                        teamId: null,
-                                        startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
-                                        duration: 1,
-                                      });
-                                    }}
-                                    title={`${project.name} - Not scheduled`}
-                                  >
-                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                                      {project.name} - Not scheduled
-                                    </span>
-                                  </div>
+                                  {(() => {
+                                    const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                                    return (
+                                      <div
+                                        className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
+                                        onClick={() => {
+                                          setSelectedProject({
+                                            id: project.id,
+                                            name: project.name,
+                                            teamId: null,
+                                            startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
+                                            duration: 1,
+                                          });
+                                        }}
+                                        title={`${project.name} - Not scheduled${isServiceTicket ? ' (Service)' : ''}`}
+                                      >
+                                        {isServiceTicket && <Wrench className="h-3 w-3 text-destructive flex-shrink-0" />}
+                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                                          {project.name} - Not scheduled
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             }
