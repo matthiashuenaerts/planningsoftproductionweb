@@ -834,7 +834,7 @@ const ServiceTeamCalendar: React.FC = () => {
                         "border border-orange-200 dark:border-orange-800 rounded-lg cursor-pointer hover:bg-accent/50 transition-colors",
                         isMobile ? "p-2 text-[11px]" : "p-3 text-xs"
                       )}
-                      onClick={() => navigate(`/projects/${project.id}`)}
+                      onClick={() => openEditDialog(a)}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium truncate flex-1">{project.name}</span>
