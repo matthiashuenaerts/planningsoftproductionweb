@@ -80,6 +80,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       setEmployeesOnHoliday(new Set());
       setSelectedTruckId('');
       setInstallationDate('');
+      setServiceHours(2);
       
       // Fetch all data
       fetchTeams();
@@ -89,6 +90,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
       fetchTrucks();
       fetchTruckAssignment();
       fetchInstallationDate();
+      fetchServiceHours();
     }
   }, [isOpen, projectId, currentTeamId, currentStartDate, currentDuration]);
 
