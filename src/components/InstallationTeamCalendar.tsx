@@ -720,7 +720,7 @@ const InstallationTeamCalendar = ({
         error: teamsError
       } = await supabase
         .from('placement_teams')
-        .select('*')
+        .select('*, team_type')
         .eq('is_active', true)
         .order('name', { ascending: true });
       
