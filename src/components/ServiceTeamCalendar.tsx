@@ -1022,6 +1022,113 @@ const ServiceTeamCalendar: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Service Ticket Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) { setIsEditDialogOpen(false); setEditingAssignment(null); } }}>
+        <DialogContent className={cn("max-h-[90vh] overflow-y-auto", isMobile ? "max-w-[95vw] p-4" : "sm:max-w-lg")}>
+          <DialogHeader>
+            <DialogTitle className={isMobile ? "text-base" : ""}>{t('as_edit_service')}</DialogTitle>
+            {editingAssignment && (
+              <p className={cn("text-muted-foreground", isMobile ? "text-xs" : "text-sm")}>
+                {projects.find(p => p.id === editingAssignment.project_id)?.name}
+              </p>
+            )}
+          </DialogHeader>
+          <div className={cn("py-2", isMobile ? "space-y-3" : "space-y-4")}>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('as_service_team')}</Label>
+              <Select value={editTeamId} onValueChange={setEditTeamId}>
+                <SelectTrigger className={isMobile ? "h-8 text-xs" : ""}>
+                  <SelectValue placeholder={t('as_select_team')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviceTeams.map(team => (
+                    <SelectItem key={team.id} value={team.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                        {team.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('as_service_date')}</Label>
+              <Input
+                type="date"
+                value={editDate}
+                onChange={e => setEditDate(e.target.value)}
+                className={isMobile ? "h-8 text-xs" : ""}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('as_possible_week')}</Label>
+              <Input
+                placeholder={t('as_possible_week_placeholder')}
+                value={editPossibleWeek}
+                onChange={e => setEditPossibleWeek(e.target.value)}
+                className={isMobile ? "h-8 text-xs" : ""}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_estimated_hours')}</Label>
+              <Input
+                type="number"
+                min="0.5"
+                max="12"
+                step="0.5"
+                value={editHours}
+                onChange={e => setEditHours(parseFloat(e.target.value) || 2)}
+                className={isMobile ? "h-8 text-xs" : ""}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_description')}</Label>
+              <Textarea
+                placeholder={t('svc_describe_service')}
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                rows={isMobile ? 2 : 3}
+                className={isMobile ? "text-xs" : ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className={isMobile ? "text-xs" : ""}>{t('svc_todos')}</Label>
+              {editTodos.map((todo, index) => (
+                <div key={index} className="flex gap-1.5">
+                  <Input
+                    placeholder={t('svc_todo_item', { index: String(index + 1) })}
+                    value={todo}
+                    onChange={e => {
+                      const updated = [...editTodos];
+                      updated[index] = e.target.value;
+                      setEditTodos(updated);
+                    }}
+                    className={isMobile ? "h-8 text-xs" : ""}
+                  />
+                  {editTodos.length > 1 && (
+                    <Button variant="ghost" size="icon" className={cn("flex-shrink-0", isMobile && "h-8 w-8")} onClick={() => setEditTodos(editTodos.filter((_, i) => i !== index))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setEditTodos([...editTodos, ''])} className={cn("w-full", isMobile && "h-7 text-xs")}>
+                <Plus className="h-4 w-4 mr-1" /> {t('svc_add_todo')}
+              </Button>
+            </div>
+          </div>
+          <div className={cn("flex gap-2", isMobile ? "flex-col-reverse" : "justify-end")}>
+            <DialogClose asChild>
+              <Button variant="outline" className={isMobile ? "w-full" : ""}>{t('svc_cancel')}</Button>
+            </DialogClose>
+            <Button onClick={handleEditSave} disabled={editSaving} className={isMobile ? "w-full" : ""}>
+              {editSaving ? t('as_saving') : t('as_save_changes')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Route Map Dialog */}
       <RouteMapDialog
         open={mapOpen}
