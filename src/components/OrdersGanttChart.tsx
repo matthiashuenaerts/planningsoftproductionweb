@@ -1110,7 +1110,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                       "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
                                       isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
                                       isResizingThisProject && 'ring-2 ring-white/50',
-                                      isServiceTicket && 'border-l-[3px] border-l-destructive'
+                                      
                                     )}
                                     style={{
                                       width: `${Math.max(20, effectiveWidth)}px`,
