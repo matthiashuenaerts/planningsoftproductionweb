@@ -230,7 +230,57 @@ const ServiceTeamCalendar: React.FC = () => {
     }
   };
 
-  // Geocode an address using Nominatim
+  const openEditDialog = (assignment: ServiceAssignment) => {
+    setEditingAssignment(assignment);
+    setEditTeamId(assignment.team_id || '');
+    setEditDate(assignment.start_date || '');
+    setEditHours(assignment.service_hours || 2);
+    setEditPossibleWeek(assignment.service_possible_week || '');
+    // Parse notes
+    const notes = assignment.service_notes || '';
+    const todoIdx = notes.indexOf('\nTodos:\n');
+    if (todoIdx >= 0) {
+      setEditDescription(notes.substring(0, todoIdx).trim());
+      const todoItems = notes.substring(todoIdx + '\nTodos:\n'.length).split('\n').map(l => l.replace(/^☐\s?/, '').trim()).filter(Boolean);
+      setEditTodos(todoItems.length > 0 ? todoItems : ['']);
+    } else {
+      setEditDescription(notes);
+      setEditTodos(['']);
+    }
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingAssignment) return;
+    setEditSaving(true);
+    try {
+      const team = serviceTeams.find(t => t.id === editTeamId);
+      const todoLines = editTodos.filter(t => t.trim()).map(t => `☐ ${t.trim()}`);
+      const notes = [editDescription, todoLines.length > 0 ? '\nTodos:\n' + todoLines.join('\n') : ''].filter(Boolean).join('\n');
+
+      const { error } = await supabase
+        .from('project_team_assignments')
+        .update({
+          team_id: editTeamId || null,
+          team: team?.name || '',
+          start_date: editDate || null,
+          service_hours: editHours,
+          service_notes: notes.trim() || null,
+          service_possible_week: editPossibleWeek.trim() || null,
+        } as any)
+        .eq('id', editingAssignment.id);
+      if (error) throw error;
+      toast({ title: t('svc_success'), description: t('as_updated') });
+      setIsEditDialogOpen(false);
+      setEditingAssignment(null);
+      loadData();
+    } catch (error: any) {
+      toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     try {
       const resp = await fetch(
