@@ -991,27 +991,23 @@ const Dashboard: React.FC = () => {
                       </div>
                     ))}
 
-                    {/* Service installations (on the service date) */}
+                    {/* Service installations (on the service date) - only actual service tickets */}
                     {dayServiceAssignments.map((sa) => (
                       <div
                         key={`service-${sa.id}`}
-                        className="p-1 rounded text-xs border cursor-pointer hover:opacity-80 transition-opacity"
+                        className="p-1 rounded text-xs border-l-[3px] border cursor-pointer hover:opacity-80 transition-opacity"
                         style={{
                           backgroundColor: `${sa.team_color}25`,
                           borderColor: `${sa.team_color}80`,
-                          borderLeftWidth: '3px',
-                          borderLeftColor: sa.team_color,
+                          borderLeftColor: 'hsl(var(--destructive))',
                         }}
                         onClick={() => navigate(createLocalizedPath(`/projects/${sa.project_id}`))}
                       >
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <Wrench className="h-3 w-3 shrink-0" style={{ color: sa.team_color }} />
-                          <span className="font-medium truncate">{sa.team_name}</span>
-                        </div>
                         <div className="font-medium break-words whitespace-normal leading-tight">{sa.project_name}</div>
-                        {sa.service_hours && (
-                          <div className="text-xs text-muted-foreground">{sa.service_hours}h</div>
-                        )}
+                        <div className="text-[10px] text-muted-foreground">
+                          <Wrench className="h-2.5 w-2.5 inline mr-0.5" />
+                          {sa.team_name} {sa.service_hours ? `• ${sa.service_hours}h` : ''}
+                        </div>
                       </div>
                     ))}
                   </div>
