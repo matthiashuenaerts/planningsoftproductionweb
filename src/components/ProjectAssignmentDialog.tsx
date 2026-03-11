@@ -100,7 +100,19 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
     }
   }, [selectedTeamId]);
 
-  const fetchInstallationDate = async () => {
+  const fetchServiceHours = async () => {
+    if (!currentTeamId) return;
+    const { data } = await supabase
+      .from('project_team_assignments')
+      .select('service_hours')
+      .eq('project_id', projectId)
+      .eq('team_id', currentTeamId)
+      .maybeSingle();
+    if (data && (data as any).service_hours) {
+      setServiceHours((data as any).service_hours);
+    }
+  };
+
     const { data, error } = await supabase
       .from('projects')
       .select('installation_date')
