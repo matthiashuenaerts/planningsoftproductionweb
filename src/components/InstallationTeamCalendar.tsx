@@ -813,6 +813,24 @@ const InstallationTeamCalendar = ({
     try {
       storePageScrollPosition();
       
+      // Check if target team is a service team
+      const targetTeam = teamId ? teams.find(t => t.id === teamId) : null;
+      const isServiceTeam = targetTeam?.team_type === 'service';
+      
+      // If dropping onto a service team, show hours dialog instead of immediate assignment
+      if (isServiceTeam && teamId && team) {
+        setServiceHoursDialog({
+          open: true,
+          projectId,
+          team,
+          teamId,
+          startDate: newStartDate || format(new Date(), 'yyyy-MM-dd'),
+          hours: 2
+        });
+        restorePageScrollPosition();
+        return;
+      }
+      
       const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
       
       if (team === null) {
@@ -852,11 +870,17 @@ const InstallationTeamCalendar = ({
           restorePageScrollPosition();
         }
       } else {
+        // Moving to a regular team - set duration=1 (full day), clear service_hours
         if (existingAssignmentIndex >= 0) {
           const existingAssignment = assignments[existingAssignmentIndex];
-          const updateData: Partial<Assignment> = { team, team_id: teamId };
+          const updateData: any = { team, team_id: teamId, service_hours: null };
           if (newStartDate) {
             updateData.start_date = newStartDate;
+          }
+          // If coming from a service team, reset duration to 1 day
+          const previousTeam = existingAssignment.team_id ? teams.find(t => t.id === existingAssignment.team_id) : null;
+          if (previousTeam?.team_type === 'service') {
+            updateData.duration = 1;
           }
           
           const { error } = await supabase
@@ -872,8 +896,9 @@ const InstallationTeamCalendar = ({
           };
           setAssignments(updatedAssignments);
 
+          const effectiveDuration = updateData.duration || existingAssignment.duration;
           const startDate = new Date(updateData.start_date || existingAssignment.start_date);
-          const installationDate = addBusinessDays(startDate, existingAssignment.duration - 1);
+          const installationDate = addBusinessDays(startDate, effectiveDuration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           const startDateStr = format(startDate, 'yyyy-MM-dd');
 
