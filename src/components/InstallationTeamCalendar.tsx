@@ -247,7 +247,15 @@ const ProjectItem = ({
               </Button>
             </div>
             
-            {team && assignment && <div className="mb-2">
+            {/* Show service hours badge if it's a service assignment */}
+            {assignment?.service_hours && <div className="mb-1">
+                <Badge variant="outline" className="text-xs gap-1">
+                  <Wrench className="h-3 w-3" />
+                  {assignment.service_hours}h
+                </Badge>
+              </div>}
+            
+            {team && assignment && !assignment.service_hours && <div className="mb-2">
                 <DurationSelector value={assignment.duration} onChange={handleDurationChange} />
               </div>}
             
