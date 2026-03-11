@@ -1236,6 +1236,46 @@ const InstallationTeamCalendar = ({
           );
         })}
       </CardContent>
+
+      {/* Service Hours Dialog */}
+      <Dialog open={serviceHoursDialog.open} onOpenChange={(open) => setServiceHoursDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              {t('itc_service_hours_title') || 'Service Assignment'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              {t('itc_service_hours_desc') || 'How many hours will this service take?'}
+            </p>
+            <div className="space-y-2">
+              <Label>{t('itc_hours') || 'Hours'}</Label>
+              <Input
+                type="number"
+                min="0.5"
+                max="24"
+                step="0.5"
+                value={serviceHoursDialog.hours}
+                onChange={(e) => setServiceHoursDialog(prev => ({ ...prev, hours: parseFloat(e.target.value) || 1 }))}
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {t('itc_service_team') || 'Team'}: {serviceHoursDialog.team}<br/>
+              {t('itc_date') || 'Date'}: {serviceHoursDialog.startDate && format(new Date(serviceHoursDialog.startDate), 'MMM d, yyyy')}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServiceHoursDialog(prev => ({ ...prev, open: false }))}>
+              {t('itc_cancel') || 'Cancel'}
+            </Button>
+            <Button onClick={handleServiceHoursConfirm}>
+              {t('itc_confirm') || 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
