@@ -61,6 +61,7 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
   const [trucks, setTrucks] = useState<TruckOption[]>([]);
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
   const [installationDate, setInstallationDate] = useState<string>('');
+  const [serviceHours, setServiceHours] = useState<number>(2);
 
   useEffect(() => {
     if (isOpen) {
