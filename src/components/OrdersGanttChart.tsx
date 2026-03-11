@@ -994,23 +994,29 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                     height: '28px',
                                   }}
                                 >
-                                  <div
-                                    className="h-7 px-3 rounded flex items-center bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors"
-                                    onClick={() => {
-                                      setSelectedProject({
-                                        id: project.id,
-                                        name: project.name,
-                                        teamId: null,
-                                        startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
-                                        duration: 1,
-                                      });
-                                    }}
-                                    title={`${project.name} - Not scheduled`}
-                                  >
-                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                                      {project.name} - Not scheduled
-                                    </span>
-                                  </div>
+                                  {(() => {
+                                    const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                                    return (
+                                      <div
+                                        className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
+                                        onClick={() => {
+                                          setSelectedProject({
+                                            id: project.id,
+                                            name: project.name,
+                                            teamId: null,
+                                            startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
+                                            duration: 1,
+                                          });
+                                        }}
+                                        title={`${project.name} - Not scheduled${isServiceTicket ? ' (Service)' : ''}`}
+                                      >
+                                        {isServiceTicket && <Wrench className="h-3 w-3 text-destructive flex-shrink-0" />}
+                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                                          {project.name} - Not scheduled
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             }
@@ -1104,7 +1110,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                       "relative h-7 hover:opacity-90 rounded flex items-center overflow-hidden shadow-sm group pointer-events-auto",
                                       isDraggingThisProject ? 'cursor-grabbing' : 'cursor-grab',
                                       isResizingThisProject && 'ring-2 ring-white/50',
-                                      isServiceTicket && 'border-l-[3px] border-l-destructive'
+                                      
                                     )}
                                     style={{
                                       width: `${Math.max(20, effectiveWidth)}px`,
@@ -1112,7 +1118,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                       opacity: isDraggingThisProject ? 0.7 : 1,
                                       transition: (isDraggingThisProject || isResizingThisProject) ? 'none' : 'width 0.15s, opacity 0.15s',
                                     }}
-                                    title={`${projectLabel}${isServiceTicket ? ' 🔧 Service' : ''}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
+                                    title={`${projectLabel}\nStart: ${teamAssignment?.start_date || 'N/A'}\nDuration: ${teamAssignment?.duration || 0} days`}
                                    onMouseDown={(e) => {
                                      // Only start drag from the bar body, not from resize handles
                                      if (!(e.target as HTMLElement).closest('[data-resize-handle]')) {
