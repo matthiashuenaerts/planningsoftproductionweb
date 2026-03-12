@@ -579,6 +579,7 @@ const Dashboard: React.FC = () => {
       } = await supabase.from('orders').select('id, project_id, status').in('project_id', projectIds);
 
       // Fetch team assignments for projects and apply overrides
+      // Only use non-service assignments for main installation color (exclude service tickets)
       const teamAssignments = await Promise.all(projectIds.map(async projectId => {
         const assignments = await projectTeamAssignmentService.getByProject(projectId);
         
@@ -586,21 +587,23 @@ const Dashboard: React.FC = () => {
         const override = teamAssignmentOverrides.find(o => o.project_id === projectId);
         
         if (override) {
-          // Use override data instead of regular assignment
           return {
             projectId,
             assignments: [{
               team: override.team_id,
               team_id: override.team_id,
               start_date: override.start_date,
-              duration: 0 // Not used in this context
+              duration: 0
             }]
           };
         }
         
+        // Filter out service ticket assignments - only keep main installation team
+        const mainAssignments = assignments.filter((a: any) => !a.service_notes);
+        
         return {
           projectId,
-          assignments
+          assignments: mainAssignments
         };
       }));
 
