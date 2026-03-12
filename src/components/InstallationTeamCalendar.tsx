@@ -720,6 +720,22 @@ const InstallationTeamCalendar = ({
     }, 50);
   };
 
+  const isServiceAssignment = (assignment: Assignment) => {
+    if (assignment.service_hours != null) return true;
+    if (!assignment.team_id) return false;
+    const assignedTeam = teams.find(t => t.id === assignment.team_id);
+    return assignedTeam?.team_type === 'service';
+  };
+
+  const getMainAssignmentIndex = (projectId: string) =>
+    assignments.findIndex(a => a.project_id === projectId && !isServiceAssignment(a));
+
+  const getMainAssignment = (projectId: string) =>
+    assignments.find(a => a.project_id === projectId && !isServiceAssignment(a));
+
+  const getServiceAssignmentsForTeamDate = (teamId: string, dateStr: string) =>
+    assignments.filter(a => a.team_id === teamId && a.start_date === dateStr && isServiceAssignment(a));
+
   const fetchAssignments = async () => {
     try {
       setLoading(true);

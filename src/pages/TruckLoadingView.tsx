@@ -30,6 +30,9 @@ interface LoadingAssignment {
   team?: { id: string; name: string; color?: string | null } | null;
 }
 
+const isServiceTicketAssignment = (assignment: any) =>
+  assignment?.service_hours != null || !!assignment?.service_notes || !!assignment?.service_possible_week;
+
 const TruckLoadingView: React.FC = () => {
   const navigate = useNavigate();
   const { t, createLocalizedPath } = useLanguage();

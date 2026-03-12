@@ -57,6 +57,9 @@ interface ServiceAssignment {
   loading_date?: string; // calculated: one workday before start_date
 }
 
+const isServiceTicketAssignment = (assignment: any) =>
+  assignment?.service_hours != null || !!assignment?.service_notes || !!assignment?.service_possible_week;
+
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
