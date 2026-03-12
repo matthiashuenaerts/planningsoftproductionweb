@@ -748,7 +748,7 @@ const Dashboard: React.FC = () => {
           
           let serviceQuery = supabase
             .from('project_team_assignments')
-            .select('id, project_id, team_id, start_date, service_hours, service_notes, duration')
+            .select('id, project_id, team_id, start_date, service_hours, service_notes, service_possible_week, duration')
             .in('team_id', serviceTeamIds)
             .gte('start_date', weekStartStr)
             .lte('start_date', weekEndStr);
@@ -765,7 +765,7 @@ const Dashboard: React.FC = () => {
             const projectNameMap = new Map((serviceProjectsData || []).map(p => [p.id, p.name]));
             
             const newServiceAssignments: ServiceAssignment[] = serviceData
-              .filter(s => s.service_notes) // Only include actual service tickets
+              .filter(s => isServiceTicketAssignment(s))
               .map(s => {
               const team = serviceTeamMap.get(s.team_id || '');
               // Calculate loading date: one workday before start_date

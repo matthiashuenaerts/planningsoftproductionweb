@@ -1196,6 +1196,8 @@ const InstallationTeamCalendar = ({
     await fetchAssignments();
     restorePageScrollPosition();
   };
+
+  const mainAssignments = assignments.filter(a => !isServiceAssignment(a));
   
   if (loading) {
     return <div className="flex justify-center p-8">
@@ -1219,7 +1221,7 @@ const InstallationTeamCalendar = ({
         </div>
       </CardHeader>
       <CardContent className={isMobile ? 'px-2 pb-2' : ''}>
-        <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
+        <UnassignedProjects projects={projects} assignments={mainAssignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
           const teamAssignments = assignments.filter(assignment => 
