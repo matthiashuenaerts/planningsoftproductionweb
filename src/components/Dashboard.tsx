@@ -57,6 +57,9 @@ interface ServiceAssignment {
   loading_date?: string; // calculated: one workday before start_date
 }
 
+const isServiceTicketAssignment = (assignment: any) =>
+  assignment?.service_hours != null || !!assignment?.service_notes || !!assignment?.service_possible_week;
+
 const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
@@ -599,7 +602,7 @@ const Dashboard: React.FC = () => {
         }
         
         // Filter out service ticket assignments - only keep main installation team
-        const mainAssignments = assignments.filter((a: any) => !a.service_notes);
+        const mainAssignments = assignments.filter((a: any) => !isServiceTicketAssignment(a));
         
         return {
           projectId,
@@ -745,7 +748,7 @@ const Dashboard: React.FC = () => {
           
           let serviceQuery = supabase
             .from('project_team_assignments')
-            .select('id, project_id, team_id, start_date, service_hours, service_notes, duration')
+            .select('id, project_id, team_id, start_date, service_hours, service_notes, service_possible_week, duration')
             .in('team_id', serviceTeamIds)
             .gte('start_date', weekStartStr)
             .lte('start_date', weekEndStr);
@@ -762,7 +765,7 @@ const Dashboard: React.FC = () => {
             const projectNameMap = new Map((serviceProjectsData || []).map(p => [p.id, p.name]));
             
             const newServiceAssignments: ServiceAssignment[] = serviceData
-              .filter(s => s.service_notes) // Only include actual service tickets
+              .filter(s => isServiceTicketAssignment(s))
               .map(s => {
               const team = serviceTeamMap.get(s.team_id || '');
               // Calculate loading date: one workday before start_date

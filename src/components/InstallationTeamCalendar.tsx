@@ -720,6 +720,22 @@ const InstallationTeamCalendar = ({
     }, 50);
   };
 
+  const isServiceAssignment = (assignment: Assignment) => {
+    if (assignment.service_hours != null) return true;
+    if (!assignment.team_id) return false;
+    const assignedTeam = teams.find(t => t.id === assignment.team_id);
+    return assignedTeam?.team_type === 'service';
+  };
+
+  const getMainAssignmentIndex = (projectId: string) =>
+    assignments.findIndex(a => a.project_id === projectId && !isServiceAssignment(a));
+
+  const getMainAssignment = (projectId: string) =>
+    assignments.find(a => a.project_id === projectId && !isServiceAssignment(a));
+
+  const getServiceAssignmentsForTeamDate = (teamId: string, dateStr: string) =>
+    assignments.filter(a => a.team_id === teamId && a.start_date === dateStr && isServiceAssignment(a));
+
   const fetchAssignments = async () => {
     try {
       setLoading(true);
@@ -840,18 +856,18 @@ const InstallationTeamCalendar = ({
         return;
       }
       
-      const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+      const existingMainAssignmentIndex = getMainAssignmentIndex(projectId);
       
       if (team === null) {
-        if (existingAssignmentIndex >= 0) {
-          const existingAssignment = assignments[existingAssignmentIndex];
+        if (existingMainAssignmentIndex >= 0) {
+          const existingMainAssignment = assignments[existingMainAssignmentIndex];
           const { error } = await supabase
             .from('project_team_assignments')
             .delete()
-            .eq('id', existingAssignment.id);
+            .eq('id', existingMainAssignment.id);
           if (error) throw error;
 
-          const updatedAssignments = assignments.filter(a => a.project_id !== projectId);
+          const updatedAssignments = assignments.filter(a => a.id !== existingMainAssignment.id);
           setAssignments(updatedAssignments);
 
           const { error: projectError } = await supabase
@@ -880,14 +896,14 @@ const InstallationTeamCalendar = ({
         }
       } else {
         // Moving to a regular team - set duration=1 (full day), clear service_hours
-        if (existingAssignmentIndex >= 0) {
-          const existingAssignment = assignments[existingAssignmentIndex];
+        if (existingMainAssignmentIndex >= 0) {
+          const existingMainAssignment = assignments[existingMainAssignmentIndex];
           const updateData: any = { team, team_id: teamId, service_hours: null };
           if (newStartDate) {
             updateData.start_date = newStartDate;
           }
           // If coming from a service team, reset duration to 1 day
-          const previousTeam = existingAssignment.team_id ? teams.find(t => t.id === existingAssignment.team_id) : null;
+          const previousTeam = existingMainAssignment.team_id ? teams.find(t => t.id === existingMainAssignment.team_id) : null;
           if (previousTeam?.team_type === 'service') {
             updateData.duration = 1;
           }
@@ -895,18 +911,18 @@ const InstallationTeamCalendar = ({
           const { error } = await supabase
             .from('project_team_assignments')
             .update(updateData)
-            .eq('id', existingAssignment.id);
+            .eq('id', existingMainAssignment.id);
           if (error) throw error;
           
           const updatedAssignments = [...assignments];
-          updatedAssignments[existingAssignmentIndex] = {
-            ...existingAssignment,
+          updatedAssignments[existingMainAssignmentIndex] = {
+            ...existingMainAssignment,
             ...updateData
           };
           setAssignments(updatedAssignments);
 
-          const effectiveDuration = updateData.duration || existingAssignment.duration;
-          const startDate = new Date(updateData.start_date || existingAssignment.start_date);
+          const effectiveDuration = updateData.duration || existingMainAssignment.duration;
+          const startDate = new Date(updateData.start_date || existingMainAssignment.start_date);
           const installationDate = addBusinessDays(startDate, effectiveDuration - 1);
           const installationDateStr = format(installationDate, 'yyyy-MM-dd');
           const startDateStr = format(startDate, 'yyyy-MM-dd');
@@ -978,37 +994,24 @@ const InstallationTeamCalendar = ({
     const { projectId, team, teamId, startDate, hours } = serviceHoursDialog;
     try {
       storePageScrollPosition();
-      const existingAssignmentIndex = assignments.findIndex(a => a.project_id === projectId);
+
+      const existingForDay = getServiceAssignmentsForTeamDate(teamId, startDate);
+      const newAssignment = {
+        project_id: projectId,
+        team,
+        team_id: teamId,
+        start_date: startDate,
+        duration: 1,
+        service_hours: hours,
+        service_order: existingForDay.length + 1,
+      };
       
-      if (existingAssignmentIndex >= 0) {
-        const existingAssignment = assignments[existingAssignmentIndex];
-        const updateData: any = { 
-          team, team_id: teamId, start_date: startDate,
-          duration: 1, service_hours: hours 
-        };
-        
-        const { error } = await supabase
-          .from('project_team_assignments')
-          .update(updateData)
-          .eq('id', existingAssignment.id);
-        if (error) throw error;
-        
-        const updatedAssignments = [...assignments];
-        updatedAssignments[existingAssignmentIndex] = { ...existingAssignment, ...updateData };
-        setAssignments(updatedAssignments);
-      } else {
-        const newAssignment = {
-          project_id: projectId, team, team_id: teamId,
-          start_date: startDate, duration: 1, service_hours: hours
-        };
-        
-        const { data, error } = await supabase
-          .from('project_team_assignments')
-          .insert([newAssignment])
-          .select();
-        if (error) throw error;
-        setAssignments([...assignments, data[0]]);
-      }
+      const { data, error } = await supabase
+        .from('project_team_assignments')
+        .insert([newAssignment])
+        .select();
+      if (error) throw error;
+      setAssignments(prev => [...prev, data[0]]);
       
       toast({
         title: t('itc_team_assigned'),
@@ -1081,7 +1084,7 @@ const InstallationTeamCalendar = ({
     try {
       storePageScrollPosition();
       
-      const assignment = assignments.find(a => a.project_id === projectId);
+      const assignment = getMainAssignment(projectId);
       if (!assignment) {
         toast({
           title: t('itc_error'),
@@ -1193,6 +1196,8 @@ const InstallationTeamCalendar = ({
     await fetchAssignments();
     restorePageScrollPosition();
   };
+
+  const mainAssignments = assignments.filter(a => !isServiceAssignment(a));
   
   if (loading) {
     return <div className="flex justify-center p-8">
@@ -1216,7 +1221,7 @@ const InstallationTeamCalendar = ({
         </div>
       </CardHeader>
       <CardContent className={isMobile ? 'px-2 pb-2' : ''}>
-        <UnassignedProjects projects={projects} assignments={assignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
+        <UnassignedProjects projects={projects} assignments={mainAssignments} truckAssignments={truckAssignments} onTruckAssign={handleTruckAssign} onDropProject={handleDropProject} />
         
         {teams.map(team => {
           const teamAssignments = assignments.filter(assignment => 
