@@ -602,7 +602,7 @@ const Dashboard: React.FC = () => {
         }
         
         // Filter out service ticket assignments - only keep main installation team
-        const mainAssignments = assignments.filter((a: any) => !a.service_notes);
+        const mainAssignments = assignments.filter((a: any) => !isServiceTicketAssignment(a));
         
         return {
           projectId,
