@@ -1084,7 +1084,7 @@ const InstallationTeamCalendar = ({
     try {
       storePageScrollPosition();
       
-      const assignment = assignments.find(a => a.project_id === projectId);
+      const assignment = getMainAssignment(projectId);
       if (!assignment) {
         toast({
           title: t('itc_error'),
