@@ -63,6 +63,7 @@ interface ServiceAssignment {
   service_order?: number;
   service_possible_week?: string;
   service_notes?: string;
+  is_service_ticket?: boolean;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
