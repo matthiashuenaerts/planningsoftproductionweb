@@ -710,11 +710,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const handleDrop = async (targetTeamId: string, targetDate: Date) => {
     if (!draggedProject) return;
 
-    const { project } = draggedProject;
+    const { project, teamId: sourceTeamId } = draggedProject;
     const teamAssignments = project.project_team_assignments;
-    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+    
+    // Find the specific assignment being dragged (match by source team)
+    const assignment = teamAssignments?.find(a => a.team_id === sourceTeamId) || 
+                       (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
 
-    if (!assignment) {
+    if (!assignment || !assignment.id) {
       toast.error('No team assignment found for this project');
       setDraggedProject(null);
       return;
@@ -736,7 +739,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           team_id: targetTeam.id,
           start_date: format(targetDate, 'yyyy-MM-dd'),
         })
-        .eq('project_id', project.id);
+        .eq('id', assignment.id);
 
       if (error) throw error;
 
