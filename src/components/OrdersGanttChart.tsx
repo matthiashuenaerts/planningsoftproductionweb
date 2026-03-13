@@ -135,11 +135,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
-        .select('id, project_id, team, team_id, start_date, duration, service_notes')
+        .select('id, project_id, team, team_id, start_date, duration, service_notes, is_service_ticket')
         .in('project_id', projectIds as string[]);
       if (assignments) {
         assignmentsByProject = assignments.reduce((acc: any, a: any) => {
-          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes, is_service_ticket: a.is_service_ticket });
           return acc;
         }, {});
       }
