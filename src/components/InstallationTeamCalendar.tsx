@@ -38,6 +38,7 @@ interface Assignment {
   start_date: string;
   duration: number;
   service_hours?: number | null;
+  is_service_ticket?: boolean;
   created_at?: string;
   updated_at?: string;
 }
