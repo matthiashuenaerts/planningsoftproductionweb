@@ -159,7 +159,9 @@ const ServiceTeamCalendar: React.FC = () => {
           .is('team_id', null);
         const combined = [...(assignByTeam || []), ...(unassignedTickets || [])];
         // Deduplicate by id
-        const unique = Array.from(new Map(combined.map((a: any) => [a.id, a])).values());
+        const uniqueMap = new Map<string, any>();
+        combined.forEach((a: any) => uniqueMap.set(a.id, a));
+        const unique = Array.from(uniqueMap.values());
         setAssignments(unique as any);
       }
     } catch (error: any) {
