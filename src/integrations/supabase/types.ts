@@ -4246,6 +4246,7 @@ export type Database = {
           created_at: string
           duration: number
           id: string
+          is_service_ticket: boolean
           project_id: string
           service_hours: number | null
           service_notes: string | null
@@ -4261,6 +4262,7 @@ export type Database = {
           created_at?: string
           duration?: number
           id?: string
+          is_service_ticket?: boolean
           project_id: string
           service_hours?: number | null
           service_notes?: string | null
@@ -4276,6 +4278,7 @@ export type Database = {
           created_at?: string
           duration?: number
           id?: string
+          is_service_ticket?: boolean
           project_id?: string
           service_hours?: number | null
           service_notes?: string | null
