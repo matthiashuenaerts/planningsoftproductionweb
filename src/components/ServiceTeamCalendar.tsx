@@ -146,16 +146,26 @@ const ServiceTeamCalendar: React.FC = () => {
       // Load assignments for service teams
       if (teamsData && teamsData.length > 0) {
         const teamIds = teamsData.map((t: any) => t.id);
-        // Load assignments for service teams that are service tickets + unassigned service tickets
-        const { data: assignData } = await supabase
+        // Load ALL assignments for service teams (both regular installs and service tickets)
+        // Plus unassigned service tickets (no team_id)
+        const { data: assignByTeam } = await supabase
           .from('project_team_assignments')
           .select('*')
-          .eq('is_service_ticket', true);
-        // Filter: only include assignments for these service teams or unassigned ones
-        const filtered = (assignData || []).filter((a: any) =>
-          teamIds.includes(a.team_id) || a.team_id === null
-        );
-        setAssignments(filtered as any);
+          .in('team_id', teamIds);
+        const { data: unassignedTickets } = await supabase
+          .from('project_team_assignments')
+          .select('*')
+          .eq('is_service_ticket', true)
+          .is('team_id', null);
+        const combined = [...(assignByTeam || []), ...(unassignedTickets || [])];
+        // Deduplicate by id
+        const seen: Record<string, boolean> = {};
+        const unique = combined.filter((a: any) => {
+          if (seen[a.id]) return false;
+          seen[a.id] = true;
+          return true;
+        });
+        setAssignments(unique as any);
       }
     } catch (error: any) {
       console.error('Error loading service calendar data:', error);
@@ -710,56 +720,67 @@ const ServiceTeamCalendar: React.FC = () => {
 
                       {/* Projects for this day */}
                       <div className={cn("space-y-1", isMobile && dayProjects.length === 0 && "hidden")}>
-                        {dayProjects.map((project, idx) => (
-                          <div
-                            key={project.id}
-                            className={cn(
-                              "border rounded cursor-pointer hover:bg-accent/50 transition-colors",
-                              isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs"
-                            )}
-                            style={{ borderLeftColor: team.color, borderLeftWidth: '3px' }}
-                            onClick={() => openEditDialog(project.assignment)}
-                          >
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="font-medium truncate flex-1">
-                                {project.assignment.service_order && (
-                                  <Badge variant="secondary" className="mr-1 text-[10px] px-1">
-                                    #{project.assignment.service_order}
-                                  </Badge>
-                                )}
-                                {project.name}
-                              </span>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <Edit3 className="h-3 w-3 text-muted-foreground" />
-                                <button
-                                  className="text-destructive hover:text-destructive/80"
-                                  onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
+                        {dayProjects.map((project, idx) => {
+                          const isTicket = project.assignment.is_service_ticket === true;
+                          return (
+                            <div
+                              key={`${project.id}-${project.assignment.id}`}
+                              className={cn(
+                                "border rounded cursor-pointer hover:bg-accent/50 transition-colors",
+                                isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs",
+                                !isTicket && "bg-primary/5"
+                              )}
+                              style={{ borderLeftColor: isTicket ? team.color : 'hsl(var(--primary))', borderLeftWidth: '3px' }}
+                              onClick={() => isTicket ? openEditDialog(project.assignment) : navigate(`/projects/${project.id}`)}
+                            >
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="font-medium truncate flex-1">
+                                  {isTicket && project.assignment.service_order && (
+                                    <Badge variant="secondary" className="mr-1 text-[10px] px-1">
+                                      #{project.assignment.service_order}
+                                    </Badge>
+                                  )}
+                                  {!isTicket && (
+                                    <Badge variant="outline" className="mr-1 text-[10px] px-1">
+                                      📦
+                                    </Badge>
+                                  )}
+                                  {project.name}
+                                </span>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <Edit3 className="h-3 w-3 text-muted-foreground" />
+                                  <button
+                                    className="text-destructive hover:text-destructive/80"
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
                               </div>
+                              <div className="text-muted-foreground truncate">{project.client}</div>
+                              <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{getProjectAddress(project)}</span>
+                              </div>
+                              {isTicket && (
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  <Input
+                                    type="number"
+                                    min="0.5"
+                                    max="12"
+                                    step="0.5"
+                                    value={project.assignment.service_hours || 2}
+                                    onChange={(e) => { e.stopPropagation(); handleUpdateHours(project.assignment.id, parseFloat(e.target.value) || 2); }}
+                                    className={cn("h-5 text-xs", isMobile ? "w-12" : "w-14")}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <span className="text-muted-foreground">{t('svc_hrs')}</span>
+                                </div>
+                              )}
                             </div>
-                            <div className="text-muted-foreground truncate">{project.client}</div>
-                            <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
-                              <MapPin className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{getProjectAddress(project)}</span>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <Input
-                                type="number"
-                                min="0.5"
-                                max="12"
-                                step="0.5"
-                                value={project.assignment.service_hours || 2}
-                                onChange={(e) => { e.stopPropagation(); handleUpdateHours(project.assignment.id, parseFloat(e.target.value) || 2); }}
-                                className={cn("h-5 text-xs", isMobile ? "w-12" : "w-14")}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <span className="text-muted-foreground">{t('svc_hrs')}</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Action buttons */}
@@ -814,7 +835,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
       {/* Still to Plan Section */}
       {(() => {
-        const unplanned = assignments.filter(a => !a.start_date || !a.team_id);
+        const unplanned = assignments.filter(a => a.is_service_ticket === true && (!a.start_date || !a.team_id));
         if (unplanned.length === 0) return null;
         return (
           <Card className="border-orange-300 dark:border-orange-700">
