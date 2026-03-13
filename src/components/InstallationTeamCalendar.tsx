@@ -724,7 +724,7 @@ const InstallationTeamCalendar = ({
   const isServiceAssignment = (assignment: Assignment) => {
     // Only assignments explicitly marked as service tickets are service assignments.
     // A regular project assigned to a service team is still a main installation.
-    return (assignment as any).is_service_ticket === true;
+    return assignment.is_service_ticket === true;
   };
 
   const getMainAssignmentIndex = (projectId: string) =>
