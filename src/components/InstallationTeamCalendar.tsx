@@ -721,9 +721,9 @@ const InstallationTeamCalendar = ({
   };
 
   const isServiceAssignment = (assignment: Assignment) => {
-    // Only assignments with explicit service_hours are service tickets.
-    // A project assigned to a service-type team without service_hours is a regular main installation.
-    return assignment.service_hours != null;
+    // Only assignments explicitly marked as service tickets are service assignments.
+    // A regular project assigned to a service team is still a main installation.
+    return (assignment as any).is_service_ticket === true;
   };
 
   const getMainAssignmentIndex = (projectId: string) =>

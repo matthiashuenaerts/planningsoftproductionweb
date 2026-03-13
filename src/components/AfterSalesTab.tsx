@@ -209,6 +209,7 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
             service_order: 1,
             service_notes: notes.trim() || null,
             service_possible_week: possibleWeek.trim() || null,
+            is_service_ticket: true,
           } as any);
         if (error) throw error;
         toast({ title: t('success'), description: t('as_created') });
