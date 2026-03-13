@@ -838,23 +838,8 @@ const InstallationTeamCalendar = ({
     try {
       storePageScrollPosition();
       
-      // Check if target team is a service team
-      const targetTeam = teamId ? teams.find(t => t.id === teamId) : null;
-      const isServiceTeam = targetTeam?.team_type === 'service';
-      
-      // If dropping onto a service team, show hours dialog instead of immediate assignment
-      if (isServiceTeam && teamId && team) {
-        setServiceHoursDialog({
-          open: true,
-          projectId,
-          team,
-          teamId,
-          startDate: newStartDate || format(new Date(), 'yyyy-MM-dd'),
-          hours: 2
-        });
-        restorePageScrollPosition();
-        return;
-      }
+      // Dropping onto any team (including service teams) is treated as a regular main installation assignment.
+      // Service tickets are only created via the dedicated "Add After Sales Service" dialog.
       
       const existingMainAssignmentIndex = getMainAssignmentIndex(projectId);
       
