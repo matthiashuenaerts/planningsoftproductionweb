@@ -1008,7 +1008,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                   }}
                                 >
                                   {(() => {
-                                    const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                                    const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
                                     return (
                                       <div
                                         className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
