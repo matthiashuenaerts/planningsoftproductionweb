@@ -262,7 +262,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
 
     if (draggingProject) {
-      const { project, dayWidth: dw } = draggingProject;
+      const { project, teamId: dragTeamId, dayWidth: dw } = draggingProject;
       const daysMoved = Math.round(dragOffset / dw);
       const wasDragged = daysMoved !== 0;
       didDragRef.current = wasDragged;
@@ -271,15 +271,16 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
       if (!wasDragged) return;
 
-      const assignment = project.project_team_assignments?.[0];
-      if (!assignment) return;
+      // Find the specific assignment matching the team row being dragged
+      const assignment = project.project_team_assignments?.find(a => a.team_id === dragTeamId) || project.project_team_assignments?.[0];
+      if (!assignment || !assignment.id) return;
 
       const newStartDate = addDays(parseYMD(assignment.start_date), daysMoved);
 
       // Optimistic update (preserve employees/truck)
       setProjects(prev => prev.map(p =>
         p.id === project.id
-          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd') } : a) || [] }
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map(a => a.id === assignment.id ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd') } : a) || [] }
           : p
       ));
 
@@ -287,7 +288,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd') })
-          .eq('project_id', project.id);
+          .eq('id', assignment.id);
         if (error) throw error;
         toast.success('Project moved successfully');
         fetchFullProjects();
