@@ -720,15 +720,18 @@ const ServiceTeamCalendar: React.FC = () => {
 
                       {/* Projects for this day */}
                       <div className={cn("space-y-1", isMobile && dayProjects.length === 0 && "hidden")}>
-                        {dayProjects.map((project, idx) => (
+                        {dayProjects.map((project, idx) => {
+                          const isTicket = project.assignment.is_service_ticket === true;
+                          return (
                           <div
-                            key={project.id}
+                            key={`${project.id}-${project.assignment.id}`}
                             className={cn(
                               "border rounded cursor-pointer hover:bg-accent/50 transition-colors",
-                              isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs"
+                              isMobile ? "p-1.5 text-[11px]" : "p-2 text-xs",
+                              !isTicket && "bg-primary/5"
                             )}
-                            style={{ borderLeftColor: team.color, borderLeftWidth: '3px' }}
-                            onClick={() => openEditDialog(project.assignment)}
+                            style={{ borderLeftColor: isTicket ? team.color : 'hsl(var(--primary))', borderLeftWidth: '3px' }}
+                            onClick={() => isTicket ? openEditDialog(project.assignment) : navigate(`/projects/${project.id}`)}
                           >
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="font-medium truncate flex-1">
