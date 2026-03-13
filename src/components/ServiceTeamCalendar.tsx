@@ -735,17 +735,18 @@ const ServiceTeamCalendar: React.FC = () => {
                           >
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="font-medium truncate flex-1">
-                                {project.assignment.service_order && (
+                                {isTicket && project.assignment.service_order && (
                                   <Badge variant="secondary" className="mr-1 text-[10px] px-1">
                                     #{project.assignment.service_order}
                                   </Badge>
                                 )}
+                                {!isTicket && (
+                                  <Badge variant="outline" className="mr-1 text-[10px] px-1">
+                                    📦
+                                  </Badge>
+                                )}
                                 {project.name}
                               </span>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <Edit3 className="h-3 w-3 text-muted-foreground" />
-                                <button
-                                  className="text-destructive hover:text-destructive/80"
                                   onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
                                 >
                                   <X className="h-3 w-3" />
