@@ -31,7 +31,7 @@ interface LoadingAssignment {
 }
 
 const isServiceTicketAssignment = (assignment: any) =>
-  assignment?.service_hours != null || !!assignment?.service_notes || !!assignment?.service_possible_week;
+  assignment?.is_service_ticket === true;
 
 const TruckLoadingView: React.FC = () => {
   const navigate = useNavigate();
@@ -111,7 +111,7 @@ const TruckLoadingView: React.FC = () => {
       // Fetch team assignments with color - exclude service tickets to get main installation team only
       const { data: teamAssignments } = await supabase
         .from('project_team_assignments')
-        .select('project_id, team_id, service_hours, service_notes, service_possible_week, placement_teams(id, name, color)');
+        .select('project_id, team_id, is_service_ticket, placement_teams(id, name, color)');
 
       const teamMap: Record<string, { id: string; name: string; color?: string | null }> = {};
       (teamAssignments || []).forEach((ta: any) => {

@@ -37,6 +37,7 @@ interface Project {
     start_date: string;
     duration: number;
     service_notes?: string | null;
+    is_service_ticket?: boolean;
   }>;
   employees?: Employee[];
   employeesOnHoliday?: Set<string>;
@@ -134,11 +135,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
-        .select('id, project_id, team, team_id, start_date, duration, service_notes')
+        .select('id, project_id, team, team_id, start_date, duration, service_notes, is_service_ticket')
         .in('project_id', projectIds as string[]);
       if (assignments) {
         assignmentsByProject = assignments.reduce((acc: any, a: any) => {
-          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes, is_service_ticket: a.is_service_ticket });
           return acc;
         }, {});
       }
@@ -344,12 +345,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('id, project_id, team, team_id, start_date, duration, service_notes')
+            .select('id, project_id, team, team_id, start_date, duration, service_notes, is_service_ticket')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
           assignmentsByProject = (assignments || []).reduce((acc: any, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+            (acc[pid] = acc[pid] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes, is_service_ticket: a.is_service_ticket });
             return acc;
           }, {} as any);
         }
@@ -1008,7 +1009,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                                   }}
                                 >
                                   {(() => {
-                                    const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                                    const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
                                     return (
                                       <div
                                         className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
@@ -1064,7 +1065,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             );
 
                             // Check if this is a service ticket (has service_notes on any assignment)
-                            const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                            const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
 
                             // Decide where to place the outside label so it never creates extra horizontal scroll
                             const dayWidthPx = position.totalDays > 0 ? containerWidth / position.totalDays : 0;

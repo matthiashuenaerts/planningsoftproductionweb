@@ -1,0 +1,1 @@
+ALTER TABLE public.project_team_assignments ADD COLUMN IF NOT EXISTS is_service_ticket boolean NOT NULL DEFAULT false;

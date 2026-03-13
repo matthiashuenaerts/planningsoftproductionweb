@@ -1,0 +1,1 @@
+UPDATE public.project_team_assignments SET is_service_ticket = true WHERE service_notes IS NOT NULL;
