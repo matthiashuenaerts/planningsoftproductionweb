@@ -100,11 +100,9 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
       
       const { data: assignmentsData } = await query.order('created_at', { ascending: true });
       
-      // Only keep true service tickets (service team rows OR rows with service-specific fields)
+      // Only show actual service tickets (is_service_ticket = true)
       const filtered = (assignmentsData || []).filter((a: any) => {
-        const isServiceTeamAssignment = !!a.team_id && teamIds.includes(a.team_id);
-        const isServiceTicket = a.service_hours !== null || a.service_notes !== null || a.service_possible_week !== null;
-        return isServiceTeamAssignment || isServiceTicket;
+        return a.is_service_ticket === true;
       });
       setAssignments(filtered as ServiceAssignment[]);
     } catch (error) {
