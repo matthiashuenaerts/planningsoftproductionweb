@@ -31,7 +31,7 @@ interface LoadingAssignment {
 }
 
 const isServiceTicketAssignment = (assignment: any) =>
-  assignment?.service_hours != null || !!assignment?.service_notes || !!assignment?.service_possible_week;
+  assignment?.is_service_ticket === true;
 
 const TruckLoadingView: React.FC = () => {
   const navigate = useNavigate();
