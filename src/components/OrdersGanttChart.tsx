@@ -37,6 +37,7 @@ interface Project {
     start_date: string;
     duration: number;
     service_notes?: string | null;
+    is_service_ticket?: boolean;
   }>;
   employees?: Employee[];
   employeesOnHoliday?: Set<string>;
