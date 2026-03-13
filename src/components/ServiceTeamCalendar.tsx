@@ -203,6 +203,7 @@ const ServiceTeamCalendar: React.FC = () => {
           service_hours: assignHours,
           service_order: existingForDay.length + 1,
           service_notes: notes.trim() || null,
+          is_service_ticket: true,
         } as any);
 
       if (error) throw error;
