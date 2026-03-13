@@ -345,12 +345,12 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('id, project_id, team, team_id, start_date, duration, service_notes')
+            .select('id, project_id, team, team_id, start_date, duration, service_notes, is_service_ticket')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
           assignmentsByProject = (assignments || []).reduce((acc: any, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+            (acc[pid] = acc[pid] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes, is_service_ticket: a.is_service_ticket });
             return acc;
           }, {} as any);
         }
