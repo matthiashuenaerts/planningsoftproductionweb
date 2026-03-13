@@ -721,10 +721,9 @@ const InstallationTeamCalendar = ({
   };
 
   const isServiceAssignment = (assignment: Assignment) => {
-    if (assignment.service_hours != null) return true;
-    if (!assignment.team_id) return false;
-    const assignedTeam = teams.find(t => t.id === assignment.team_id);
-    return assignedTeam?.team_type === 'service';
+    // Only assignments with explicit service_hours are service tickets.
+    // A project assigned to a service-type team without service_hours is a regular main installation.
+    return assignment.service_hours != null;
   };
 
   const getMainAssignmentIndex = (projectId: string) =>
