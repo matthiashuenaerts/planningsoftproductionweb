@@ -232,18 +232,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         newDuration = Math.max(1, originalDuration + daysMoved);
       }
 
+      // Find the specific assignment for the team being resized
+      const resizeTeamId = resizingProject.teamId;
+      const matchedAssignment = project.project_team_assignments?.find(a => a.team_id === resizeTeamId) || project.project_team_assignments?.[0];
+      const assignmentId = matchedAssignment?.id;
+
       // Optimistically update local state (preserve employees/truck)
       setProjects(prev => prev.map(p =>
         p.id === project.id
-          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration } : a) || [] }
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map(a => a.id === assignmentId ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration } : a) || [] }
           : p
       ));
+
+      if (!assignmentId) return;
 
       try {
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
-          .eq('project_id', project.id);
+          .eq('id', assignmentId);
         if (error) throw error;
         toast.success('Project duration updated');
         fetchFullProjects();
