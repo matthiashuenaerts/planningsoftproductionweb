@@ -31,6 +31,7 @@ interface Project {
   installation_date: string;
   progress: number;
   project_team_assignments?: Array<{
+    id?: string;
     team: string;
     team_id: string | null;
     start_date: string;
