@@ -31,6 +31,7 @@ interface Project {
   installation_date: string;
   progress: number;
   project_team_assignments?: Array<{
+    id?: string;
     team: string;
     team_id: string | null;
     start_date: string;
@@ -129,15 +130,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectsError || !projectsData) return;
 
     const projectIds = projectsData.map(p => p.id).filter(Boolean);
-    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
+    let assignmentsByProject: Record<string, Array<{ id: string; team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
-        .select('project_id, team, team_id, start_date, duration, service_notes')
+        .select('id, project_id, team, team_id, start_date, duration, service_notes')
         .in('project_id', projectIds as string[]);
       if (assignments) {
         assignmentsByProject = assignments.reduce((acc: any, a: any) => {
-          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
           return acc;
         }, {});
       }
@@ -192,7 +193,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     e.stopPropagation();
     e.preventDefault();
     const teamAssignments = project.project_team_assignments;
-    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+    const assignment = teamAssignments?.find(a => a.team_id === teamId) || 
+                       (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
     
     if (assignment?.start_date && assignment?.duration) {
       setResizingProject({
@@ -231,18 +233,25 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         newDuration = Math.max(1, originalDuration + daysMoved);
       }
 
+      // Find the specific assignment for the team being resized
+      const resizeTeamId = resizingProject.teamId;
+      const matchedAssignment = project.project_team_assignments?.find(a => a.team_id === resizeTeamId) || project.project_team_assignments?.[0];
+      const assignmentId = matchedAssignment?.id;
+
       // Optimistically update local state (preserve employees/truck)
       setProjects(prev => prev.map(p =>
         p.id === project.id
-          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration } : a) || [] }
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map(a => a.id === assignmentId ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration } : a) || [] }
           : p
       ));
+
+      if (!assignmentId) return;
 
       try {
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
-          .eq('project_id', project.id);
+          .eq('id', assignmentId);
         if (error) throw error;
         toast.success('Project duration updated');
         fetchFullProjects();
@@ -254,7 +263,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
 
     if (draggingProject) {
-      const { project, dayWidth: dw } = draggingProject;
+      const { project, teamId: dragTeamId, dayWidth: dw } = draggingProject;
       const daysMoved = Math.round(dragOffset / dw);
       const wasDragged = daysMoved !== 0;
       didDragRef.current = wasDragged;
@@ -263,15 +272,16 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
       if (!wasDragged) return;
 
-      const assignment = project.project_team_assignments?.[0];
-      if (!assignment) return;
+      // Find the specific assignment matching the team row being dragged
+      const assignment = project.project_team_assignments?.find(a => a.team_id === dragTeamId) || project.project_team_assignments?.[0];
+      if (!assignment || !assignment.id) return;
 
       const newStartDate = addDays(parseYMD(assignment.start_date), daysMoved);
 
       // Optimistic update (preserve employees/truck)
       setProjects(prev => prev.map(p =>
         p.id === project.id
-          ? { ...p, project_team_assignments: p.project_team_assignments?.map((a, i) => i === 0 ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd') } : a) || [] }
+          ? { ...p, project_team_assignments: p.project_team_assignments?.map(a => a.id === assignment.id ? { ...a, start_date: format(newStartDate, 'yyyy-MM-dd') } : a) || [] }
           : p
       ));
 
@@ -279,7 +289,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd') })
-          .eq('project_id', project.id);
+          .eq('id', assignment.id);
         if (error) throw error;
         toast.success('Project moved successfully');
         fetchFullProjects();
@@ -330,18 +340,18 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
         // Fetch team assignments for all projects and merge locally
         const projectIds = (projectsData || []).map(p => p.id).filter(Boolean);
-        let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
+        let assignmentsByProject: Record<string, Array<{ id: string; team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
         if (projectIds.length > 0) {
           const { data: assignments, error: assignError } = await supabase
             .from('project_team_assignments')
-            .select('project_id, team, team_id, start_date, duration, service_notes')
+            .select('id, project_id, team, team_id, start_date, duration, service_notes')
             .in('project_id', projectIds as string[]);
           if (assignError) throw assignError;
-          assignmentsByProject = (assignments || []).reduce((acc: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>, a: any) => {
+          assignmentsByProject = (assignments || []).reduce((acc: any, a: any) => {
             const pid = a.project_id as string;
-            (acc[pid] = acc[pid] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+            (acc[pid] = acc[pid] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
             return acc;
-          }, {} as Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>>);
+          }, {} as any);
         }
 
         const mergedProjects = (projectsData || []).map((p: any) => ({
@@ -709,11 +719,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const handleDrop = async (targetTeamId: string, targetDate: Date) => {
     if (!draggedProject) return;
 
-    const { project } = draggedProject;
+    const { project, teamId: sourceTeamId } = draggedProject;
     const teamAssignments = project.project_team_assignments;
-    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+    
+    // Find the specific assignment being dragged (match by source team)
+    const assignment = teamAssignments?.find(a => a.team_id === sourceTeamId) || 
+                       (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
 
-    if (!assignment) {
+    if (!assignment || !assignment.id) {
       toast.error('No team assignment found for this project');
       setDraggedProject(null);
       return;
@@ -735,7 +748,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           team_id: targetTeam.id,
           start_date: format(targetDate, 'yyyy-MM-dd'),
         })
-        .eq('project_id', project.id);
+        .eq('id', assignment.id);
 
       if (error) throw error;
 
