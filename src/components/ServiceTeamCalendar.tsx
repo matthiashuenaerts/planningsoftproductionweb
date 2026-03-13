@@ -835,7 +835,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
       {/* Still to Plan Section */}
       {(() => {
-        const unplanned = assignments.filter(a => !a.start_date || !a.team_id);
+        const unplanned = assignments.filter(a => a.is_service_ticket === true && (!a.start_date || !a.team_id));
         if (unplanned.length === 0) return null;
         return (
           <Card className="border-orange-300 dark:border-orange-700">
