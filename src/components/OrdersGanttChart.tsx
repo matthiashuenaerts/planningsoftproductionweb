@@ -1064,7 +1064,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             );
 
                             // Check if this is a service ticket (has service_notes on any assignment)
-                            const isServiceTicket = project.project_team_assignments?.some(a => a.service_notes);
+                            const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
 
                             // Decide where to place the outside label so it never creates extra horizontal scroll
                             const dayWidthPx = position.totalDays > 0 ? containerWidth / position.totalDays : 0;
