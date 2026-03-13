@@ -193,7 +193,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     e.stopPropagation();
     e.preventDefault();
     const teamAssignments = project.project_team_assignments;
-    const assignment = teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null;
+    const assignment = teamAssignments?.find(a => a.team_id === teamId) || 
+                       (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
     
     if (assignment?.start_date && assignment?.duration) {
       setResizingProject({
