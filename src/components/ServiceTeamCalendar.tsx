@@ -146,16 +146,21 @@ const ServiceTeamCalendar: React.FC = () => {
       // Load assignments for service teams
       if (teamsData && teamsData.length > 0) {
         const teamIds = teamsData.map((t: any) => t.id);
-        // Load assignments for service teams that are service tickets + unassigned service tickets
-        const { data: assignData } = await supabase
+        // Load ALL assignments for service teams (both regular installs and service tickets)
+        // Plus unassigned service tickets (no team_id)
+        const { data: assignByTeam } = await supabase
           .from('project_team_assignments')
           .select('*')
-          .eq('is_service_ticket', true);
-        // Filter: only include assignments for these service teams or unassigned ones
-        const filtered = (assignData || []).filter((a: any) =>
-          teamIds.includes(a.team_id) || a.team_id === null
-        );
-        setAssignments(filtered as any);
+          .in('team_id', teamIds);
+        const { data: unassignedTickets } = await supabase
+          .from('project_team_assignments')
+          .select('*')
+          .eq('is_service_ticket', true)
+          .is('team_id', null);
+        const combined = [...(assignByTeam || []), ...(unassignedTickets || [])];
+        // Deduplicate by id
+        const unique = Array.from(new Map(combined.map((a: any) => [a.id, a])).values());
+        setAssignments(unique as any);
       }
     } catch (error: any) {
       console.error('Error loading service calendar data:', error);
