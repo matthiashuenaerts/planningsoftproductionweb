@@ -146,14 +146,14 @@ const ServiceTeamCalendar: React.FC = () => {
       // Load assignments for service teams
       if (teamsData && teamsData.length > 0) {
         const teamIds = teamsData.map((t: any) => t.id);
-        // Load assignments for service teams + unassigned service tickets (no team_id but have service_notes)
+        // Load assignments for service teams that are service tickets + unassigned service tickets
         const { data: assignData } = await supabase
           .from('project_team_assignments')
           .select('*')
-          .or(`team_id.in.(${teamIds.join(',')}),team_id.is.null`);
-        // Filter: only include service team assignments or those with service_notes (actual tickets)
+          .eq('is_service_ticket', true);
+        // Filter: only include assignments for these service teams or unassigned ones
         const filtered = (assignData || []).filter((a: any) =>
-          teamIds.includes(a.team_id) || (a.team_id === null && a.service_notes)
+          teamIds.includes(a.team_id) || a.team_id === null
         );
         setAssignments(filtered as any);
       }
