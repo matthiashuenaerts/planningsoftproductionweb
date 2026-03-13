@@ -130,15 +130,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     if (projectsError || !projectsData) return;
 
     const projectIds = projectsData.map(p => p.id).filter(Boolean);
-    let assignmentsByProject: Record<string, Array<{ team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
+    let assignmentsByProject: Record<string, Array<{ id: string; team: string; team_id: string | null; start_date: string; duration: number; service_notes?: string | null }>> = {};
     if (projectIds.length > 0) {
       const { data: assignments } = await supabase
         .from('project_team_assignments')
-        .select('project_id, team, team_id, start_date, duration, service_notes')
+        .select('id, project_id, team, team_id, start_date, duration, service_notes')
         .in('project_id', projectIds as string[]);
       if (assignments) {
         assignmentsByProject = assignments.reduce((acc: any, a: any) => {
-          (acc[a.project_id] = acc[a.project_id] || []).push({ team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
+          (acc[a.project_id] = acc[a.project_id] || []).push({ id: a.id, team: a.team, team_id: a.team_id, start_date: a.start_date, duration: a.duration, service_notes: a.service_notes });
           return acc;
         }, {});
       }
