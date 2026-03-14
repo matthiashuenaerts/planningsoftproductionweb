@@ -116,10 +116,10 @@ const ServiceTeamCalendar: React.FC = () => {
   const [mapDateLabel, setMapDateLabel] = useState('');
   const [optimizedRoutes, setOptimizedRoutes] = useState<Record<string, SavedRouteData>>({});
 
-  const weekDays = eachDayOfInterval({
+  const weekDays = useMemo(() => eachDayOfInterval({
     start: currentWeekStart,
     end: endOfWeek(currentWeekStart, { weekStartsOn: 1 })
-  }).filter(d => d.getDay() !== 0 && d.getDay() !== 6);
+  }).filter(d => d.getDay() !== 0 && d.getDay() !== 6), [currentWeekStart]);
 
   // Load saved routes from DB
   const loadSavedRoutes = useCallback(async (teamIds: string[]) => {
