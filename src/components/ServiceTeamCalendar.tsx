@@ -76,6 +76,7 @@ interface SavedRouteData {
   departureTime?: string;
   workStartTime?: string;
   workEndTime?: string;
+  returnTime?: string;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
@@ -575,6 +576,7 @@ const ServiceTeamCalendar: React.FC = () => {
         departureTime: departureTimeStr,
         workStartTime,
         workEndTime,
+        returnTime: returnTimeStr || undefined,
       };
 
       setOptimizedRoutes(prev => ({ ...prev, [routeKey]: savedRoute }));
@@ -605,6 +607,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const [mapDepartureTime, setMapDepartureTime] = useState<string | undefined>();
   const [mapWorkStartTime, setMapWorkStartTime] = useState<string | undefined>();
   const [mapWorkEndTime, setMapWorkEndTime] = useState<string | undefined>();
+  const [mapReturnTime, setMapReturnTime] = useState<string | undefined>();
 
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
@@ -619,6 +622,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapDepartureTime(route.departureTime);
     setMapWorkStartTime(route.workStartTime);
     setMapWorkEndTime(route.workEndTime);
+    setMapReturnTime(route.returnTime);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
@@ -1225,6 +1229,7 @@ const ServiceTeamCalendar: React.FC = () => {
         departureTime={mapDepartureTime}
         workStartTime={mapWorkStartTime}
         workEndTime={mapWorkEndTime}
+        returnTime={mapReturnTime}
       />
     </div>
   );
