@@ -576,6 +576,7 @@ const ServiceTeamCalendar: React.FC = () => {
         departureTime: departureTimeStr,
         workStartTime,
         workEndTime,
+        returnTime: returnTimeStr || undefined,
       };
 
       setOptimizedRoutes(prev => ({ ...prev, [routeKey]: savedRoute }));
