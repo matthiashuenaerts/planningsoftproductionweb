@@ -607,6 +607,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const [mapDepartureTime, setMapDepartureTime] = useState<string | undefined>();
   const [mapWorkStartTime, setMapWorkStartTime] = useState<string | undefined>();
   const [mapWorkEndTime, setMapWorkEndTime] = useState<string | undefined>();
+  const [mapReturnTime, setMapReturnTime] = useState<string | undefined>();
 
   const handleShowMap = (teamId: string, dateStr: string, teamName: string) => {
     const routeKey = `${teamId}_${dateStr}`;
