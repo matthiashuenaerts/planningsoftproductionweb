@@ -622,6 +622,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapDepartureTime(route.departureTime);
     setMapWorkStartTime(route.workStartTime);
     setMapWorkEndTime(route.workEndTime);
+    setMapReturnTime(route.returnTime);
     setMapTeamName(teamName);
     setMapDateLabel(format(new Date(dateStr + 'T12:00:00'), 'EEEE, MMM d yyyy'));
     setMapOpen(true);
