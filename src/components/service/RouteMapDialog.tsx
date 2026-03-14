@@ -230,9 +230,9 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
                   {wp.estimatedDeparture && <span className="text-[10px] text-muted-foreground shrink-0">→ {wp.estimatedDeparture}</span>}
                 </div>
               ))}
-              {waypoints.length > 0 && waypoints[waypoints.length - 1].estimatedDeparture && startPoint && (
+              {waypoints.length > 0 && startPoint && (
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span className={cn("font-mono", isMobile ? "text-[10px] w-10" : "text-xs w-14")}>{waypoints[waypoints.length - 1].estimatedDeparture}</span>
+                  <span className={cn("font-mono", isMobile ? "text-[10px] w-10" : "text-xs w-14")}>{returnTime || waypoints[waypoints.length - 1]?.estimatedDeparture || '--:--'}</span>
                   <div className="w-4 h-4 rounded-full bg-green-500 text-white text-[10px] flex items-center justify-center font-bold shrink-0">S</div>
                   <span className="truncate">Return to base</span>
                 </div>
