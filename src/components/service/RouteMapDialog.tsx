@@ -38,6 +38,7 @@ interface RouteMapDialogProps {
   departureTime?: string;
   workStartTime?: string;
   workEndTime?: string;
+  returnTime?: string;
 }
 
 const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
