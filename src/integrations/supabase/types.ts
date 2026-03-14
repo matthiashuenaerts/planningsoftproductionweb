@@ -4245,6 +4245,7 @@ export type Database = {
         Row: {
           created_at: string
           duration: number
+          fixed_time: string | null
           id: string
           is_service_ticket: boolean
           project_id: string
@@ -4261,6 +4262,7 @@ export type Database = {
         Insert: {
           created_at?: string
           duration?: number
+          fixed_time?: string | null
           id?: string
           is_service_ticket?: boolean
           project_id: string
@@ -4277,6 +4279,7 @@ export type Database = {
         Update: {
           created_at?: string
           duration?: number
+          fixed_time?: string | null
           id?: string
           is_service_ticket?: boolean
           project_id?: string
@@ -4865,6 +4868,51 @@ export type Database = {
           },
           {
             foreignKeyName: "schedules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_routes: {
+        Row: {
+          created_at: string
+          id: string
+          route_data: Json
+          route_date: string
+          team_id: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          route_data?: Json
+          route_date: string
+          team_id: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          route_data?: Json
+          route_date?: string
+          team_id?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_routes_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "placement_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_routes_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"

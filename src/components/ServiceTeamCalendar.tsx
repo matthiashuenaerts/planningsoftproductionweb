@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X, Search, Check, AlertCircle, Edit3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Route, Loader2, Map, Plus, X, Search, Check, AlertCircle, Edit3, Pin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,6 +64,18 @@ interface ServiceAssignment {
   service_possible_week?: string;
   service_notes?: string;
   is_service_ticket?: boolean;
+  fixed_time?: string | null;
+}
+
+interface SavedRouteData {
+  waypoints: RouteWaypoint[];
+  geometry: [number, number][];
+  startPoint?: { lat: number; lng: number; address: string };
+  totalDrivingMinutes?: number;
+  unrecognizedAddresses?: string[];
+  departureTime?: string;
+  workStartTime?: string;
+  workEndTime?: string;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
@@ -84,7 +96,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const [assignHours, setAssignHours] = useState<number>(2);
   const [assignDescription, setAssignDescription] = useState('');
   const [assignTodos, setAssignTodos] = useState<string[]>(['']);
-  // Edit ticket dialog state
+  // Edit dialog state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<ServiceAssignment | null>(null);
   const [editTeamId, setEditTeamId] = useState('');
@@ -93,6 +105,7 @@ const ServiceTeamCalendar: React.FC = () => {
   const [editDescription, setEditDescription] = useState('');
   const [editTodos, setEditTodos] = useState<string[]>(['']);
   const [editPossibleWeek, setEditPossibleWeek] = useState('');
+  const [editFixedTime, setEditFixedTime] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
@@ -101,28 +114,40 @@ const ServiceTeamCalendar: React.FC = () => {
   const [mapStartPoint, setMapStartPoint] = useState<{ lat: number; lng: number; address: string } | undefined>();
   const [mapTeamName, setMapTeamName] = useState('');
   const [mapDateLabel, setMapDateLabel] = useState('');
-  // Track which team+date combos have been optimized so we can show "Show on Map"
-  const [optimizedRoutes, setOptimizedRoutes] = useState<Record<string, {
-    waypoints: RouteWaypoint[];
-    geometry: [number, number][];
-    startPoint?: { lat: number; lng: number; address: string };
-    totalDrivingMinutes?: number;
-    unrecognizedAddresses?: string[];
-    departureTime?: string;
-    workStartTime?: string;
-    workEndTime?: string;
-  }>>({});
+  const [optimizedRoutes, setOptimizedRoutes] = useState<Record<string, SavedRouteData>>({});
 
   const weekDays = eachDayOfInterval({
     start: currentWeekStart,
     end: endOfWeek(currentWeekStart, { weekStartsOn: 1 })
-  }).filter(d => d.getDay() !== 0 && d.getDay() !== 6); // weekdays only
+  }).filter(d => d.getDay() !== 0 && d.getDay() !== 6);
+
+  // Load saved routes from DB
+  const loadSavedRoutes = useCallback(async (teamIds: string[]) => {
+    if (teamIds.length === 0) return;
+    const startDate = format(weekDays[0], 'yyyy-MM-dd');
+    const endDate = format(weekDays[weekDays.length - 1], 'yyyy-MM-dd');
+    
+    const { data } = await supabase
+      .from('service_routes')
+      .select('*')
+      .in('team_id', teamIds)
+      .gte('route_date', startDate)
+      .lte('route_date', endDate);
+    
+    if (data && data.length > 0) {
+      const routes: Record<string, SavedRouteData> = {};
+      data.forEach((r: any) => {
+        const key = `${r.team_id}_${r.route_date}`;
+        routes[key] = r.route_data as SavedRouteData;
+      });
+      setOptimizedRoutes(prev => ({ ...prev, ...routes }));
+    }
+  }, [weekDays]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Load service teams
       let teamsQuery = (supabase
         .from('placement_teams')
         .select('*') as any)
@@ -133,7 +158,6 @@ const ServiceTeamCalendar: React.FC = () => {
       const { data: teamsData } = await teamsQuery;
       setServiceTeams((teamsData as any) || []);
 
-      // Load projects with addresses
       let projQuery = supabase
         .from('projects')
         .select(`*, project_team_assignments!left(*)`)
@@ -143,11 +167,8 @@ const ServiceTeamCalendar: React.FC = () => {
       const { data: projData } = await projQuery;
       setProjects((projData as any) || []);
 
-      // Load assignments for service teams
       if (teamsData && teamsData.length > 0) {
         const teamIds = teamsData.map((t: any) => t.id);
-        // Load ALL assignments for service teams (both regular installs and service tickets)
-        // Plus unassigned service tickets (no team_id)
         const { data: assignByTeam } = await supabase
           .from('project_team_assignments')
           .select('*')
@@ -158,7 +179,6 @@ const ServiceTeamCalendar: React.FC = () => {
           .eq('is_service_ticket', true)
           .is('team_id', null);
         const combined = [...(assignByTeam || []), ...(unassignedTickets || [])];
-        // Deduplicate by id
         const seen: Record<string, boolean> = {};
         const unique = combined.filter((a: any) => {
           if (seen[a.id]) return false;
@@ -166,13 +186,16 @@ const ServiceTeamCalendar: React.FC = () => {
           return true;
         });
         setAssignments(unique as any);
+        
+        // Load saved routes
+        await loadSavedRoutes(teamIds);
       }
     } catch (error: any) {
       console.error('Error loading service calendar data:', error);
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, loadSavedRoutes]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -198,7 +221,6 @@ const ServiceTeamCalendar: React.FC = () => {
       const team = serviceTeams.find(t => t.id === selectedTeamId);
       const existingForDay = getProjectsForTeamAndDate(selectedTeamId, selectedDate);
 
-      // Build notes from description + todos
       const todoLines = assignTodos.filter(t => t.trim()).map(t => `☐ ${t.trim()}`);
       const notes = [assignDescription, todoLines.length > 0 ? '\nTodos:\n' + todoLines.join('\n') : ''].filter(Boolean).join('\n');
 
@@ -218,7 +240,6 @@ const ServiceTeamCalendar: React.FC = () => {
 
       if (error) throw error;
 
-      // Post to project chat for record-keeping
       const project = projects.find(p => p.id === assignProjectId);
       if (notes.trim()) {
         const { data: empData } = await supabase.from('employees').select('id').limit(1).single();
@@ -248,7 +269,7 @@ const ServiceTeamCalendar: React.FC = () => {
     setEditDate(assignment.start_date || '');
     setEditHours(assignment.service_hours || 2);
     setEditPossibleWeek(assignment.service_possible_week || '');
-    // Parse notes
+    setEditFixedTime(assignment.fixed_time || '');
     const notes = assignment.service_notes || '';
     const todoIdx = notes.indexOf('\nTodos:\n');
     if (todoIdx >= 0) {
@@ -279,6 +300,7 @@ const ServiceTeamCalendar: React.FC = () => {
           service_hours: editHours,
           service_notes: notes.trim() || null,
           service_possible_week: editPossibleWeek.trim() || null,
+          fixed_time: editFixedTime.trim() || null,
         } as any)
         .eq('id', editingAssignment.id);
       if (error) throw error;
@@ -309,6 +331,20 @@ const ServiceTeamCalendar: React.FC = () => {
     }
   };
 
+  const saveRouteToDb = async (teamId: string, dateStr: string, routeData: SavedRouteData) => {
+    try {
+      await supabase
+        .from('service_routes')
+        .upsert({
+          team_id: teamId,
+          route_date: dateStr,
+          route_data: routeData as any,
+        } as any, { onConflict: 'team_id,route_date' });
+    } catch (err) {
+      console.error('Failed to save route:', err);
+    }
+  };
+
   const handleOptimizeRoute = async (teamId: string, dateStr: string) => {
     setOptimizing(true);
     try {
@@ -321,16 +357,18 @@ const ServiceTeamCalendar: React.FC = () => {
         return;
       }
 
-      // Fetch installation working hours for this day
       const targetDate = new Date(dateStr + 'T12:00:00');
-      const dayOfWeek = targetDate.getDay(); // 0=Sun, 6=Sat
+      const dayOfWeek = targetDate.getDay();
       const allWorkingHours = await workingHoursService.getWorkingHours(tenant?.id);
       const installationHours = workingHoursService.getWorkingHoursForDay(allWorkingHours, 'installation', dayOfWeek);
       
       const workStartTime = installationHours?.start_time || '08:00';
       const workEndTime = installationHours?.end_time || '17:00';
 
-      // Geocode team start address
+      // Separate fixed-time items from flexible ones
+      const fixedItems = dayProjects.filter(p => p.assignment.fixed_time);
+      const flexibleItems = dayProjects.filter(p => !p.assignment.fixed_time);
+
       const teamStartAddress = [team?.start_street, team?.start_number, team?.start_postal_code, team?.start_city].filter(Boolean).join(' ');
       const startCoords = teamStartAddress ? await geocodeAddress(teamStartAddress) : null;
 
@@ -343,166 +381,215 @@ const ServiceTeamCalendar: React.FC = () => {
         })
       );
 
-      const projectsWithCoords = geocodedProjects.filter(p => p.coords !== null);
       const unrecognizedAddresses = geocodedProjects
         .filter(p => p.coords === null && p.fullAddress !== t('svc_no_address'))
         .map(p => `${p.name}: ${p.fullAddress}`);
       geocodedProjects
         .filter(p => p.fullAddress === t('svc_no_address'))
         .forEach(p => unrecognizedAddresses.push(`${p.name}: ${t('svc_no_address_set')}`));
-      
-      if (projectsWithCoords.length < 2) {
-        toast({ title: t('svc_warning'), description: t('svc_geocode_fallback') });
-        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
-        return;
+
+      // If we have fixed items, we need a different approach
+      // Optimize flexible items with OSRM, then insert fixed items at their time slots
+      const flexGeo = geocodedProjects.filter(p => !p.assignment.fixed_time && p.coords);
+      const fixedGeo = geocodedProjects.filter(p => p.assignment.fixed_time);
+
+      let orderedAll: typeof geocodedProjects = [];
+
+      if (flexGeo.length >= 2 && startCoords) {
+        // Use OSRM Trip API only for flexible items
+        const coordinates: string[] = [`${startCoords.lng},${startCoords.lat}`];
+        flexGeo.forEach(p => coordinates.push(`${p.coords!.lng},${p.coords!.lat}`));
+        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
+
+        const sourceParam = '&source=first&destination=last';
+        const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=false&geometries=geojson&steps=false&annotations=duration${sourceParam}&roundtrip=false`;
+        
+        const osrmResp = await fetch(osrmUrl);
+        const osrmData = await osrmResp.json();
+
+        if (osrmData.code === 'Ok' && osrmData.trips?.length > 0) {
+          const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
+          const projectWaypoints = waypointOrder.slice(1, waypointOrder.length - 1);
+          const optimizedFlex = projectWaypoints
+            .map((wpIdx: number) => flexGeo[wpIdx - 1])
+            .filter(Boolean);
+          orderedAll = [...optimizedFlex];
+        } else {
+          orderedAll = [...flexGeo];
+        }
+      } else {
+        orderedAll = [...flexGeo];
       }
 
-      // Build OSRM coordinates string: start + all projects + start again (return home)
-      const coordinates: string[] = [];
-      if (startCoords) {
-        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
-      }
-      projectsWithCoords.forEach(p => {
-        coordinates.push(`${p.coords!.lng},${p.coords!.lat}`);
+      // Insert fixed-time items at appropriate positions
+      // Sort fixed items by their fixed_time
+      const sortedFixed = [...fixedGeo].sort((a, b) => {
+        const timeA = a.assignment.fixed_time || '00:00';
+        const timeB = b.assignment.fixed_time || '00:00';
+        return timeA.localeCompare(timeB);
       });
-      if (startCoords) {
-        coordinates.push(`${startCoords.lng},${startCoords.lat}`);
-      }
 
-      // Use OSRM Trip API - roundtrip with source=first and destination=last (return home)
-      const sourceParam = startCoords ? '&source=first&destination=last' : '';
-      const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coordinates.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration${sourceParam}&roundtrip=false`;
+      // Merge: build timeline, insert fixed items where they belong
+      // Simple approach: add all, then sort by computed arrival (fixed items pinned)
+      orderedAll = [...orderedAll, ...sortedFixed];
+
+      // Now compute times and reorder to respect fixed times
+      const [workStartH, workStartM] = workStartTime.split(':').map(Number);
+      const workStartTotalMin = workStartH * 60 + workStartM;
+
+      // Build final order respecting fixed times
+      // Place fixed items first, then fill gaps with flexible items
+      const finalOrder: typeof geocodedProjects = [];
+      const usedFlex = new Set<string>();
+      const remainingFlex = orderedAll.filter(p => !p.assignment.fixed_time);
       
-      const osrmResp = await fetch(osrmUrl);
-      const osrmData = await osrmResp.json();
+      // Create time slots for fixed items
+      interface TimeSlot { item: typeof geocodedProjects[0]; startMin: number; endMin: number; }
+      const fixedSlots: TimeSlot[] = sortedFixed.map(p => {
+        const [fh, fm] = (p.assignment.fixed_time || '08:00').split(':').map(Number);
+        const startMin = fh * 60 + fm;
+        const endMin = startMin + (p.assignment.service_hours || 1) * 60;
+        return { item: p, startMin, endMin };
+      });
 
-      if (osrmData.code !== 'Ok' || !osrmData.trips || osrmData.trips.length === 0) {
-        toast({ title: t('svc_warning'), description: t('svc_route_unavailable') });
-        await fallbackPostalOptimize(team, dayProjects, teamId, dateStr);
-        return;
+      // Fill schedule: start from work start, add flex items, insert fixed items at their time
+      let currentMin = workStartTotalMin;
+      let flexIdx = 0;
+
+      // Sort all events (fixed slots) by start time
+      const allEvents = [...fixedSlots].sort((a, b) => a.startMin - b.startMin);
+      let eventIdx = 0;
+
+      while (flexIdx < remainingFlex.length || eventIdx < allEvents.length) {
+        // Check if next fixed event is coming up
+        if (eventIdx < allEvents.length && (flexIdx >= remainingFlex.length || allEvents[eventIdx].startMin <= currentMin + (remainingFlex[flexIdx]?.assignment.service_hours || 1) * 60)) {
+          // Check if we can fit a flex item before this fixed slot
+          if (flexIdx < remainingFlex.length) {
+            const flexDuration = (remainingFlex[flexIdx].assignment.service_hours || 1) * 60;
+            if (currentMin + flexDuration <= allEvents[eventIdx].startMin) {
+              finalOrder.push(remainingFlex[flexIdx]);
+              currentMin += flexDuration;
+              flexIdx++;
+              continue;
+            }
+          }
+          // Place the fixed item
+          finalOrder.push(allEvents[eventIdx].item);
+          currentMin = allEvents[eventIdx].endMin;
+          eventIdx++;
+        } else if (flexIdx < remainingFlex.length) {
+          finalOrder.push(remainingFlex[flexIdx]);
+          currentMin += (remainingFlex[flexIdx].assignment.service_hours || 1) * 60;
+          flexIdx++;
+        } else {
+          break;
+        }
       }
-
-      const trip = osrmData.trips[0];
-      const waypointOrder = osrmData.waypoints.map((wp: any) => wp.waypoint_index);
-      
-      // Map OSRM waypoint order back to projects
-      const offset = startCoords ? 1 : 0;
-      const endOffset = startCoords ? 1 : 0;
-      const projectWaypoints = waypointOrder.slice(offset, waypointOrder.length - endOffset);
-      const orderedProjects = projectWaypoints
-        .map((wpIdx: number) => {
-          const projectIdx = wpIdx - offset;
-          return projectsWithCoords[projectIdx];
-        })
-        .filter(Boolean);
 
       // Update service_order in DB
-      for (let i = 0; i < orderedProjects.length; i++) {
+      for (let i = 0; i < finalOrder.length; i++) {
         await supabase
           .from('project_team_assignments')
           .update({ service_order: i + 1 } as any)
-          .eq('id', orderedProjects[i].assignment.id);
+          .eq('id', finalOrder[i].assignment.id);
       }
 
-      // Extract leg durations from the trip
-      const legDurations: number[] = trip.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+      // Now get the full route geometry with the final order
+      const finalWithCoords = finalOrder.filter(p => p.coords);
+      let routeGeometry: [number, number][] = [];
+      let totalDrivingMinutes: number | undefined;
+      let legDurations: number[] = [];
 
-      // Calculate departure time based on working hours
-      // The team needs to arrive at the first stop by workStartTime
-      // So departure = workStartTime - driving time to first stop
+      if (finalWithCoords.length >= 1 && startCoords) {
+        const coords: string[] = [`${startCoords.lng},${startCoords.lat}`];
+        finalWithCoords.forEach(p => coords.push(`${p.coords!.lng},${p.coords!.lat}`));
+        coords.push(`${startCoords.lng},${startCoords.lat}`);
+
+        const routeUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
+        const routeResp = await fetch(routeUrl);
+        const routeData = await routeResp.json();
+
+        if (routeData.code === 'Ok' && routeData.routes?.[0]) {
+          const route = routeData.routes[0];
+          routeGeometry = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+          totalDrivingMinutes = route.duration ? route.duration / 60 : undefined;
+          legDurations = route.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+        }
+      }
+
+      // Calculate arrival/departure times
       const firstLegMinutes = legDurations.length > 0 ? legDurations[0] : 0;
-      const [workStartH, workStartM] = workStartTime.split(':').map(Number);
-      const workStartTotalMin = workStartH * 60 + workStartM;
       const departureTotalMin = Math.max(0, workStartTotalMin - Math.ceil(firstLegMinutes));
-      const departureH = Math.floor(departureTotalMin / 60);
-      const departureM = departureTotalMin % 60;
-      const departureTimeStr = `${String(departureH).padStart(2, '0')}:${String(departureM).padStart(2, '0')}`;
+      const departureTimeStr = `${String(Math.floor(departureTotalMin / 60)).padStart(2, '0')}:${String(departureTotalMin % 60).padStart(2, '0')}`;
 
-      // Calculate estimated arrival and departure times for each stop
-      let currentTimeMin = workStartTotalMin; // Arrive at first stop at work start
-      const mapWps: RouteWaypoint[] = orderedProjects.map((p: any, i: number) => {
-        const arrivalMin = currentTimeMin;
+      let calcTimeMin = workStartTotalMin;
+      const mapWps: RouteWaypoint[] = finalOrder.map((p, i) => {
+        // If fixed time, use that as arrival
+        let arrivalMin = calcTimeMin;
+        if (p.assignment.fixed_time) {
+          const [fh, fm] = p.assignment.fixed_time.split(':').map(Number);
+          arrivalMin = fh * 60 + fm;
+        }
         const serviceMin = (p.assignment.service_hours || 0) * 60;
         const departureMin = arrivalMin + serviceMin;
         
-        const arrivalH = Math.floor(arrivalMin / 60);
-        const arrivalM = arrivalMin % 60;
-        const depH = Math.floor(departureMin / 60);
-        const depM = departureMin % 60;
-
         const wp: RouteWaypoint = {
           name: p.name,
           client: p.client,
           address: p.fullAddress,
-          lat: p.coords!.lat,
-          lng: p.coords!.lng,
+          lat: p.coords?.lat || 0,
+          lng: p.coords?.lng || 0,
           order: i + 1,
           serviceHours: p.assignment.service_hours,
-          estimatedArrival: `${String(arrivalH).padStart(2, '0')}:${String(arrivalM).padStart(2, '0')}`,
-          estimatedDeparture: `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`,
+          estimatedArrival: `${String(Math.floor(arrivalMin / 60)).padStart(2, '0')}:${String(Math.round(arrivalMin % 60)).padStart(2, '0')}`,
+          estimatedDeparture: `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(Math.round(departureMin % 60)).padStart(2, '0')}`,
         };
 
-        // Next stop: departure from this stop + driving to next stop
-        // legDurations[0] = start->stop1, legDurations[1] = stop1->stop2, etc.
-        const nextLegIdx = i + 1; // leg from this stop to next
+        const nextLegIdx = i + 1;
         const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
-        currentTimeMin = departureMin + Math.ceil(drivingToNext);
+        calcTimeMin = departureMin + Math.ceil(drivingToNext);
 
         return wp;
       });
 
       // Calculate return time
-      const returnLegIdx = legDurations.length - 1;
-      const lastStopDepartureMin = mapWps.length > 0 
-        ? (() => {
-            const lastWp = mapWps[mapWps.length - 1];
-            const [h, m] = lastWp.estimatedDeparture!.split(':').map(Number);
-            return h * 60 + m;
-          })()
-        : workStartTotalMin;
-      const returnDrivingMin = returnLegIdx >= 0 ? legDurations[returnLegIdx] : 0;
-      const returnTotalMin = lastStopDepartureMin + Math.ceil(returnDrivingMin);
-      const returnH = Math.floor(returnTotalMin / 60);
-      const returnM = returnTotalMin % 60;
-      const returnTimeStr = `${String(returnH).padStart(2, '0')}:${String(returnM).padStart(2, '0')}`;
-
-      // Build route geometry
-      const routeGeometry: [number, number][] = trip.geometry.coordinates.map(
-        (c: [number, number]) => [c[1], c[0]] as [number, number]
-      );
+      const lastWp = mapWps[mapWps.length - 1];
+      let returnTimeStr = '';
+      if (lastWp?.estimatedDeparture) {
+        const [h, m] = lastWp.estimatedDeparture.split(':').map(Number);
+        const lastDepMin = h * 60 + m;
+        const returnLegMin = legDurations.length > 0 ? legDurations[legDurations.length - 1] : 0;
+        const returnTotalMin = lastDepMin + Math.ceil(returnLegMin);
+        returnTimeStr = `${String(Math.floor(returnTotalMin / 60)).padStart(2, '0')}:${String(returnTotalMin % 60).padStart(2, '0')}`;
+      }
 
       const routeKey = `${teamId}_${dateStr}`;
       const startPt = startCoords ? { ...startCoords, address: teamStartAddress } : undefined;
-      const totalDrivingMinutes = trip.duration ? trip.duration / 60 : undefined;
       
-      setOptimizedRoutes(prev => ({
-        ...prev,
-        [routeKey]: {
-          waypoints: mapWps,
-          geometry: routeGeometry,
-          startPoint: startPt,
-          totalDrivingMinutes,
-          unrecognizedAddresses,
-          departureTime: departureTimeStr,
-          workStartTime,
-          workEndTime,
-        }
-      }));
+      const savedRoute: SavedRouteData = {
+        waypoints: mapWps,
+        geometry: routeGeometry,
+        startPoint: startPt,
+        totalDrivingMinutes,
+        unrecognizedAddresses,
+        departureTime: departureTimeStr,
+        workStartTime,
+        workEndTime,
+      };
 
-      // Check if the total day exceeds working hours
+      setOptimizedRoutes(prev => ({ ...prev, [routeKey]: savedRoute }));
+
+      // Save to DB
+      await saveRouteToDb(teamId, dateStr, savedRoute);
+
       const [workEndH, workEndM] = workEndTime.split(':').map(Number);
       const workEndTotalMin = workEndH * 60 + workEndM;
-      const overtime = returnTotalMin > workEndTotalMin;
-      const overtimeMsg = overtime 
-        ? ` ${t('svc_return_exceeds', { returnTime: returnTimeStr, endTime: workEndTime })}` 
-        : ` ${t('svc_return_by', { time: returnTimeStr })}`;
+      const returnMin = returnTimeStr ? (() => { const [h, m] = returnTimeStr.split(':').map(Number); return h * 60 + m; })() : 0;
+      const overtime = returnMin > workEndTotalMin;
 
-      const warningMsg = unrecognizedAddresses.length > 0 
-        ? ` (${t('svc_addresses_not_recognized', { count: String(unrecognizedAddresses.length) })})` 
-        : '';
       toast({ 
         title: t('svc_route_optimized'), 
-        description: `${t('svc_depart_stops', { time: departureTimeStr, count: String(orderedProjects.length) })}${overtimeMsg}${warningMsg}`,
+        description: `${t('svc_depart_stops', { time: departureTimeStr, count: String(finalOrder.length) })}${overtime ? ` ⚠️ Return ${returnTimeStr} > ${workEndTime}` : ` Return by ${returnTimeStr}`}`,
         variant: overtime ? 'destructive' : 'default',
       });
       loadData();
@@ -511,48 +598,6 @@ const ServiceTeamCalendar: React.FC = () => {
     } finally {
       setOptimizing(false);
     }
-  };
-
-  // Fallback: postal code nearest-neighbor (original logic)
-  const fallbackPostalOptimize = async (
-    team: ServiceTeam | undefined,
-    dayProjects: (ServiceProject & { assignment: ServiceAssignment })[],
-    teamId: string,
-    dateStr: string
-  ) => {
-    const projectsWithAddr = dayProjects.map(p => ({
-      ...p,
-      postalNum: parseInt(p.address_postal_code || '0') || 0
-    }));
-    const startPostal = parseInt(team?.start_postal_code || '0') || 0;
-    const sorted: typeof projectsWithAddr = [];
-    const remaining = [...projectsWithAddr];
-    let currentPostal = startPostal;
-
-    while (remaining.length > 0) {
-      let nearestIdx = 0;
-      let nearestDist = Math.abs(remaining[0].postalNum - currentPostal);
-      for (let i = 1; i < remaining.length; i++) {
-        const dist = Math.abs(remaining[i].postalNum - currentPostal);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestIdx = i;
-        }
-      }
-      sorted.push(remaining[nearestIdx]);
-      currentPostal = remaining[nearestIdx].postalNum;
-      remaining.splice(nearestIdx, 1);
-    }
-
-    for (let i = 0; i < sorted.length; i++) {
-      await supabase
-        .from('project_team_assignments')
-        .update({ service_order: i + 1 } as any)
-        .eq('id', sorted[i].assignment.id);
-    }
-
-    toast({ title: t('svc_route_optimized'), description: t('svc_optimized_postal', { count: String(sorted.length) }) });
-    loadData();
   };
 
   const [mapDrivingMinutes, setMapDrivingMinutes] = useState<number | undefined>();
@@ -603,17 +648,6 @@ const ServiceTeamCalendar: React.FC = () => {
     } catch (error: any) {
       toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
     }
-  };
-
-  // Get unassigned projects for a given date (projects with installation_date matching)
-  const getUnassignedProjects = (dateStr: string) => {
-    const assignedProjectIds = assignments
-      .filter(a => a.start_date === dateStr)
-      .map(a => a.project_id);
-    return projects.filter(p => 
-      p.installation_date === dateStr && 
-      !assignedProjectIds.includes(p.id)
-    );
   };
 
   if (loading) {
@@ -720,7 +754,7 @@ const ServiceTeamCalendar: React.FC = () => {
 
                       {/* Projects for this day */}
                       <div className={cn("space-y-1", isMobile && dayProjects.length === 0 && "hidden")}>
-                        {dayProjects.map((project, idx) => {
+                        {dayProjects.map((project) => {
                           const isTicket = project.assignment.is_service_ticket === true;
                           return (
                             <div
@@ -731,11 +765,11 @@ const ServiceTeamCalendar: React.FC = () => {
                                 !isTicket && "bg-primary/5"
                               )}
                               style={{ borderLeftColor: isTicket ? team.color : 'hsl(var(--primary))', borderLeftWidth: '3px' }}
-                              onClick={() => isTicket ? openEditDialog(project.assignment) : navigate(`/projects/${project.id}`)}
+                              onClick={() => openEditDialog(project.assignment)}
                             >
                               <div className="flex items-center justify-between mb-0.5">
                                 <span className="font-medium truncate flex-1">
-                                  {isTicket && project.assignment.service_order && (
+                                  {project.assignment.service_order && (
                                     <Badge variant="secondary" className="mr-1 text-[10px] px-1">
                                       #{project.assignment.service_order}
                                     </Badge>
@@ -743,6 +777,11 @@ const ServiceTeamCalendar: React.FC = () => {
                                   {!isTicket && (
                                     <Badge variant="outline" className="mr-1 text-[10px] px-1">
                                       📦
+                                    </Badge>
+                                  )}
+                                  {project.assignment.fixed_time && (
+                                    <Badge variant="default" className="mr-1 text-[10px] px-1 gap-0.5">
+                                      <Pin className="h-2 w-2" />{project.assignment.fixed_time}
                                     </Badge>
                                   )}
                                   {project.name}
@@ -762,22 +801,21 @@ const ServiceTeamCalendar: React.FC = () => {
                                 <MapPin className="h-3 w-3 shrink-0" />
                                 <span className="truncate">{getProjectAddress(project)}</span>
                               </div>
-                              {isTicket && (
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <Input
-                                    type="number"
-                                    min="0.5"
-                                    max="12"
-                                    step="0.5"
-                                    value={project.assignment.service_hours || 2}
-                                    onChange={(e) => { e.stopPropagation(); handleUpdateHours(project.assignment.id, parseFloat(e.target.value) || 2); }}
-                                    className={cn("h-5 text-xs", isMobile ? "w-12" : "w-14")}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                  <span className="text-muted-foreground">{t('svc_hrs')}</span>
-                                </div>
-                              )}
+                              {/* Hours input for ALL items (service tickets and regular projects) */}
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <Input
+                                  type="number"
+                                  min="0.5"
+                                  max="12"
+                                  step="0.5"
+                                  value={project.assignment.service_hours || 2}
+                                  onChange={(e) => { e.stopPropagation(); handleUpdateHours(project.assignment.id, parseFloat(e.target.value) || 2); }}
+                                  className={cn("h-5 text-xs", isMobile ? "w-12" : "w-14")}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <span className="text-muted-foreground">{t('svc_hrs')}</span>
+                              </div>
                             </div>
                           );
                         })}
@@ -928,7 +966,6 @@ const ServiceTeamCalendar: React.FC = () => {
             </p>
           </DialogHeader>
           <div className={cn("py-2", isMobile ? "space-y-3" : "space-y-4")}>
-            {/* Date & Team side by side on mobile */}
             <div className={cn(isMobile ? "grid grid-cols-2 gap-2" : "space-y-4")}>
               <div className="space-y-1">
                 <Label className={isMobile ? "text-xs" : ""}>{t('svc_date')}</Label>
@@ -1048,7 +1085,7 @@ const ServiceTeamCalendar: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Service Ticket Dialog */}
+      {/* Edit Assignment Dialog (works for both service tickets and regular projects) */}
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) { setIsEditDialogOpen(false); setEditingAssignment(null); } }}>
         <DialogContent className={cn("max-h-[90vh] overflow-y-auto", isMobile ? "max-w-[95vw] p-4" : "sm:max-w-lg")}>
           <DialogHeader>
@@ -1096,17 +1133,36 @@ const ServiceTeamCalendar: React.FC = () => {
                 className={isMobile ? "h-8 text-xs" : ""}
               />
             </div>
-            <div className="space-y-1">
-              <Label className={isMobile ? "text-xs" : ""}>{t('svc_estimated_hours')}</Label>
-              <Input
-                type="number"
-                min="0.5"
-                max="12"
-                step="0.5"
-                value={editHours}
-                onChange={e => setEditHours(parseFloat(e.target.value) || 2)}
-                className={isMobile ? "h-8 text-xs" : ""}
-              />
+            <div className={cn(isMobile ? "grid grid-cols-2 gap-2" : "grid grid-cols-2 gap-4")}>
+              <div className="space-y-1">
+                <Label className={isMobile ? "text-xs" : ""}>{t('svc_estimated_hours')}</Label>
+                <Input
+                  type="number"
+                  min="0.5"
+                  max="12"
+                  step="0.5"
+                  value={editHours}
+                  onChange={e => setEditHours(parseFloat(e.target.value) || 2)}
+                  className={isMobile ? "h-8 text-xs" : ""}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className={cn("flex items-center gap-1", isMobile ? "text-xs" : "")}>
+                  <Pin className="h-3 w-3" /> Fixed arrival time
+                </Label>
+                <Input
+                  type="time"
+                  value={editFixedTime}
+                  onChange={e => setEditFixedTime(e.target.value)}
+                  placeholder="--:--"
+                  className={isMobile ? "h-8 text-xs" : ""}
+                />
+                {editFixedTime && (
+                  <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1" onClick={() => setEditFixedTime('')}>
+                    Clear fixed time
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <Label className={isMobile ? "text-xs" : ""}>{t('svc_description')}</Label>

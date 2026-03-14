@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import Navbar from '@/components/Navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/context/AuthContext';
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Play, Route, Loader2, Navigation, Home } from 'lucide-react';
+import { MapPin, Clock, Play, Route, Loader2, Navigation, Home, ChevronLeft, ChevronRight, Calendar, Pin } from 'lucide-react';
 import L from 'leaflet';
 
 interface ServiceStop {
@@ -26,6 +26,8 @@ interface ServiceStop {
   serviceHours: number;
   serviceOrder: number;
   serviceNotes: string | null;
+  isServiceTicket: boolean;
+  fixedTime: string | null;
   lat?: number;
   lng?: number;
   estimatedArrival?: string;
@@ -43,6 +45,16 @@ interface RouteData {
   workEndTime?: string;
 }
 
+interface SavedRouteData {
+  waypoints: { name: string; client: string; address: string; lat: number; lng: number; order: number; serviceHours?: number; estimatedArrival?: string; estimatedDeparture?: string }[];
+  geometry: [number, number][];
+  startPoint?: { lat: number; lng: number; address: string };
+  totalDrivingMinutes?: number;
+  departureTime?: string;
+  workStartTime?: string;
+  workEndTime?: string;
+}
+
 const ServiceInstallation: React.FC = () => {
   const isMobile = useIsMobile();
   const { currentEmployee } = useAuth();
@@ -56,10 +68,11 @@ const ServiceInstallation: React.FC = () => {
   const [teamName, setTeamName] = useState('');
   const [teamColor, setTeamColor] = useState('#f73b3b');
   const [startingTimer, setStartingTimer] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const mapRef = React.useRef<HTMLDivElement>(null);
   const mapInstanceRef = React.useRef<L.Map | null>(null);
 
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     try {
@@ -77,7 +90,7 @@ const ServiceInstallation: React.FC = () => {
     }
   };
 
-  const loadTodaysRoute = useCallback(async () => {
+  const loadRoute = useCallback(async () => {
     if (!currentEmployee) return;
     setLoading(true);
 
@@ -87,16 +100,13 @@ const ServiceInstallation: React.FC = () => {
       let targetTeams: any[] = [];
 
       if (isPrivileged) {
-        // Admins, teamleaders, developers see ALL service teams
         const { data: allServiceTeams } = await (supabase
           .from('placement_teams')
           .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
           .eq('team_type', 'service')
           .eq('is_active', true);
-
         targetTeams = allServiceTeams || [];
       } else {
-        // Regular employees: only their own service team(s)
         const { data: teamMemberships } = await supabase
           .from('placement_team_members' as any)
           .select('team_id')
@@ -126,28 +136,34 @@ const ServiceInstallation: React.FC = () => {
         return;
       }
 
-      // Use first team for route display (color, name, start point)
       const team = targetTeams[0];
       setTeamName(isPrivileged && targetTeams.length > 1
         ? targetTeams.map((t: any) => t.name).join(' / ')
         : team.name);
       setTeamColor(team.color || '#f73b3b');
 
-      // Fetch installation working hours for today
-      const targetDate = new Date();
+      const targetDate = selectedDate;
       const dayOfWeek = targetDate.getDay();
       const allWorkingHours = await workingHoursService.getWorkingHours(tenant?.id);
       const installationHours = workingHoursService.getWorkingHoursForDay(allWorkingHours, 'installation', dayOfWeek);
       const workStartTime = installationHours?.start_time || '08:00';
       const workEndTime = installationHours?.end_time || '17:00';
 
-      // Get today's assignments for ALL target teams
       const allTeamIds = targetTeams.map((t: any) => t.id);
+
+      // Try to load saved route first
+      const { data: savedRoutes } = await supabase
+        .from('service_routes')
+        .select('*')
+        .in('team_id', allTeamIds)
+        .eq('route_date', dateStr);
+
+      // Get assignments for the day
       const { data: assignments } = await supabase
         .from('project_team_assignments')
         .select('*')
         .in('team_id', allTeamIds)
-        .eq('start_date', today);
+        .eq('start_date', dateStr);
 
       if (!assignments || assignments.length === 0) {
         setRouteData({ stops: [], geometry: [], totalDrivingMinutes: 0, workStartTime, workEndTime });
@@ -155,7 +171,6 @@ const ServiceInstallation: React.FC = () => {
         return;
       }
 
-      // Fetch project details
       const projectIds = assignments.map((a: any) => a.project_id);
       const { data: projectsData } = await supabase
         .from('projects')
@@ -164,7 +179,9 @@ const ServiceInstallation: React.FC = () => {
 
       const projectsMap = new Map((projectsData || []).map((p: any) => [p.id, p]));
 
-      // Build stops sorted by service_order (the optimized order from the calendar)
+      // If we have a saved route, use its order and timing data
+      const savedRoute = savedRoutes?.[0]?.route_data as unknown as SavedRouteData | undefined;
+      
       const sortedAssignments = [...assignments].sort((a: any, b: any) => (a.service_order || 0) - (b.service_order || 0));
 
       const stopsWithCoords = await Promise.all(
@@ -173,7 +190,21 @@ const ServiceInstallation: React.FC = () => {
           const address = proj
             ? [proj.address_street, proj.address_number, proj.address_postal_code, proj.address_city].filter(Boolean).join(' ')
             : 'No address';
-          const coords = address !== 'No address' ? await geocodeAddress(address) : null;
+          
+          // Try to get coords from saved route first, then geocode
+          let coords: { lat: number; lng: number } | null = null;
+          if (savedRoute?.waypoints) {
+            const savedWp = savedRoute.waypoints.find(w => w.name === proj?.name);
+            if (savedWp?.lat && savedWp?.lng) {
+              coords = { lat: savedWp.lat, lng: savedWp.lng };
+            }
+          }
+          if (!coords && address !== 'No address') {
+            coords = await geocodeAddress(address);
+          }
+
+          // Get timing from saved route if available
+          const savedWp = savedRoute?.waypoints?.find(w => w.order === (a.service_order || idx + 1));
 
           return {
             assignmentId: a.id,
@@ -184,103 +215,80 @@ const ServiceInstallation: React.FC = () => {
             serviceHours: a.service_hours || 0,
             serviceOrder: a.service_order || idx + 1,
             serviceNotes: a.service_notes || null,
+            isServiceTicket: a.is_service_ticket === true,
+            fixedTime: a.fixed_time || null,
             lat: coords?.lat,
             lng: coords?.lng,
+            estimatedArrival: savedWp?.estimatedArrival,
+            estimatedDeparture: savedWp?.estimatedDeparture,
           } as ServiceStop;
         })
       );
 
-      // Build route geometry via OSRM using the optimized order
+      // Use saved route geometry/timing if available
+      let geometry: [number, number][] = savedRoute?.geometry || [];
+      let totalDrivingMinutes = savedRoute?.totalDrivingMinutes;
+      let departureTime = savedRoute?.departureTime;
+
       const teamStartAddr = [team.start_street, team.start_number, team.start_postal_code, team.start_city].filter(Boolean).join(' ');
-      const startCoords = teamStartAddr ? await geocodeAddress(teamStartAddr) : null;
+      const startCoords = savedRoute?.startPoint || (teamStartAddr ? await geocodeAddress(teamStartAddr) : null);
+      const startPointData = startCoords ? { ...startCoords, address: savedRoute?.startPoint?.address || teamStartAddr } : undefined;
 
-      const stopsWithGeo = stopsWithCoords.filter(s => s.lat && s.lng);
-      let geometry: [number, number][] = [];
-      let totalDrivingMinutes: number | undefined;
-      let legDurations: number[] = [];
-
-      if (stopsWithGeo.length >= 1 && startCoords) {
-        // Use OSRM route API (not trip) to follow the exact optimized order
-        const coords: string[] = [];
-        coords.push(`${startCoords.lng},${startCoords.lat}`);
+      // If no saved route, compute live
+      if (!savedRoute && stopsWithCoords.filter(s => s.lat && s.lng).length >= 1 && startCoords) {
+        const stopsWithGeo = stopsWithCoords.filter(s => s.lat && s.lng);
+        const coords: string[] = [`${startCoords.lng},${startCoords.lat}`];
         stopsWithGeo.forEach(s => coords.push(`${s.lng},${s.lat}`));
-        coords.push(`${startCoords.lng},${startCoords.lat}`); // return home
-
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
+        coords.push(`${startCoords.lng},${startCoords.lat}`);
 
         try {
+          const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
           const resp = await fetch(osrmUrl);
           const data = await resp.json();
           if (data.code === 'Ok' && data.routes?.[0]) {
             const route = data.routes[0];
-            geometry = route.geometry.coordinates.map(
-              (c: [number, number]) => [c[1], c[0]] as [number, number]
-            );
+            geometry = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
             totalDrivingMinutes = route.duration ? route.duration / 60 : undefined;
-            legDurations = route.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
-          }
-        } catch {
-          // Silently fail on OSRM
-        }
-      } else if (stopsWithGeo.length >= 2) {
-        // No start point, just route between stops
-        const coords: string[] = [];
-        stopsWithGeo.forEach(s => coords.push(`${s.lng},${s.lat}`));
-        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
-        try {
-          const resp = await fetch(osrmUrl);
-          const data = await resp.json();
-          if (data.code === 'Ok' && data.routes?.[0]) {
-            geometry = data.routes[0].geometry.coordinates.map(
-              (c: [number, number]) => [c[1], c[0]] as [number, number]
-            );
-            totalDrivingMinutes = data.routes[0].duration ? data.routes[0].duration / 60 : undefined;
-            legDurations = data.routes[0].legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+            const legDurations = route.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+
+            const [workStartH, workStartM] = workStartTime.split(':').map(Number);
+            const workStartTotalMin = workStartH * 60 + workStartM;
+            const firstLegMin = legDurations.length > 0 ? legDurations[0] : 0;
+            const departureTotalMin = Math.max(0, workStartTotalMin - Math.ceil(firstLegMin));
+            departureTime = `${String(Math.floor(departureTotalMin / 60)).padStart(2, '0')}:${String(departureTotalMin % 60).padStart(2, '0')}`;
+
+            let currentTimeMin = workStartTotalMin;
+            stopsWithCoords.forEach((stop, i) => {
+              let arrivalMin = currentTimeMin;
+              if (stop.fixedTime) {
+                const [fh, fm] = stop.fixedTime.split(':').map(Number);
+                arrivalMin = fh * 60 + fm;
+              }
+              const serviceMin = (stop.serviceHours || 0) * 60;
+              const departureMin = arrivalMin + serviceMin;
+              stop.estimatedArrival = `${String(Math.floor(arrivalMin / 60)).padStart(2, '0')}:${String(Math.round(arrivalMin % 60)).padStart(2, '0')}`;
+              stop.estimatedDeparture = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(Math.round(departureMin % 60)).padStart(2, '0')}`;
+              const nextLegIdx = i + 1;
+              const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
+              currentTimeMin = departureMin + Math.ceil(drivingToNext);
+            });
           }
         } catch {}
       }
 
-      // Calculate departure time and arrival/departure per stop
-      const [workStartH, workStartM] = workStartTime.split(':').map(Number);
-      const workStartTotalMin = workStartH * 60 + workStartM;
-      const firstLegMin = legDurations.length > 0 ? legDurations[0] : 0;
-      const departureTotalMin = Math.max(0, workStartTotalMin - Math.ceil(firstLegMin));
-      const departureTime = `${String(Math.floor(departureTotalMin / 60)).padStart(2, '0')}:${String(departureTotalMin % 60).padStart(2, '0')}`;
-
-      // Calculate per-stop arrival/departure times
-      let currentTimeMin = workStartTotalMin; // arrive at first stop at work start
-      const stopsWithTimes = stopsWithCoords.map((stop, i) => {
-        const arrivalMin = currentTimeMin;
-        const serviceMin = (stop.serviceHours || 0) * 60;
-        const departureMin = arrivalMin + serviceMin;
-
-        stop.estimatedArrival = `${String(Math.floor(arrivalMin / 60)).padStart(2, '0')}:${String(Math.round(arrivalMin % 60)).padStart(2, '0')}`;
-        stop.estimatedDeparture = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(Math.round(departureMin % 60)).padStart(2, '0')}`;
-
-        // Next: departure from this stop + driving to next
-        const nextLegIdx = i + 1; // leg from this stop to next (or to home)
-        const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
-        currentTimeMin = departureMin + Math.ceil(drivingToNext);
-
-        return stop;
-      });
-
-      // Calculate return home time
-      const lastStop = stopsWithTimes[stopsWithTimes.length - 1];
+      // Calculate return time
+      const lastStop = stopsWithCoords[stopsWithCoords.length - 1];
       let returnTime: string | undefined;
-      if (lastStop?.estimatedDeparture) {
+      if (lastStop?.estimatedDeparture && startCoords) {
         const [depH, depM] = lastStop.estimatedDeparture.split(':').map(Number);
-        const lastDepMin = depH * 60 + depM;
-        const returnLegMin = legDurations.length > 0 ? legDurations[legDurations.length - 1] : 0;
-        // Only add return leg if it's the actual return-to-start leg (we added start coords at end)
-        const returnMin = startCoords ? lastDepMin + Math.ceil(returnLegMin) : lastDepMin;
-        returnTime = `${String(Math.floor(returnMin / 60)).padStart(2, '0')}:${String(Math.round(returnMin % 60)).padStart(2, '0')}`;
+        returnTime = `${String(depH).padStart(2, '0')}:${String(depM).padStart(2, '0')}`;
+        // If we have total driving and multiple stops, estimate return more accurately
       }
 
       setRouteData({
-        stops: stopsWithTimes,
+        stops: stopsWithCoords,
         geometry,
-        startPoint: startCoords ? { ...startCoords, address: teamStartAddr } : undefined,
+        startPoint: startPointData,
         totalDrivingMinutes,
         departureTime,
         returnTime,
@@ -293,11 +301,11 @@ const ServiceInstallation: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentEmployee, tenant?.id, today]);
+  }, [currentEmployee, tenant?.id, dateStr]);
 
   useEffect(() => {
-    loadTodaysRoute();
-  }, [loadTodaysRoute]);
+    loadRoute();
+  }, [loadRoute]);
 
   // Initialize/update map when routeData changes
   useEffect(() => {
@@ -308,7 +316,6 @@ const ServiceInstallation: React.FC = () => {
       mapInstanceRef.current = null;
     }
 
-    // Small delay to ensure container has rendered dimensions
     const initTimer = setTimeout(() => {
       if (!mapRef.current) return;
 
@@ -321,7 +328,6 @@ const ServiceInstallation: React.FC = () => {
 
       const bounds = L.latLngBounds([]);
 
-      // Add start point
       if (routeData.startPoint) {
         const startIcon = L.divIcon({
           html: `<div style="background:${teamColor};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏠</div>`,
@@ -335,7 +341,6 @@ const ServiceInstallation: React.FC = () => {
         bounds.extend([routeData.startPoint.lat, routeData.startPoint.lng]);
       }
 
-      // Add stop markers with arrival times
       routeData.stops.forEach((stop) => {
         if (!stop.lat || !stop.lng) return;
         const icon = L.divIcon({
@@ -350,7 +355,6 @@ const ServiceInstallation: React.FC = () => {
         bounds.extend([stop.lat, stop.lng]);
       });
 
-      // Draw route
       if (routeData.geometry.length > 0) {
         L.polyline(routeData.geometry, {
           color: teamColor,
@@ -359,14 +363,11 @@ const ServiceInstallation: React.FC = () => {
         }).addTo(map);
       }
 
-      // Invalidate size first, then fit bounds
       map.invalidateSize();
-
       if (bounds.isValid()) {
         map.fitBounds(bounds, { padding: [40, 40] });
       }
 
-      // Additional invalidateSize calls for late layout shifts
       setTimeout(() => {
         map.invalidateSize();
         if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
@@ -420,13 +421,14 @@ const ServiceInstallation: React.FC = () => {
   const totalServiceHours = routeData?.stops.reduce((sum, s) => sum + s.serviceHours, 0) || 0;
   const drivingHours = routeData?.totalDrivingMinutes ? routeData.totalDrivingMinutes / 60 : 0;
 
-  // Check if return exceeds work end
   const isOvertime = (() => {
     if (!routeData?.returnTime || !routeData?.workEndTime) return false;
     const [rh, rm] = routeData.returnTime.split(':').map(Number);
     const [eh, em] = routeData.workEndTime.split(':').map(Number);
     return rh * 60 + rm > eh * 60 + em;
   })();
+
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
   return (
     <div className="flex min-h-screen">
@@ -438,7 +440,7 @@ const ServiceInstallation: React.FC = () => {
       {isMobile && <Navbar />}
       <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
         <div className={`${isMobile ? 'px-3 py-3' : 'p-6'} max-w-7xl mx-auto`}>
-          <div className={`flex ${isMobile ? 'flex-col gap-1' : 'items-center justify-between'} mb-4`}>
+          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} mb-4`}>
             <div>
               <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-foreground`}>{t('si_title')}</h1>
               <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
@@ -448,9 +450,24 @@ const ServiceInstallation: React.FC = () => {
                     {teamName}
                   </span>
                 )}
-                {' · '}
-                {format(new Date(), 'EEEE, MMMM d yyyy')}
               </p>
+            </div>
+            {/* Day Navigation */}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSelectedDate(addDays(selectedDate, -1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant={isToday ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setSelectedDate(new Date())}
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                {isMobile ? format(selectedDate, 'EEE d MMM') : format(selectedDate, 'EEEE, MMMM d yyyy')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setSelectedDate(addDays(selectedDate, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -532,7 +549,6 @@ const ServiceInstallation: React.FC = () => {
                     </CardHeader>
                     <CardContent className={isMobile ? 'px-3 pb-3' : ''}>
                       <div className={`space-y-1.5 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                        {/* Departure */}
                         {routeData.departureTime && routeData.startPoint && (
                           <div className="flex items-center gap-2 sm:gap-3 text-muted-foreground">
                             <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{routeData.departureTime}</span>
@@ -541,7 +557,6 @@ const ServiceInstallation: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Each stop */}
                         {routeData.stops.map((stop) => (
                           <div key={stop.assignmentId} className="flex items-center gap-2 sm:gap-3">
                             <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{stop.estimatedArrival || '--:--'}</span>
@@ -552,6 +567,8 @@ const ServiceInstallation: React.FC = () => {
                               {stop.serviceOrder}
                             </div>
                             <span className="truncate flex-1">
+                              {stop.fixedTime && <Pin className="h-3 w-3 inline mr-0.5 text-primary" />}
+                              {!stop.isServiceTicket && <span className="mr-0.5">📦</span>}
                               {stop.projectName}{' '}
                               <span className="text-muted-foreground">({stop.client})</span>
                             </span>
@@ -562,7 +579,6 @@ const ServiceInstallation: React.FC = () => {
                           </div>
                         ))}
 
-                        {/* Return home */}
                         {routeData.returnTime && routeData.startPoint && (
                           <div className={`flex items-center gap-2 sm:gap-3 ${isOvertime ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                             <span className={`font-mono ${isMobile ? 'text-[10px] w-10' : 'text-xs w-12'} text-right`}>{routeData.returnTime}</span>
@@ -602,7 +618,17 @@ const ServiceInstallation: React.FC = () => {
 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between gap-1">
-                                    <h4 className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{stop.projectName}</h4>
+                                    <h4 className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} truncate flex items-center gap-1`}>
+                                      {stop.fixedTime && (
+                                        <Badge variant="default" className="text-[10px] px-1 gap-0.5 shrink-0">
+                                          <Pin className="h-2 w-2" />{stop.fixedTime}
+                                        </Badge>
+                                      )}
+                                      {!stop.isServiceTicket && (
+                                        <Badge variant="outline" className="text-[10px] px-1 shrink-0">📦</Badge>
+                                      )}
+                                      {stop.projectName}
+                                    </h4>
                                     {stop.estimatedArrival && (
                                       <Badge variant="outline" className={`${isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'} shrink-0`}>
                                         {stop.estimatedArrival}{!isMobile && ` — ${stop.estimatedDeparture}`}
