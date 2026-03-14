@@ -76,6 +76,7 @@ interface SavedRouteData {
   departureTime?: string;
   workStartTime?: string;
   workEndTime?: string;
+  returnTime?: string;
 }
 
 const ServiceTeamCalendar: React.FC = () => {
