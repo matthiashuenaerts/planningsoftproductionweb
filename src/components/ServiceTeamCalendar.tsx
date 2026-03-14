@@ -1229,6 +1229,7 @@ const ServiceTeamCalendar: React.FC = () => {
         departureTime={mapDepartureTime}
         workStartTime={mapWorkStartTime}
         workEndTime={mapWorkEndTime}
+        returnTime={mapReturnTime}
       />
     </div>
   );
