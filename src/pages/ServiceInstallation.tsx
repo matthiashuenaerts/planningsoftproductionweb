@@ -180,7 +180,7 @@ const ServiceInstallation: React.FC = () => {
       const projectsMap = new Map((projectsData || []).map((p: any) => [p.id, p]));
 
       // If we have a saved route, use its order and timing data
-      const savedRoute = savedRoutes?.[0]?.route_data as SavedRouteData | undefined;
+      const savedRoute = savedRoutes?.[0]?.route_data as unknown as SavedRouteData | undefined;
       
       const sortedAssignments = [...assignments].sort((a: any, b: any) => (a.service_order || 0) - (b.service_order || 0));
 
