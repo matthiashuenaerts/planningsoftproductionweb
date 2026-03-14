@@ -198,9 +198,14 @@ const RouteMapDialog: React.FC<RouteMapDialogProps> = ({
                 {totalHours.toFixed(1)}h
               </Badge>
             )}
-            {workEndTime && (
+            {returnTime && (
               <Badge variant="outline" className={cn("gap-1", isMobile && "text-[10px] px-1.5 py-0")}>
-                🏠 {workEndTime}
+                🏠 {returnTime}
+              </Badge>
+            )}
+            {workEndTime && (
+              <Badge variant={returnTime && returnTime > workEndTime ? "destructive" : "outline"} className={cn("gap-1", isMobile && "text-[10px] px-1.5 py-0")}>
+                ⏰ {workEndTime}
               </Badge>
             )}
           </div>
