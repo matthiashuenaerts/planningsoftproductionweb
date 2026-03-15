@@ -805,7 +805,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                   <Edit3 className="h-3 w-3 text-muted-foreground" />
                                   <button
                                     className="text-destructive hover:text-destructive/80"
-                                    onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id, isTicket); }}
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
