@@ -1742,7 +1742,7 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
                 const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * height : 0;
                 
                 let lastX = 0, lastY = 0;
-                const steps = 8; // bezier approximation steps
+                const steps = 24; // bezier approximation steps
                 
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
