@@ -117,13 +117,6 @@ const NotificationBanner = () => {
       role="alert"
     >
       <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-card shadow-2xl shadow-primary/10 backdrop-blur-sm">
-        {/* Progress bar */}
-        <div className="absolute top-0 left-0 h-[3px] w-full bg-muted/30">
-          <div
-            className="h-full bg-primary transition-all duration-50 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
 
         <div className="p-4 pt-5">
           <div className="flex items-start gap-3">
