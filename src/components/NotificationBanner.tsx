@@ -57,7 +57,6 @@ const NotificationBanner = () => {
   }, [notifications, isSuccess, latestUnread?.id, showNotification]);
 
   // No auto-dismiss — notification stays until manually closed with X
-  }, [latestUnread?.id]);
 
   const triggerClose = useCallback(() => {
     setIsExiting(true);
