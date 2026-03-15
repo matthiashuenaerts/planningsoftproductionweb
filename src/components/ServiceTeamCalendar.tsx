@@ -919,7 +919,7 @@ const ServiceTeamCalendar: React.FC = () => {
                         <span className="font-medium truncate flex-1">{project.name}</span>
                         <button
                           className="text-destructive hover:text-destructive/80 ml-1"
-                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(a.id); }}
+                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(a.id, a.is_service_ticket === true); }}
                         >
                           <X className="h-3 w-3" />
                         </button>
