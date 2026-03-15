@@ -377,7 +377,7 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
         const rawBytes = await blobData.arrayBuffer();
         const annotatedBytes = await generateAnnotatedPdf(projectId, fileName, rawBytes);
         const finalBlob = annotatedBytes
-          ? new Blob([annotatedBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
+          ? new Blob([annotatedBytes], { type: 'application/pdf' })
           : blobData;
         const url = URL.createObjectURL(finalBlob);
         window.open(url, '_blank');
