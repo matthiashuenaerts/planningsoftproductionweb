@@ -56,23 +56,7 @@ const NotificationBanner = () => {
     }
   }, [notifications, isSuccess, latestUnread?.id, showNotification]);
 
-  // Auto-dismiss with progress bar
-  useEffect(() => {
-    if (!latestUnread) return;
-
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        const next = prev - (100 / (AUTO_DISMISS_MS / 50));
-        if (next <= 0) {
-          clearInterval(interval);
-          triggerClose();
-          return 0;
-        }
-        return next;
-      });
-    }, 50);
-
-    return () => clearInterval(interval);
+  // No auto-dismiss — notification stays until manually closed with X
   }, [latestUnread?.id]);
 
   const triggerClose = useCallback(() => {
