@@ -138,7 +138,7 @@ export async function generateAnnotatedPdf(
                 }
               } else if (cmd[0] === 'C') {
                 const c1x = pathLeft + cmd[1] * width - offsetX;
-                const c1y = pathLeft + cmd[2] * height - offsetY;
+                const c1y = pathTop + cmd[2] * height - offsetY;
                 const c2x = pathLeft + cmd[3] * width - offsetX;
                 const c2y = pathTop + cmd[4] * height - offsetY;
                 const ex = pathLeft + cmd[5] * width - offsetX;
