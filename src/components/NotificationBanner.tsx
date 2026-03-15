@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
-const AUTO_DISMISS_MS = 8000;
+
 
 const NotificationBanner = () => {
   const { currentEmployee } = useAuth();
@@ -18,7 +18,7 @@ const NotificationBanner = () => {
   const navigate = useNavigate();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const [isExiting, setIsExiting] = useState(false);
-  const [progress, setProgress] = useState(100);
+  
   const { showNotification } = useNativeNotifications();
 
   const { data: notifications, isSuccess } = useQuery({
@@ -47,7 +47,7 @@ const NotificationBanner = () => {
         if (latest.id !== latestUnread?.id) {
           setLatestUnread(latest);
           setIsExiting(false);
-          setProgress(100);
+          
           showNotification('AutoMattiOn Compass', latest.message);
         }
       } else {
@@ -56,24 +56,7 @@ const NotificationBanner = () => {
     }
   }, [notifications, isSuccess, latestUnread?.id, showNotification]);
 
-  // Auto-dismiss with progress bar
-  useEffect(() => {
-    if (!latestUnread) return;
-
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        const next = prev - (100 / (AUTO_DISMISS_MS / 50));
-        if (next <= 0) {
-          clearInterval(interval);
-          triggerClose();
-          return 0;
-        }
-        return next;
-      });
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [latestUnread?.id]);
+  // No auto-dismiss — notification stays until manually closed with X
 
   const triggerClose = useCallback(() => {
     setIsExiting(true);
@@ -134,13 +117,6 @@ const NotificationBanner = () => {
       role="alert"
     >
       <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-card shadow-2xl shadow-primary/10 backdrop-blur-sm">
-        {/* Progress bar */}
-        <div className="absolute top-0 left-0 h-[3px] w-full bg-muted/30">
-          <div
-            className="h-full bg-primary transition-all duration-50 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
 
         <div className="p-4 pt-5">
           <div className="flex items-start gap-3">
