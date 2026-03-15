@@ -628,13 +628,24 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapOpen(true);
   };
 
-  const handleRemoveAssignment = async (assignmentId: string) => {
+  const handleRemoveAssignment = async (assignmentId: string, isServiceTicket: boolean = true) => {
     try {
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .delete()
-        .eq('id', assignmentId);
-      if (error) throw error;
+      if (!isServiceTicket) {
+        // For regular project installations, just unassign the team (null out team_id, team, start_date)
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({ team_id: null, team: '', start_date: null } as any)
+          .eq('id', assignmentId);
+        if (error) throw error;
+        toast({ title: t('success'), description: t('svc_team_unassigned') || 'Installation team removed' });
+      } else {
+        // For service tickets, delete the assignment
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .delete()
+          .eq('id', assignmentId);
+        if (error) throw error;
+      }
       loadData();
     } catch (error: any) {
       toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
