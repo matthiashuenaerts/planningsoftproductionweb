@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
-const AUTO_DISMISS_MS = 8000;
+
 
 const NotificationBanner = () => {
   const { currentEmployee } = useAuth();
