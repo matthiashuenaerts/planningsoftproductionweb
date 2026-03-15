@@ -111,7 +111,7 @@ export async function generateAnnotatedPdf(
             const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * width : 0;
             const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * height : 0;
             let lastX = 0, lastY = 0;
-            const steps = 8;
+            const steps = 24;
             const color = rgb(pc.r / 255, pc.g / 255, pc.b / 255);
 
             for (const cmd of annotation.path) {
