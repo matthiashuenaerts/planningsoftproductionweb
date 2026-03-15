@@ -338,7 +338,7 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
         const rawBytes = await data.arrayBuffer();
         const annotatedBytes = await generateAnnotatedPdf(projectId, fileName, rawBytes);
         if (annotatedBytes) {
-          blob = new Blob([annotatedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+          blob = new Blob([annotatedBytes], { type: 'application/pdf' });
         }
       }
 
