@@ -18,7 +18,7 @@ const NotificationBanner = () => {
   const navigate = useNavigate();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const [isExiting, setIsExiting] = useState(false);
-  const [progress, setProgress] = useState(100);
+  
   const { showNotification } = useNativeNotifications();
 
   const { data: notifications, isSuccess } = useQuery({
