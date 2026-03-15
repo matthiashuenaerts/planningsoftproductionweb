@@ -628,13 +628,24 @@ const ServiceTeamCalendar: React.FC = () => {
     setMapOpen(true);
   };
 
-  const handleRemoveAssignment = async (assignmentId: string) => {
+  const handleRemoveAssignment = async (assignmentId: string, isServiceTicket: boolean = true) => {
     try {
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .delete()
-        .eq('id', assignmentId);
-      if (error) throw error;
+      if (!isServiceTicket) {
+        // For regular project installations, just unassign the team (null out team_id, team, start_date)
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({ team_id: null, team: '', start_date: null } as any)
+          .eq('id', assignmentId);
+        if (error) throw error;
+        toast({ title: t('success'), description: t('svc_team_unassigned') || 'Installation team removed' });
+      } else {
+        // For service tickets, delete the assignment
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .delete()
+          .eq('id', assignmentId);
+        if (error) throw error;
+      }
       loadData();
     } catch (error: any) {
       toast({ title: t('svc_error'), description: error.message, variant: 'destructive' });
@@ -794,7 +805,7 @@ const ServiceTeamCalendar: React.FC = () => {
                                   <Edit3 className="h-3 w-3 text-muted-foreground" />
                                   <button
                                     className="text-destructive hover:text-destructive/80"
-                                    onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id); }}
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(project.assignment.id, isTicket); }}
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -908,7 +919,7 @@ const ServiceTeamCalendar: React.FC = () => {
                         <span className="font-medium truncate flex-1">{project.name}</span>
                         <button
                           className="text-destructive hover:text-destructive/80 ml-1"
-                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(a.id); }}
+                          onClick={(e) => { e.stopPropagation(); handleRemoveAssignment(a.id, a.is_service_ticket === true); }}
                         >
                           <X className="h-3 w-3" />
                         </button>
