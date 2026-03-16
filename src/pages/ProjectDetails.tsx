@@ -342,6 +342,18 @@ const ProjectDetails = () => {
         } catch (error) {
           console.error('Error fetching project efficiency:', error);
         }
+
+        // Fetch team assignments for this project
+        try {
+          const { data: teamAssignments } = await supabase
+            .from('project_team_assignments')
+            .select('id, project_id, team_id, is_service_ticket, start_date, duration, service_hours, fixed_time, service_notes, placement_teams(id, name, color)')
+            .eq('project_id', projectId);
+          setProjectTeamAssignments(teamAssignments || []);
+          console.log('Loaded team assignments:', teamAssignments);
+        } catch (error) {
+          console.error('Error fetching team assignments:', error);
+        }
       } catch (error: any) {
         console.error('Error loading project data:', error);
         toast({
