@@ -102,6 +102,7 @@ const ProjectDetails = () => {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [showPartDetailDialog, setShowPartDetailDialog] = useState(false);
+  const [projectTeamAssignments, setProjectTeamAssignments] = useState<any[]>([]);
   const {
     currentEmployee
   } = useAuth();
