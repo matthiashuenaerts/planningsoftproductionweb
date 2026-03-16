@@ -102,6 +102,7 @@ const ProjectDetails = () => {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [showPartDetailDialog, setShowPartDetailDialog] = useState(false);
+  const [projectTeamAssignments, setProjectTeamAssignments] = useState<any[]>([]);
   const {
     currentEmployee
   } = useAuth();
@@ -340,6 +341,18 @@ const ProjectDetails = () => {
           }
         } catch (error) {
           console.error('Error fetching project efficiency:', error);
+        }
+
+        // Fetch team assignments for this project
+        try {
+          const { data: teamAssignments } = await supabase
+            .from('project_team_assignments')
+            .select('id, project_id, team_id, is_service_ticket, start_date, duration, service_hours, fixed_time, service_notes, placement_teams(id, name, color)')
+            .eq('project_id', projectId);
+          setProjectTeamAssignments(teamAssignments || []);
+          console.log('Loaded team assignments:', teamAssignments);
+        } catch (error) {
+          console.error('Error fetching team assignments:', error);
         }
       } catch (error: any) {
         console.error('Error loading project data:', error);
@@ -1663,6 +1676,88 @@ const ProjectDetails = () => {
                   <CardTitle className="text-base sm:text-2xl">{t('project_summary')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-5">
+                  {/* Important Dates - Moved to top */}
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-medium mb-1.5">{t('important_dates')}</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-1 gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('start_date_label')}</div>
+                          <div className="font-medium truncate text-xs sm:text-sm">{project?.start_date && formatDate(project.start_date)}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('installation_date_label')}</div>
+                          <div className="font-medium truncate text-xs sm:text-sm">{project?.installation_date && formatDate(project.installation_date)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Installation Team Assignment */}
+                  {(() => {
+                    // Get the main installation team (non-service ticket)
+                    const mainAssignment = projectTeamAssignments?.find((a: any) => !a.is_service_ticket);
+                    if (!mainAssignment) return null;
+                    const team = mainAssignment.placement_teams;
+                    return (
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1.5">{t('installation_team') || 'Installation Team'}</h4>
+                        <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
+                          <div 
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: team?.color || '#6b7280' }}
+                          />
+                          <div className="min-w-0">
+                            <div className="font-medium truncate text-xs sm:text-sm">{team?.name || t('not_assigned')}</div>
+                            {mainAssignment.start_date && (
+                              <div className="text-[10px] sm:text-xs text-muted-foreground">
+                                {formatDate(mainAssignment.start_date)} • {mainAssignment.duration} {t('days') || 'days'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Service Tickets */}
+                  {(() => {
+                    const serviceTickets = projectTeamAssignments?.filter((a: any) => a.is_service_ticket) || [];
+                    if (serviceTickets.length === 0) return null;
+                    return (
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-medium mb-1.5">
+                          {t('service_tickets') || 'Service Tickets'} ({serviceTickets.length})
+                        </h4>
+                        <div className="space-y-1.5">
+                          {serviceTickets.map((ticket: any) => {
+                            const team = ticket.placement_teams;
+                            return (
+                              <div key={ticket.id} className="flex items-center gap-1.5 text-xs sm:text-sm bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: team?.color || '#f59e0b' }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium truncate text-xs sm:text-sm">{team?.name || t('service_team')}</div>
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground">
+                                    {ticket.start_date ? formatDate(ticket.start_date) : t('no_date')}
+                                    {ticket.service_hours && ` • ${ticket.service_hours}h`}
+                                    {ticket.fixed_time && ` • ${ticket.fixed_time}`}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Status + Progress inline on mobile */}
                   <div className="flex items-center gap-3 sm:block sm:space-y-4">
                     <div className="flex-shrink-0">
@@ -1742,26 +1837,6 @@ const ProjectDetails = () => {
                       <div className="bg-blue-50 dark:bg-blue-950/30 p-1.5 sm:p-2 rounded-lg">
                         <div className="font-bold text-sm sm:text-base text-blue-800 dark:text-blue-300">{deliveredAccessoriesCount}</div>
                         <div className="text-blue-600 dark:text-blue-400 text-[10px] sm:text-xs leading-tight">{t('delivered')}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-medium mb-1.5">{t('important_dates')}</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-1 gap-1.5 sm:gap-2">
-                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        <div className="min-w-0">
-                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('start_date_label')}</div>
-                          <div className="font-medium truncate text-xs sm:text-sm">{project?.start_date && formatDate(project.start_date)}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs sm:text-sm bg-muted/40 rounded-lg p-2">
-                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                        <div className="min-w-0">
-                          <div className="text-[10px] sm:text-xs text-muted-foreground">{t('installation_date_label')}</div>
-                          <div className="font-medium truncate text-xs sm:text-sm">{project?.installation_date && formatDate(project.installation_date)}</div>
-                        </div>
                       </div>
                     </div>
                   </div>
