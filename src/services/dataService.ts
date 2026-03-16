@@ -902,6 +902,7 @@ export const employeeService = {
     role: string; 
     workstation?: string;
     logistics?: boolean;
+    tenantId?: string | null;
   }): Promise<Employee> {
     // Use edge function to create both auth user and employee
     const { data, error } = await supabase.functions.invoke('create-employee', {
