@@ -148,7 +148,7 @@ const EmployeeSettings: React.FC = () => {
           toast({ title: "Validation Error", description: "Name and password are required", variant: "destructive" });
           return;
         }
-        await employeeService.create(dataToSend);
+        await employeeService.create({ ...dataToSend, tenantId: tenant?.id });
         toast({ title: "Success", description: "Employee added successfully" });
       }
       
