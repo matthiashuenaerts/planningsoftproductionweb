@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, password, role, logistics, workstation, preferred_language, isDeveloper } = await req.json();
+    const { name, email, password, role, logistics, workstation, preferred_language, isDeveloper, tenantId: explicitTenantId } = await req.json();
 
     if (!name || !password) {
       return new Response(
@@ -132,6 +132,9 @@ serve(async (req) => {
     // Developers have no tenant_id - they get context dynamically
     if (isDeveloper) {
       // Don't set tenant_id at all - it will be NULL
+    } else if (explicitTenantId) {
+      // Use explicitly provided tenant ID from the frontend
+      insertData.tenant_id = explicitTenantId;
     } else if (callerTenantId) {
       insertData.tenant_id = callerTenantId;
     }
