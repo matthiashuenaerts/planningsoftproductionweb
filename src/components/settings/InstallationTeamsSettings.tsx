@@ -724,6 +724,11 @@ const InstallationTeamsSettings: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell>
+                          <span className="text-sm font-medium">
+                            {(team as any).hourly_cost ? `€${Number((team as any).hourly_cost).toFixed(2)}` : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={team.is_active ? "default" : "secondary"}>
                             {team.is_active ? "Active" : "Inactive"}
                           </Badge>
