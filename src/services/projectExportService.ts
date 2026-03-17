@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Project } from '@/services/dataService';
 import { orderService } from '@/services/orderService';
+import { extractStoragePath } from '@/lib/storageUtils';
 
 interface ExportData {
   project: Project;
