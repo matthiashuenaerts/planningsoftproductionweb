@@ -1364,7 +1364,9 @@ const TimeRegistrations = () => {
                 <TableBody>
                   {filteredRegistrations.map((registration: any) => {
                      const duration = registration.duration_minutes || 0;
-                     const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost;
+                     const hourlyCost = registration.tasks?.standard_tasks?.hourly_cost 
+                       || registration.project_team_assignments?.placement_teams?.hourly_cost
+                       || 0;
                      let cost = 0;
                      if (hourlyCost && duration > 0) {
                        cost = (duration / 60) * hourlyCost;
