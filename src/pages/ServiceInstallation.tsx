@@ -67,6 +67,7 @@ const ServiceInstallation: React.FC = () => {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [teamName, setTeamName] = useState('');
   const [teamColor, setTeamColor] = useState('#f73b3b');
+  const [teamHourlyCost, setTeamHourlyCost] = useState<number>(0);
   const [startingTimer, setStartingTimer] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const mapRef = React.useRef<HTMLDivElement>(null);
