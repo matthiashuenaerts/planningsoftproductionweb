@@ -613,6 +613,7 @@ const PersonalTasks = () => {
     await fetchPersonalData();
   };
 
+  const isTaskActive = (taskId: string) => {
     return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
   };
 
