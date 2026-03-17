@@ -660,8 +660,9 @@ const InstallationTeamsSettings: React.FC = () => {
                   <TableHead>Type</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Default Members</TableHead>
-                  <TableHead>External Team Names</TableHead>
-                  <TableHead>Status</TableHead>
+                   <TableHead>External Team Names</TableHead>
+                   <TableHead>€/h</TableHead>
+                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
