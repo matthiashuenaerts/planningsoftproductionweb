@@ -52,6 +52,7 @@ interface InstallationTeam {
   external_team_names: string[];
   is_active: boolean;
   team_type: string;
+  hourly_cost?: number;
   start_street?: string;
   start_number?: string;
   start_postal_code?: string;
