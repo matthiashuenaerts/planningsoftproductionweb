@@ -719,20 +719,20 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg w-[95vw] max-h-[85vh] flex flex-col p-3 sm:p-6">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-sm sm:text-lg leading-tight">
-            <Radio className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+          <DialogTitle className="flex items-center gap-2">
+            <Radio className="h-5 w-5" />
             Scanner Listener - {workstationName}
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          <DialogDescription>
             Luister naar USB scanner, COM poort, of ontvang via bypass
           </DialogDescription>
         </DialogHeader>
         {scannerContent}
         <div className="flex justify-end pt-2">
-          <Button variant="outline" size="sm" onClick={handleClose} className="text-xs sm:text-sm">
-            <X className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" /> Sluiten
+          <Button variant="outline" onClick={handleClose}>
+            <X className="h-4 w-4 mr-1" /> Sluiten
           </Button>
         </div>
       </DialogContent>
