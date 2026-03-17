@@ -21,6 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { standardTasksService } from '@/services/standardTasksService';
 import { checklistService } from '@/services/checklistService';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
+import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 
 interface Task {
   id: string;
