@@ -21,6 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { standardTasksService } from '@/services/standardTasksService';
 import { checklistService } from '@/services/checklistService';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
+import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
 
 interface Task {
   id: string;
@@ -92,6 +93,14 @@ const PersonalTasks = () => {
     taskId: string;
     standardTaskId: string;
     taskName: string;
+  } | null>(null);
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingNewTaskId, setPendingNewTaskId] = useState<string | null>(null);
+  const [pendingStopData, setPendingStopData] = useState<{
+    registrationId: string;
+    taskDetails: any;
+    overTimeMinutes: number;
+    elapsedMinutes: number;
   } | null>(null);
 
   // Helper function to get next workday (skip weekends and holidays)
@@ -438,6 +447,61 @@ const PersonalTasks = () => {
           if (!canStart) return;
         }
 
+        // Check if there's an active registration with negative time
+        const currentActiveReg = activeTimeRegistrations.find(r => r.is_active);
+        if (currentActiveReg && currentActiveReg.start_time) {
+          // Fetch the active task's duration
+          let activeDuration: number | null = null;
+          let activeTitle = 'Current Task';
+          if (currentActiveReg.task_id) {
+            const { data: taskData } = await supabase
+              .from('tasks')
+              .select('title, duration')
+              .eq('id', currentActiveReg.task_id)
+              .single();
+            activeDuration = taskData?.duration || null;
+            activeTitle = taskData?.title || activeTitle;
+          } else if (currentActiveReg.workstation_task_id) {
+            const { data: wsData } = await supabase
+              .from('workstation_tasks')
+              .select('task_name, duration')
+              .eq('id', currentActiveReg.workstation_task_id)
+              .single();
+            activeDuration = wsData?.duration || null;
+            activeTitle = wsData?.task_name || activeTitle;
+          }
+
+          if (activeDuration) {
+            const start = new Date(currentActiveReg.start_time);
+            const now = new Date();
+            const elapsedMs = now.getTime() - start.getTime();
+            const durationMs = activeDuration * 60 * 1000;
+            const remainingMs = durationMs - elapsedMs;
+            
+            if (remainingMs < 0) {
+              const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+              
+              // Reset start_time to NOW so elapsed becomes 0
+              await supabase
+                .from('time_registrations')
+                .update({ start_time: new Date().toISOString() })
+                .eq('id', currentActiveReg.id);
+              
+              await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+              
+              setPendingNewTaskId(taskId);
+              setPendingStopData({
+                registrationId: currentActiveReg.id,
+                taskDetails: { title: activeTitle, duration: activeDuration },
+                overTimeMinutes,
+                elapsedMinutes: 0
+              });
+              setShowExtraTimeDialog(true);
+              return; // Don't start new task yet - wait for dialog
+            }
+          }
+        }
+
         console.log('Starting task and time registration for:', taskId);
         await timeRegistrationService.startTask(currentEmployee.id, taskId);
         
@@ -491,6 +555,62 @@ const PersonalTasks = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Handle extra time confirmation when starting a new task with negative timer
+  const handleExtraTimeConfirm = async (totalMinutes: number) => {
+    if (!pendingStopData || !currentEmployee) return;
+
+    try {
+      // Update the current task's duration
+      const currentActiveReg = activeTimeRegistrations.find(r => r.is_active);
+      if (currentActiveReg?.task_id) {
+        await supabase
+          .from('tasks')
+          .update({ duration: totalMinutes })
+          .eq('id', currentActiveReg.task_id);
+      } else if (currentActiveReg?.workstation_task_id) {
+        await supabase
+          .from('workstation_tasks')
+          .update({ duration: totalMinutes })
+          .eq('id', currentActiveReg.workstation_task_id);
+      }
+
+      // Stop the current time registration
+      await timeRegistrationService.stopTask(pendingStopData.registrationId);
+
+      await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+
+      toast({
+        title: t('task_duration_updated') || 'Task Duration Updated',
+        description: `${t('task_paused_with_new_duration') || 'Task paused with new duration:'} ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      });
+
+      // Now start the new task if there's a pending one
+      if (pendingNewTaskId) {
+        await timeRegistrationService.startTask(currentEmployee.id, pendingNewTaskId);
+        await fetchActiveTimeRegistrations();
+        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+
+        toast({
+          title: t("task_started"),
+          description: t("task_started_desc"),
+        });
+      }
+    } catch (error) {
+      console.error('Error handling extra time:', error);
+      toast({
+        title: t('error'),
+        description: t('task_status_update_error', { message: (error as Error).message }),
+        variant: 'destructive'
+      });
+    }
+
+    setShowExtraTimeDialog(false);
+    setPendingStopData(null);
+    setPendingNewTaskId(null);
+    await fetchPersonalData();
   };
 
   const isTaskActive = (taskId: string) => {
@@ -789,6 +909,19 @@ const PersonalTasks = () => {
             onComplete={handleChecklistComplete}
           />
         )}
+
+        <TaskExtraTimeDialog
+          isOpen={showExtraTimeDialog}
+          onClose={() => {
+            setShowExtraTimeDialog(false);
+            setPendingStopData(null);
+            setPendingNewTaskId(null);
+          }}
+          taskTitle={pendingStopData?.taskDetails?.title || t('current_task') || 'Current Task'}
+          overTimeMinutes={pendingStopData?.overTimeMinutes || 0}
+          elapsedMinutes={pendingStopData?.elapsedMinutes || 0}
+          onConfirm={handleExtraTimeConfirm}
+        />
       </div>
     </div>
   );
