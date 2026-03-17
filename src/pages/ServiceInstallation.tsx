@@ -512,6 +512,11 @@ const ServiceInstallation: React.FC = () => {
                 <Badge variant="secondary" className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                   ≈ {(totalServiceHours + drivingHours).toFixed(1)}h {t('si_total')}
                 </Badge>
+                {teamHourlyCost > 0 && (
+                  <Badge variant="outline" className={`gap-1 ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
+                    💰 €{(totalServiceHours * teamHourlyCost).toFixed(2)} ({t('si_estimated')})
+                  </Badge>
+                )}
                 {routeData.returnTime && (
                   <Badge variant={isOvertime ? 'destructive' : 'outline'} className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                     <Home className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
