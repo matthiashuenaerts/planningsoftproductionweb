@@ -123,7 +123,7 @@ const ServiceInstallation: React.FC = () => {
 
         const { data: serviceTeams } = await (supabase
           .from('placement_teams')
-          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
+          .select('id, name, color, hourly_cost, start_street, start_number, start_postal_code, start_city') as any)
           .eq('team_type', 'service')
           .eq('is_active', true)
           .in('id', memberTeamIds);
