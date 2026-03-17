@@ -139,11 +139,13 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
       for (const part of exportData.brokenParts) {
         if (part.image_path) {
           try {
+            const storagePath = extractStoragePath('broken_parts', part.image_path);
+            if (!storagePath) continue;
             const { data, error } = await supabase.storage
               .from('broken_parts')
-              .download(part.image_path);
+              .download(storagePath);
             if (error) throw error;
-            brokenPartsImagesFolder?.file(part.image_path.split('/').pop() || part.image_path, data);
+            brokenPartsImagesFolder?.file(storagePath.split('/').pop() || storagePath, data);
           } catch(e) {
             console.error(`Failed to download broken part image ${part.image_path}:`, e);
             brokenPartsImagesFolder?.file(`${part.image_path.split('/').pop() || part.image_path}.error.txt`, `Could not download file.`);
