@@ -326,12 +326,12 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                   const remainingQuantity = item.quantity - (item.delivered_quantity || 0);
 
                   return (
-                    <div key={item.id} className={`border rounded-lg ${isMobile ? 'p-3' : 'p-4 md:p-6'}`}>
-                      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-col sm:flex-row sm:items-start sm:justify-between gap-4'}`}>
-                        <div className="flex-1 space-y-2 min-w-0">
-                          <div>
-                            <h4 className={`font-semibold ${isMobile ? 'text-xs break-words' : 'text-base md:text-lg truncate'}`}>{item.description}</h4>
-                            <p className={`text-muted-foreground ${isMobile ? 'text-[10px] break-all' : 'text-sm truncate'}`}>{t('ed_article')}: {item.article_code}</p>
+                    <div key={item.id} className={`border rounded-lg overflow-hidden ${isMobile ? 'p-3' : 'p-4 md:p-5'}`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-col gap-4'}`}>
+                        <div className="min-w-0 space-y-2">
+                          <div className="min-w-0">
+                            <h4 className={`font-semibold break-words whitespace-pre-wrap ${isMobile ? 'text-xs leading-relaxed' : 'text-sm md:text-base leading-snug'}`}>{item.description}</h4>
+                            <p className={`text-muted-foreground break-all ${isMobile ? 'text-[10px] mt-0.5' : 'text-xs md:text-sm mt-1'}`}>{t('ed_article')}: {item.article_code}</p>
                           </div>
 
                           <div className={`grid grid-cols-2 gap-1 ${isMobile ? 'text-[11px]' : 'text-sm'}`}>
@@ -377,7 +377,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                   value={delivery.stockLocation}
                                   onChange={(e) => updateItemDelivery(item.id, 'stockLocation', e.target.value)}
                                   placeholder={t('ed_location_placeholder')}
-                                  className={`flex-1 ${isMobile ? 'h-8 text-xs' : ''}`}
+                                  className={`flex-1 min-w-0 ${isMobile ? 'h-8 text-xs' : ''}`}
                                 />
                                 {order.project_id && (
                                   <Popover>
@@ -386,7 +386,7 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                         variant="outline"
                                         size="sm"
                                         onClick={() => fetchLocationSuggestions(item.id)}
-                                        className={isMobile ? 'h-8 px-2' : 'px-3'}
+                                        className={`shrink-0 ${isMobile ? 'h-8 px-2' : 'px-3'}`}
                                       >
                                         <ChevronDown className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
                                         {!isMobile && <span className="hidden sm:inline ml-1">{t('ed_suggestions')}</span>}
@@ -409,8 +409,8 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                                                 className="w-full justify-start text-left"
                                                 onClick={() => updateItemDelivery(item.id, 'stockLocation', location)}
                                               >
-                                                <MapPin className="h-3 w-3 mr-2" />
-                                                {location}
+                                                <MapPin className="h-3 w-3 mr-2 shrink-0" />
+                                                <span className="truncate">{location}</span>
                                               </Button>
                                             ))}
                                           </div>
@@ -428,14 +428,14 @@ export const EnhancedDeliveryConfirmationModal: React.FC<EnhancedDeliveryConfirm
                           )}
                         </div>
 
-                        <div className={`flex ${isMobile ? 'flex-row items-center gap-2' : 'flex-row sm:flex-col items-center gap-3'}`}>
+                        <div className={`flex items-center gap-2 ${isMobile ? '' : 'pt-1 border-t border-border/50'}`}>
                           <Checkbox
                             id={`full-delivery-${item.id}`}
                             checked={delivery.isFullyDelivered}
                             onCheckedChange={(checked) => updateItemDelivery(item.id, 'isFullyDelivered', checked)}
-                            className={isMobile ? 'w-6 h-6 rounded' : 'w-8 h-8 rounded-md'}
+                            className={isMobile ? 'w-6 h-6 rounded shrink-0' : 'w-7 h-7 rounded-md shrink-0'}
                           />
-                          <Label className={`font-medium ${isMobile ? 'text-[10px]' : 'text-sm text-center'}`}>{t('ed_all_received')}</Label>
+                          <Label htmlFor={`full-delivery-${item.id}`} className={`font-medium cursor-pointer ${isMobile ? 'text-[10px]' : 'text-sm'}`}>{t('ed_all_received')}</Label>
                           {delivery.isFullyDelivered && (
                             <span className={`font-medium text-green-600 ${isMobile ? 'text-[10px]' : 'text-sm'}`}>
                               ✓ {remainingQuantity}
