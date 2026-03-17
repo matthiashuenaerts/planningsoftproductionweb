@@ -447,33 +447,57 @@ const PersonalTasks = () => {
         }
 
         // Check if there's an active registration with negative time
-        if (activeRegistration?.is_active && activeTaskDetails?.duration && activeRegistration.start_time) {
-          const start = new Date(activeRegistration.start_time);
-          const now = new Date();
-          const elapsedMs = now.getTime() - start.getTime();
-          const durationMs = activeTaskDetails.duration * 60 * 1000;
-          const remainingMs = durationMs - elapsedMs;
-          
-          if (remainingMs < 0) {
-            const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+        const currentActiveReg = activeTimeRegistrations.find(r => r.is_active);
+        if (currentActiveReg && currentActiveReg.start_time) {
+          // Fetch the active task's duration
+          let activeDuration: number | null = null;
+          let activeTitle = 'Current Task';
+          if (currentActiveReg.task_id) {
+            const { data: taskData } = await supabase
+              .from('tasks')
+              .select('title, duration')
+              .eq('id', currentActiveReg.task_id)
+              .single();
+            activeDuration = taskData?.duration || null;
+            activeTitle = taskData?.title || activeTitle;
+          } else if (currentActiveReg.workstation_task_id) {
+            const { data: wsData } = await supabase
+              .from('workstation_tasks')
+              .select('task_name, duration')
+              .eq('id', currentActiveReg.workstation_task_id)
+              .single();
+            activeDuration = wsData?.duration || null;
+            activeTitle = wsData?.task_name || activeTitle;
+          }
+
+          if (activeDuration) {
+            const start = new Date(currentActiveReg.start_time);
+            const now = new Date();
+            const elapsedMs = now.getTime() - start.getTime();
+            const durationMs = activeDuration * 60 * 1000;
+            const remainingMs = durationMs - elapsedMs;
             
-            // Reset start_time to NOW so elapsed becomes 0
-            await supabase
-              .from('time_registrations')
-              .update({ start_time: new Date().toISOString() })
-              .eq('id', activeRegistration.id);
-            
-            await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
-            
-            setPendingNewTaskId(taskId);
-            setPendingStopData({
-              registrationId: activeRegistration.id,
-              taskDetails: activeTaskDetails,
-              overTimeMinutes,
-              elapsedMinutes: 0
-            });
-            setShowExtraTimeDialog(true);
-            return; // Don't start new task yet - wait for dialog
+            if (remainingMs < 0) {
+              const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+              
+              // Reset start_time to NOW so elapsed becomes 0
+              await supabase
+                .from('time_registrations')
+                .update({ start_time: new Date().toISOString() })
+                .eq('id', currentActiveReg.id);
+              
+              await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+              
+              setPendingNewTaskId(taskId);
+              setPendingStopData({
+                registrationId: currentActiveReg.id,
+                taskDetails: { title: activeTitle, duration: activeDuration },
+                overTimeMinutes,
+                elapsedMinutes: 0
+              });
+              setShowExtraTimeDialog(true);
+              return; // Don't start new task yet - wait for dialog
+            }
           }
         }
 
