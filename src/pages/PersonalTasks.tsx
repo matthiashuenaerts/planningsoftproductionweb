@@ -556,7 +556,62 @@ const PersonalTasks = () => {
     }
   };
 
-  const isTaskActive = (taskId: string) => {
+  // Handle extra time confirmation when starting a new task with negative timer
+  const handleExtraTimeConfirm = async (totalMinutes: number) => {
+    if (!pendingStopData || !currentEmployee) return;
+
+    try {
+      // Update the current task's duration
+      const currentActiveReg = activeTimeRegistrations.find(r => r.is_active);
+      if (currentActiveReg?.task_id) {
+        await supabase
+          .from('tasks')
+          .update({ duration: totalMinutes })
+          .eq('id', currentActiveReg.task_id);
+      } else if (currentActiveReg?.workstation_task_id) {
+        await supabase
+          .from('workstation_tasks')
+          .update({ duration: totalMinutes })
+          .eq('id', currentActiveReg.workstation_task_id);
+      }
+
+      // Stop the current time registration
+      await timeRegistrationService.stopTask(pendingStopData.registrationId);
+
+      await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+      await queryClient.invalidateQueries({ queryKey: ['taskDetails'] });
+
+      toast({
+        title: t('task_duration_updated') || 'Task Duration Updated',
+        description: `${t('task_paused_with_new_duration') || 'Task paused with new duration:'} ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      });
+
+      // Now start the new task if there's a pending one
+      if (pendingNewTaskId) {
+        await timeRegistrationService.startTask(currentEmployee.id, pendingNewTaskId);
+        await fetchActiveTimeRegistrations();
+        await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+
+        toast({
+          title: t("task_started"),
+          description: t("task_started_desc"),
+        });
+      }
+    } catch (error) {
+      console.error('Error handling extra time:', error);
+      toast({
+        title: t('error'),
+        description: t('task_status_update_error', { message: (error as Error).message }),
+        variant: 'destructive'
+      });
+    }
+
+    setShowExtraTimeDialog(false);
+    setPendingStopData(null);
+    setPendingNewTaskId(null);
+    await fetchPersonalData();
+  };
+
     return activeTimeRegistrations.some(reg => reg.task_id === taskId || reg.workstation_task_id === taskId);
   };
 
