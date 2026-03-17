@@ -497,7 +497,8 @@ export const timeRegistrationService = {
             phases (name, projects (id, name)), 
             standard_tasks (hourly_cost)
           ),
-          workstation_tasks (task_name, workstations (id, name))
+          workstation_tasks (task_name, workstations (id, name)),
+          project_team_assignments (team_id, placement_teams (hourly_cost))
         `)
         .order('start_time', { ascending: false })
         .range(from, from + batchSize - 1);
