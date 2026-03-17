@@ -652,6 +652,9 @@ const ServiceInstallation: React.FC = () => {
                                   <div className={`flex items-center gap-1 mt-0.5 ${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>
                                     <Clock className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} flex-shrink-0`} />
                                     <span>{stop.serviceHours}h {t('si_estimated')}</span>
+                                    {teamHourlyCost > 0 && (
+                                      <span className="ml-1">• €{(stop.serviceHours * teamHourlyCost).toFixed(2)}</span>
+                                    )}
                                   </div>
 
                                   {stop.serviceNotes && (
