@@ -855,6 +855,38 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
     if (!currentEmployee) return;
     
     try {
+      // Check if there's an active registration with negative time
+      if (activeRegistration?.is_active && activeTaskDetails?.duration && activeRegistration.start_time) {
+        const start = new Date(activeRegistration.start_time);
+        const now = new Date();
+        const elapsedMs = now.getTime() - start.getTime();
+        const durationMs = activeTaskDetails.duration * 60 * 1000;
+        const remainingMs = durationMs - elapsedMs;
+        
+        if (remainingMs < 0) {
+          // Current timer is negative - must handle this first
+          const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+          
+          // Reset start_time to NOW so elapsed becomes 0
+          await supabase
+            .from('time_registrations')
+            .update({ start_time: new Date().toISOString() })
+            .eq('id', activeRegistration.id);
+          
+          await queryClient.invalidateQueries({ queryKey: ['activeTimeRegistration'] });
+          
+          setPendingNewTaskId(taskId);
+          setPendingStopData({
+            registrationId: activeRegistration.id,
+            taskDetails: activeTaskDetails,
+            overTimeMinutes,
+            elapsedMinutes: 0
+          });
+          setShowExtraTimeDialog(true);
+          return; // Don't start new task yet - wait for dialog
+        }
+      }
+
       const currentTask = tasks.find(task => task.id === taskId);
       if (currentTask?.is_workstation_task) {
         await timeRegistrationService.startWorkstationTask(currentEmployee.id, taskId);

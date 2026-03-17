@@ -93,6 +93,14 @@ const PersonalTasks = () => {
     standardTaskId: string;
     taskName: string;
   } | null>(null);
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingNewTaskId, setPendingNewTaskId] = useState<string | null>(null);
+  const [pendingStopData, setPendingStopData] = useState<{
+    registrationId: string;
+    taskDetails: any;
+    overTimeMinutes: number;
+    elapsedMinutes: number;
+  } | null>(null);
 
   // Helper function to get next workday (skip weekends and holidays)
   const getNextWorkday = async (date: Date) => {
