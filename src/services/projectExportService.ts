@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Project } from '@/services/dataService';
 import { orderService } from '@/services/orderService';
+import { extractStoragePath } from '@/lib/storageUtils';
 
 interface ExportData {
   project: Project;
@@ -138,11 +139,13 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
       for (const part of exportData.brokenParts) {
         if (part.image_path) {
           try {
+            const storagePath = extractStoragePath('broken_parts', part.image_path);
+            if (!storagePath) continue;
             const { data, error } = await supabase.storage
               .from('broken_parts')
-              .download(part.image_path);
+              .download(storagePath);
             if (error) throw error;
-            brokenPartsImagesFolder?.file(part.image_path.split('/').pop() || part.image_path, data);
+            brokenPartsImagesFolder?.file(storagePath.split('/').pop() || storagePath, data);
           } catch(e) {
             console.error(`Failed to download broken part image ${part.image_path}:`, e);
             brokenPartsImagesFolder?.file(`${part.image_path.split('/').pop() || part.image_path}.error.txt`, `Could not download file.`);
@@ -156,14 +159,22 @@ export const exportProjectDataAsZip = async (project: Project): Promise<void> =>
       const attachmentsFolder = zip.folder('order_attachments');
       for (const attachment of exportData.orderAttachments) {
         try {
+          // Normalize file_path - it may be a full URL (legacy) or a plain path
+          const storagePath = extractStoragePath('order-attachments', attachment.file_path);
+          if (!storagePath) {
+            console.error(`Invalid file path for attachment ${attachment.file_name}`);
+            attachmentsFolder?.file(`${attachment.file_name}.error.txt`, `Invalid file path: ${attachment.file_path}`);
+            continue;
+          }
+
           const { data, error } = await supabase.storage
-            .from('order_attachments')
-            .download(attachment.file_path);
+            .from('order-attachments')
+            .download(storagePath);
           if (error) throw error;
           attachmentsFolder?.file(attachment.file_name, data);
         } catch(e) {
           console.error(`Failed to download attachment ${attachment.file_name}:`, e);
-          attachmentsFolder?.file(`${attachment.file_name}.error.txt`, `Could not download file.`);
+          attachmentsFolder?.file(`${attachment.file_name}.error.txt`, `Could not download file: ${(e as Error).message}`);
         }
       }
     }
