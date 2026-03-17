@@ -507,6 +507,20 @@ const InstallationTeamsSettings: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hourly_cost">Hourly Cost (€)</Label>
+                  <Input 
+                    id="hourly_cost" 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={teamData.hourly_cost || ''}
+                    onChange={(e) => setTeamData(prev => ({ ...prev, hourly_cost: parseFloat(e.target.value) || 0 }))}
+                  />
+                  <p className="text-xs text-muted-foreground">Used to calculate service time registration costs</p>
+                </div>
                 
                 <div className="space-y-2">
                   <Label>External Team Names</Label>
