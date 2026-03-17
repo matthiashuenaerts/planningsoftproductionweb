@@ -3258,6 +3258,7 @@ export type Database = {
           color: string
           created_at: string
           external_team_names: string[] | null
+          hourly_cost: number | null
           id: string
           is_active: boolean
           name: string
@@ -3273,6 +3274,7 @@ export type Database = {
           color?: string
           created_at?: string
           external_team_names?: string[] | null
+          hourly_cost?: number | null
           id?: string
           is_active?: boolean
           name: string
@@ -3288,6 +3290,7 @@ export type Database = {
           color?: string
           created_at?: string
           external_team_names?: string[] | null
+          hourly_cost?: number | null
           id?: string
           is_active?: boolean
           name?: string

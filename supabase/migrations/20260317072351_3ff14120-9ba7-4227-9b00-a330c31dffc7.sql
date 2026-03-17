@@ -1,0 +1,1 @@
+ALTER TABLE public.placement_teams ADD COLUMN IF NOT EXISTS hourly_cost numeric DEFAULT 0;

@@ -52,6 +52,7 @@ interface InstallationTeam {
   external_team_names: string[];
   is_active: boolean;
   team_type: string;
+  hourly_cost?: number;
   start_street?: string;
   start_number?: string;
   start_postal_code?: string;
@@ -99,6 +100,7 @@ const InstallationTeamsSettings: React.FC = () => {
     external_team_names: [] as string[],
     is_active: true,
     team_type: 'conventional' as string,
+    hourly_cost: 0,
     start_street: '',
     start_number: '',
     start_postal_code: '',
@@ -263,6 +265,7 @@ const InstallationTeamsSettings: React.FC = () => {
         external_team_names: team.external_team_names || [],
         is_active: team.is_active,
         team_type: team.team_type || 'conventional',
+        hourly_cost: (team as any).hourly_cost || 0,
         start_street: team.start_street || '',
         start_number: team.start_number || '',
         start_postal_code: team.start_postal_code || '',
@@ -279,6 +282,7 @@ const InstallationTeamsSettings: React.FC = () => {
         external_team_names: [],
         is_active: true,
         team_type: 'conventional',
+        hourly_cost: 0,
         start_street: '',
         start_number: '',
         start_postal_code: '',
@@ -503,6 +507,20 @@ const InstallationTeamsSettings: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hourly_cost">Hourly Cost (€)</Label>
+                  <Input 
+                    id="hourly_cost" 
+                    type="number" 
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={teamData.hourly_cost || ''}
+                    onChange={(e) => setTeamData(prev => ({ ...prev, hourly_cost: parseFloat(e.target.value) || 0 }))}
+                  />
+                  <p className="text-xs text-muted-foreground">Used to calculate service time registration costs</p>
+                </div>
                 
                 <div className="space-y-2">
                   <Label>External Team Names</Label>
@@ -642,15 +660,16 @@ const InstallationTeamsSettings: React.FC = () => {
                   <TableHead>Type</TableHead>
                   <TableHead>Color</TableHead>
                   <TableHead>Default Members</TableHead>
-                  <TableHead>External Team Names</TableHead>
-                  <TableHead>Status</TableHead>
+                   <TableHead>External Team Names</TableHead>
+                   <TableHead>€/h</TableHead>
+                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {teams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       No installation teams found
                     </TableCell>
                   </TableRow>
@@ -703,6 +722,11 @@ const InstallationTeamsSettings: React.FC = () => {
                           ) : (
                             <span className="text-sm text-muted-foreground">No mappings</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">
+                            {(team as any).hourly_cost ? `€${Number((team as any).hourly_cost).toFixed(2)}` : '-'}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge variant={team.is_active ? "default" : "secondary"}>

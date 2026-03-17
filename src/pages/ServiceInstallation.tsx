@@ -67,6 +67,7 @@ const ServiceInstallation: React.FC = () => {
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [teamName, setTeamName] = useState('');
   const [teamColor, setTeamColor] = useState('#f73b3b');
+  const [teamHourlyCost, setTeamHourlyCost] = useState<number>(0);
   const [startingTimer, setStartingTimer] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const mapRef = React.useRef<HTMLDivElement>(null);
@@ -102,7 +103,7 @@ const ServiceInstallation: React.FC = () => {
       if (isPrivileged) {
         const { data: allServiceTeams } = await (supabase
           .from('placement_teams')
-          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
+          .select('id, name, color, hourly_cost, start_street, start_number, start_postal_code, start_city') as any)
           .eq('team_type', 'service')
           .eq('is_active', true);
         targetTeams = allServiceTeams || [];
@@ -122,7 +123,7 @@ const ServiceInstallation: React.FC = () => {
 
         const { data: serviceTeams } = await (supabase
           .from('placement_teams')
-          .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
+          .select('id, name, color, hourly_cost, start_street, start_number, start_postal_code, start_city') as any)
           .eq('team_type', 'service')
           .eq('is_active', true)
           .in('id', memberTeamIds);
@@ -141,6 +142,7 @@ const ServiceInstallation: React.FC = () => {
         ? targetTeams.map((t: any) => t.name).join(' / ')
         : team.name);
       setTeamColor(team.color || '#f73b3b');
+      setTeamHourlyCost(team.hourly_cost || 0);
 
       const targetDate = selectedDate;
       const dayOfWeek = targetDate.getDay();
@@ -510,6 +512,11 @@ const ServiceInstallation: React.FC = () => {
                 <Badge variant="secondary" className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                   ≈ {(totalServiceHours + drivingHours).toFixed(1)}h {t('si_total')}
                 </Badge>
+                {teamHourlyCost > 0 && (
+                  <Badge variant="outline" className={`gap-1 ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
+                    💰 €{(totalServiceHours * teamHourlyCost).toFixed(2)} ({t('si_estimated')})
+                  </Badge>
+                )}
                 {routeData.returnTime && (
                   <Badge variant={isOvertime ? 'destructive' : 'outline'} className={`gap-1 font-semibold ${isMobile ? 'text-[10px] px-2 py-0.5' : ''}`}>
                     <Home className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
@@ -645,6 +652,9 @@ const ServiceInstallation: React.FC = () => {
                                   <div className={`flex items-center gap-1 mt-0.5 ${isMobile ? 'text-[10px]' : 'text-xs'} text-muted-foreground`}>
                                     <Clock className={`${isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3'} flex-shrink-0`} />
                                     <span>{stop.serviceHours}h {t('si_estimated')}</span>
+                                    {teamHourlyCost > 0 && (
+                                      <span className="ml-1">• €{(stop.serviceHours * teamHourlyCost).toFixed(2)}</span>
+                                    )}
                                   </div>
 
                                   {stop.serviceNotes && (
