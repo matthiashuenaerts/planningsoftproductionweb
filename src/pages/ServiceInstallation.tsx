@@ -142,6 +142,7 @@ const ServiceInstallation: React.FC = () => {
         ? targetTeams.map((t: any) => t.name).join(' / ')
         : team.name);
       setTeamColor(team.color || '#f73b3b');
+      setTeamHourlyCost(team.hourly_cost || 0);
 
       const targetDate = selectedDate;
       const dayOfWeek = targetDate.getDay();
