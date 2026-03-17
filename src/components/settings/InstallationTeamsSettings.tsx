@@ -100,6 +100,7 @@ const InstallationTeamsSettings: React.FC = () => {
     external_team_names: [] as string[],
     is_active: true,
     team_type: 'conventional' as string,
+    hourly_cost: 0,
     start_street: '',
     start_number: '',
     start_postal_code: '',
