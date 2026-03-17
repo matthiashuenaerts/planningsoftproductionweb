@@ -95,6 +95,11 @@ export const KeyboardScannerListener: React.FC<KeyboardScannerListenerProps> = (
   const [acceptAllInput, setAcceptAllInput] = useState(true);
   const [manualInput, setManualInput] = useState('');
 
+  // Relay (bypass) serial port state
+  const [relayConnected, setRelayConnected] = useState(false);
+  const relayPortRef = useRef<any>(null);
+  const relayWriterRef = useRef<any>(null);
+
   const bufferRef = useRef('');
   const lastKeyTimeRef = useRef(0);
   const serialPortRef = useRef<any>(null);
