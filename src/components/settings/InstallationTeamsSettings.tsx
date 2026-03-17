@@ -265,6 +265,7 @@ const InstallationTeamsSettings: React.FC = () => {
         external_team_names: team.external_team_names || [],
         is_active: team.is_active,
         team_type: team.team_type || 'conventional',
+        hourly_cost: (team as any).hourly_cost || 0,
         start_street: team.start_street || '',
         start_number: team.start_number || '',
         start_postal_code: team.start_postal_code || '',
