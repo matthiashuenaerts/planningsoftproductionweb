@@ -908,6 +908,19 @@ const PersonalTasks = () => {
             onComplete={handleChecklistComplete}
           />
         )}
+
+        <TaskExtraTimeDialog
+          isOpen={showExtraTimeDialog}
+          onClose={() => {
+            setShowExtraTimeDialog(false);
+            setPendingStopData(null);
+            setPendingNewTaskId(null);
+          }}
+          taskTitle={pendingStopData?.taskDetails?.title || t('current_task') || 'Current Task'}
+          overTimeMinutes={pendingStopData?.overTimeMinutes || 0}
+          elapsedMinutes={pendingStopData?.elapsedMinutes || 0}
+          onConfirm={handleExtraTimeConfirm}
+        />
       </div>
     </div>
   );
