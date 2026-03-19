@@ -141,6 +141,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       const searchResults = await helpService.searchArticles(searchQuery);
       setArticles(searchResults);
       setSelectedCategory(null);
+      setHasSearched(true);
     } catch (error) {
       toast({ title: "Error", description: "Failed to search help articles", variant: "destructive" });
     } finally {
