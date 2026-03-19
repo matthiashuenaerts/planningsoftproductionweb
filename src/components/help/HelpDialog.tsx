@@ -288,6 +288,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
             if (!e.target.value.trim()) {
               setArticles([]);
               setSelectedCategory(null);
+              setHasSearched(false);
             }
           }}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -302,6 +303,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
               setSearchQuery('');
               setArticles([]);
               setSelectedCategory(null);
+              setHasSearched(false);
             }}
           >
             <X className="h-3.5 w-3.5" />
