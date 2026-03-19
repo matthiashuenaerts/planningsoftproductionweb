@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import DOMPurify from 'dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, ArrowLeft, Play, ExternalLink, Tag, Plus, Edit, Trash2, Upload, Video, Image, Settings, ChevronRight, BookOpen } from 'lucide-react';
+import { Search, ArrowLeft, Play, Tag, Plus, Edit, Trash2, Upload, Video, Image, Settings, ChevronRight, BookOpen, X, FileVideo, FileImage, FolderOpen, HelpCircle } from 'lucide-react';
 import { helpService, HelpCategory, HelpArticleWithCategory } from '@/services/helpService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +22,39 @@ interface HelpDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Sub-component for rendering article media with signed URLs
+const ArticleMedia: React.FC<{ article: HelpArticleWithCategory }> = ({ article }) => {
+  const signedVideoUrl = useSignedUrl('help-media', article.video_url);
+  const signedImageUrl = useSignedUrl('help-media', article.image_url);
+
+  return (
+    <>
+      {signedVideoUrl && (
+        <div className="aspect-video bg-muted rounded-xl overflow-hidden border border-border">
+          <video
+            controls
+            className="w-full h-full"
+            poster={signedImageUrl || undefined}
+          >
+            <source src={signedVideoUrl} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      )}
+
+      {signedImageUrl && !article.video_url && (
+        <div className="rounded-xl overflow-hidden border border-border">
+          <img
+            src={signedImageUrl}
+            alt={article.title}
+            className="w-full object-cover max-h-72"
+          />
+        </div>
+      )}
+    </>
+  );
+};
 
 export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) => {
   const [categories, setCategories] = useState<HelpCategory[]>([]);
@@ -34,11 +66,13 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const [managementMode, setManagementMode] = useState(false);
   const [editingCategory, setEditingCategory] = useState<HelpCategory | null>(null);
   const [editingArticle, setEditingArticle] = useState<HelpArticleWithCategory | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [videoPath, setVideoPath] = useState('');
+  const [imagePath, setImagePath] = useState('');
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const isMobile = useIsMobile();
-  const signedVideoUrl = useSignedUrl('help-media', selectedArticle?.video_url);
-  const signedImageUrl = useSignedUrl('help-media', selectedArticle?.image_url);
 
   useEffect(() => {
     if (open) {
@@ -52,17 +86,23 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     }
   }, [open]);
 
+  useEffect(() => {
+    if (editingArticle) {
+      setVideoPath(editingArticle.video_url || '');
+      setImagePath(editingArticle.image_url || '');
+    } else {
+      setVideoPath('');
+      setImagePath('');
+    }
+  }, [editingArticle]);
+
   const loadCategories = async () => {
     try {
       setLoading(true);
       const categoriesData = await helpService.getCategories();
       setCategories(categoriesData);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load help categories",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load help categories", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -83,11 +123,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       }
       setArticles(articlesData);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load help articles",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load help articles", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -98,18 +134,13 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       loadArticles();
       return;
     }
-
     try {
       setLoading(true);
       const searchResults = await helpService.searchArticles(searchQuery);
       setArticles(searchResults);
       setSelectedCategory(null);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to search help articles",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to search help articles", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -143,10 +174,24 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     loadArticles();
   };
 
+  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
+    const setUploading = type === 'video' ? setUploadingVideo : setUploadingImage;
+    const setPath = type === 'video' ? setVideoPath : setImagePath;
+    try {
+      setUploading(true);
+      const path = await helpService.uploadHelpMedia(file, type + 's');
+      setPath(path);
+      toast({ title: "Success", description: `${type === 'video' ? 'Video' : 'Image'} uploaded` });
+    } catch (error) {
+      toast({ title: "Error", description: `Failed to upload ${type}`, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCategorySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
     const categoryData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
@@ -163,30 +208,23 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
         await helpService.createCategory(categoryData);
         toast({ title: "Success", description: "Category created successfully" });
       }
-      
       setEditingCategory(null);
       loadCategories();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save category",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to save category", variant: "destructive" });
     }
   };
 
   const handleArticleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
     const tags = (formData.get('tags') as string).split(',').map(tag => tag.trim()).filter(tag => tag);
-    
     const articleData = {
       category_id: formData.get('category_id') as string,
       title: formData.get('title') as string,
       content: formData.get('content') as string,
-      video_url: formData.get('video_url') as string || undefined,
-      image_url: formData.get('image_url') as string || undefined,
+      video_url: videoPath || undefined,
+      image_url: imagePath || undefined,
       tags,
       display_order: parseInt(formData.get('display_order') as string) || 0,
       is_published: formData.get('is_published') === 'on',
@@ -201,16 +239,11 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
         await helpService.createArticle(articleData);
         toast({ title: "Success", description: "Article created successfully" });
       }
-      
       setEditingArticle(null);
       loadCategories();
       loadArticles();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save article",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to save article", variant: "destructive" });
     }
   };
 
@@ -220,11 +253,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       toast({ title: "Success", description: "Category deleted successfully" });
       loadCategories();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete category",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
     }
   };
 
@@ -234,178 +263,158 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
       toast({ title: "Success", description: "Article deleted successfully" });
       loadArticles();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete article",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to delete article", variant: "destructive" });
     }
   };
 
-  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
-    try {
-      const url = await helpService.uploadHelpMedia(file, type + 's');
-      toast({ title: "Success", description: `${type} uploaded successfully` });
-      return url;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to upload ${type}`,
-        variant: "destructive"
-      });
-      return null;
-    }
-  };
+  // ─── USER-FACING VIEWS ───
 
   const renderCategories = () => (
-    <div className={`space-y-${isMobile ? '3' : '4'}`}>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search help articles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            className={`pl-10 ${isMobile ? 'h-10 text-sm' : ''}`}
-          />
+    <div className="space-y-5">
+      {/* Hero Search */}
+      <div className="relative">
+        <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-2xl p-6 pb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <HelpCircle className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold text-foreground">How can we help you?</h3>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search articles, topics, guides..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!e.target.value.trim()) {
+                  setArticles([]);
+                  setSelectedCategory(null);
+                }
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-10 h-11 bg-background/80 backdrop-blur-sm border-border/60 rounded-xl text-sm shadow-sm focus-visible:ring-primary/30"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                onClick={() => {
+                  setSearchQuery('');
+                  setArticles([]);
+                  setSelectedCategory(null);
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
-        <Button onClick={handleSearch} variant="outline" className={isMobile ? 'h-10 w-10 p-0' : ''}>
-          <Search className="h-4 w-4" />
-        </Button>
       </div>
 
-      <div className={`grid gap-${isMobile ? '2' : '3'}`}>
-        {categories.map((category, index) => (
-          isMobile ? (
-            <div
+      {/* Categories Grid */}
+      <div>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">Browse by topic</p>
+        <div className="grid gap-2">
+          {categories.map((category, index) => (
+            <button
               key={category.id}
-              className="flex items-center gap-3 p-3.5 bg-card border border-border rounded-xl active:scale-[0.98] transition-all cursor-pointer"
+              className="group flex items-center gap-3.5 p-3.5 bg-card hover:bg-accent/50 border border-border/60 rounded-xl transition-all duration-150 text-left w-full"
               onClick={() => handleCategorySelect(category)}
             >
-              <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 text-primary shrink-0">
-                <span className="text-xs font-bold">{String(index + 1).padStart(2, '0')}</span>
+              <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary/10 text-primary shrink-0 group-hover:bg-primary/15 transition-colors">
+                <FolderOpen className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{category.name}</p>
+                <p className="font-medium text-sm text-foreground">{category.name}</p>
                 {category.description && (
                   <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{category.description}</p>
                 )}
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </div>
-          ) : (
-            <Card
-              key={category.id}
-              className="cursor-pointer hover:bg-accent transition-colors"
-              onClick={() => handleCategorySelect(category)}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{category.name}</CardTitle>
-                {category.description && (
-                  <CardDescription className="text-sm">
-                    {category.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-            </Card>
-          )
-        ))}
+              <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
+            </button>
+          ))}
+        </div>
       </div>
+
+      {categories.length === 0 && !loading && (
+        <div className="text-center py-8">
+          <HelpCircle className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No help topics available yet.</p>
+        </div>
+      )}
     </div>
   );
 
   const renderArticlesList = () => (
-    <div className={`space-y-${isMobile ? '3' : '4'}`}>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 w-8 p-0 shrink-0">
           <ArrowLeft className="h-4 w-4" />
-          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className={`font-semibold truncate ${isMobile ? 'text-base' : 'text-lg'}`}>
-          {selectedCategory ? selectedCategory.name : 'Search Results'}
-        </h3>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-base truncate">
+            {selectedCategory ? selectedCategory.name : 'Search Results'}
+          </h3>
+          {selectedCategory?.description && (
+            <p className="text-xs text-muted-foreground truncate">{selectedCategory.description}</p>
+          )}
+        </div>
       </div>
 
-      <div className={`space-y-${isMobile ? '2' : '3'}`}>
+      <Separator />
+
+      <div className="space-y-2">
         {articles.map((article) => (
-          isMobile ? (
-            <div
-              key={article.id}
-              className="flex items-center gap-3 p-3.5 bg-card border border-border rounded-xl active:scale-[0.98] transition-all cursor-pointer"
-              onClick={() => setSelectedArticle(article)}
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm line-clamp-2">{article.title}</p>
+          <button
+            key={article.id}
+            className="group flex items-center gap-3 p-3.5 bg-card hover:bg-accent/50 border border-border/60 rounded-xl transition-all duration-150 text-left w-full"
+            onClick={() => setSelectedArticle(article)}
+          >
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">{article.title}</p>
+              <div className="flex items-center gap-2 mt-1.5">
                 {!selectedCategory && (
-                  <Badge variant="secondary" className="mt-1 text-[10px] px-1.5 py-0 h-4">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                     {article.category.name}
                   </Badge>
                 )}
-                {article.tags.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                    {article.tags.slice(0, 2).map((tag, index) => (
-                      <Badge key={index} variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {article.tags.length > 2 && (
-                      <span className="text-[10px] text-muted-foreground">+{article.tags.length - 2}</span>
-                    )}
-                  </div>
+                {article.video_url && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-0.5">
+                    <Play className="h-2.5 w-2.5" />
+                    Video
+                  </Badge>
+                )}
+                {article.image_url && !article.video_url && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-0.5">
+                    <Image className="h-2.5 w-2.5" />
+                    Image
+                  </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {article.video_url && <Play className="h-3.5 w-3.5 text-muted-foreground" />}
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-          ) : (
-            <Card
-              key={article.id}
-              className="cursor-pointer hover:bg-accent transition-colors"
-              onClick={() => setSelectedArticle(article)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">{article.title}</CardTitle>
-                    {!selectedCategory && (
-                      <Badge variant="secondary" className="mt-1">
-                        {article.category.name}
-                      </Badge>
-                    )}
-                  </div>
-                  {article.video_url && (
-                    <Play className="h-4 w-4 text-muted-foreground" />
+              {article.tags.length > 0 && (
+                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                  {article.tags.slice(0, 3).map((tag, index) => (
+                    <span key={index} className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                  {article.tags.length > 3 && (
+                    <span className="text-[10px] text-muted-foreground">+{article.tags.length - 3}</span>
                   )}
                 </div>
-                {article.tags.length > 0 && (
-                  <div className="flex items-center gap-1 mt-2">
-                    <Tag className="h-3 w-3 text-muted-foreground" />
-                    <div className="flex gap-1">
-                      {article.tags.slice(0, 3).map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {article.tags.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{article.tags.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardHeader>
-            </Card>
-          )
+              )}
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
+          </button>
         ))}
       </div>
 
       {articles.length === 0 && !loading && (
-        <div className={`text-center text-muted-foreground ${isMobile ? 'py-6 text-sm' : 'py-8'}`}>
-          {searchQuery ? 'No articles found for your search.' : 'No articles in this category.'}
+        <div className="text-center py-10">
+          <Search className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">
+            {searchQuery ? 'No articles found for your search.' : 'No articles in this category yet.'}
+          </p>
         </div>
       )}
     </div>
@@ -415,45 +424,24 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     if (!selectedArticle) return null;
 
     return (
-      <div className={`space-y-${isMobile ? '3' : '4'}`}>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 w-8 p-0 shrink-0">
             <ArrowLeft className="h-4 w-4" />
-            {!isMobile && <span className="ml-1">Back</span>}
           </Button>
-          <Badge variant="secondary" className={isMobile ? 'text-[10px] px-1.5 py-0 h-5' : ''}>
+          <Badge variant="secondary" className="text-xs">
             {selectedArticle.category.name}
           </Badge>
         </div>
 
-        <div className={`space-y-${isMobile ? '3' : '4'}`}>
-          <h2 className={`font-bold ${isMobile ? 'text-lg leading-tight' : 'text-xl'}`}>{selectedArticle.title}</h2>
+        <div className="space-y-5">
+          <h2 className="text-xl font-bold text-foreground leading-tight">{selectedArticle.title}</h2>
 
-          {signedVideoUrl && (
-            <div className="aspect-video bg-muted rounded-xl overflow-hidden">
-              <video
-                controls
-                className="w-full h-full"
-                poster={signedImageUrl || undefined}
-              >
-                <source src={signedVideoUrl} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          )}
+          <ArticleMedia article={selectedArticle} />
 
-          {signedImageUrl && !selectedArticle.video_url && (
-            <div className="rounded-xl overflow-hidden">
-              <img
-                src={signedImageUrl}
-                alt={selectedArticle.title}
-                className={`w-full object-cover ${isMobile ? 'max-h-48' : 'max-h-64'}`}
-              />
-            </div>
-          )}
-
-          <div className={`prose prose-sm max-w-none ${isMobile ? 'text-sm leading-relaxed' : ''}`}>
+          <div className="prose prose-sm max-w-none dark:prose-invert">
             <div
+              className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
                 __html: DOMPurify.sanitize(
                   selectedArticle.content.replace(/\n/g, '<br>'),
@@ -464,13 +452,14 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
           </div>
 
           {selectedArticle.tags.length > 0 && (
-            <div>
-              <h4 className={`font-medium mb-2 ${isMobile ? 'text-sm' : ''}`}>Tags</h4>
-              <div className="flex flex-wrap gap-1">
+            <div className="pt-2">
+              <Separator className="mb-4" />
+              <div className="flex items-center gap-2 flex-wrap">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
                 {selectedArticle.tags.map((tag, index) => (
-                  <Badge key={index} variant="outline" className={isMobile ? 'text-xs' : ''}>
+                  <span key={index} className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md">
                     {tag}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             </div>
@@ -480,57 +469,50 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     );
   };
 
+  // ─── MANAGEMENT VIEWS ───
+
   const renderManagement = () => (
-    <div className={`space-y-${isMobile ? '3' : '4'}`}>
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+        <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 w-8 p-0">
           <ArrowLeft className="h-4 w-4" />
-          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>Help Management</h3>
+        <h3 className="font-semibold text-lg">Help Management</h3>
       </div>
 
-      <Tabs defaultValue="categories" className={`space-y-${isMobile ? '3' : '4'}`}>
-        <TabsList className={isMobile ? 'w-full' : ''}>
-          <TabsTrigger value="categories" className={isMobile ? 'flex-1 text-xs' : ''}>Categories</TabsTrigger>
-          <TabsTrigger value="articles" className={isMobile ? 'flex-1 text-xs' : ''}>Articles</TabsTrigger>
+      <Tabs defaultValue="categories" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="articles">Articles</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="categories" className={`space-y-${isMobile ? '3' : '4'}`}>
-          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
+        <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-between items-center">
             <h4 className="font-medium">Categories</h4>
             <Button
               size="sm"
-              className={isMobile ? 'w-full h-10' : ''}
               onClick={() => setEditingCategory({
-                id: '',
-                name: '',
-                description: '',
-                display_order: 0,
-                is_active: true,
-                is_global: false,
-                created_at: '',
-                updated_at: ''
+                id: '', name: '', description: '', display_order: 0,
+                is_active: true, is_global: false, created_at: '', updated_at: ''
               })}
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Category
             </Button>
           </div>
-
-          <div className={`space-y-2 ${isMobile ? 'max-h-[40vh]' : 'max-h-48'} overflow-y-auto`}>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {categories.map((category) => (
-              <div key={category.id} className={`bg-card border border-border rounded-xl ${isMobile ? 'p-3' : 'p-3'}`}>
+              <div key={category.id} className="bg-card border border-border rounded-xl p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h5 className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{category.name}</h5>
-                    <p className={`text-muted-foreground line-clamp-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>{category.description}</p>
+                    <h5 className="font-medium">{category.name}</h5>
+                    <p className="text-sm text-muted-foreground line-clamp-1">{category.description}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingCategory(category)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCategory(category)}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -540,26 +522,16 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
           </div>
         </TabsContent>
 
-        <TabsContent value="articles" className={`space-y-${isMobile ? '3' : '4'}`}>
-          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'}`}>
+        <TabsContent value="articles" className="space-y-4">
+          <div className="flex justify-between items-center">
             <h4 className="font-medium">Articles</h4>
             <Button
               size="sm"
-              className={isMobile ? 'w-full h-10' : ''}
               onClick={() => setEditingArticle({
-                id: '',
-                category_id: '',
-                title: '',
-                content: '',
-                video_url: '',
-                image_url: '',
-                tags: [],
-                display_order: 0,
-                is_published: true,
-                is_global: false,
-                created_by: '',
-                created_at: '',
-                updated_at: '',
+                id: '', category_id: '', title: '', content: '',
+                video_url: '', image_url: '', tags: [], display_order: 0,
+                is_published: true, is_global: false, created_by: '',
+                created_at: '', updated_at: '',
                 category: categories[0] || { id: '', name: '', description: '', display_order: 0, is_active: true, is_global: false, created_at: '', updated_at: '' }
               })}
             >
@@ -567,20 +539,19 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
               Add Article
             </Button>
           </div>
-
-          <div className={`space-y-2 ${isMobile ? 'max-h-[40vh]' : 'max-h-48'} overflow-y-auto`}>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {articles.map((article) => (
-              <div key={article.id} className={`bg-card border border-border rounded-xl ${isMobile ? 'p-3' : 'p-3'}`}>
+              <div key={article.id} className="bg-card border border-border rounded-xl p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <h5 className={`font-medium ${isMobile ? 'text-sm' : ''}`}>{article.title}</h5>
-                    <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>{article.category.name}</p>
+                    <h5 className="font-medium">{article.title}</h5>
+                    <p className="text-sm text-muted-foreground">{article.category.name}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingArticle(article)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                    <Button variant="ghost" size="sm" onClick={() => setEditingArticle(article)}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article.id)} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteArticle(article.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -594,260 +565,160 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   );
 
   const renderCategoryForm = () => (
-    <div className={`space-y-${isMobile ? '3' : '4'}`}>
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
+        <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 w-8 p-0">
           <ArrowLeft className="h-4 w-4" />
-          {!isMobile && <span className="ml-1">Back</span>}
         </Button>
-        <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
+        <h3 className="font-semibold text-lg">
           {editingCategory?.id ? 'Edit Category' : 'Create Category'}
         </h3>
       </div>
-
-      <form onSubmit={handleCategorySubmit} className={`space-y-${isMobile ? '3' : '4'}`}>
+      <form onSubmit={handleCategorySubmit} className="space-y-4">
         <div>
-          <Label htmlFor="name" className={isMobile ? 'text-sm' : ''}>Name</Label>
-          <Input
-            id="name"
-            name="name"
-            defaultValue={editingCategory?.name}
-            required
-            className={isMobile ? 'h-10 text-sm mt-1' : ''}
-          />
+          <Label htmlFor="name">Name</Label>
+          <Input id="name" name="name" defaultValue={editingCategory?.name} required />
         </div>
         <div>
-          <Label htmlFor="description" className={isMobile ? 'text-sm' : ''}>Description</Label>
-          <Textarea
-            id="description"
-            name="description"
-            defaultValue={editingCategory?.description}
-            className={isMobile ? 'text-sm mt-1' : ''}
-          />
+          <Label htmlFor="description">Description</Label>
+          <Textarea id="description" name="description" defaultValue={editingCategory?.description} />
         </div>
         <div>
-          <Label htmlFor="display_order" className={isMobile ? 'text-sm' : ''}>Display Order</Label>
-          <Input
-            id="display_order"
-            name="display_order"
-            type="number"
-            defaultValue={editingCategory?.display_order || 0}
-            className={isMobile ? 'h-10 text-sm mt-1' : ''}
-          />
+          <Label htmlFor="display_order">Display Order</Label>
+          <Input id="display_order" name="display_order" type="number" defaultValue={editingCategory?.display_order || 0} />
         </div>
         <div className="flex items-center space-x-2">
-          <Switch
-            id="is_active"
-            name="is_active"
-            defaultChecked={editingCategory?.is_active ?? true}
-          />
-          <Label htmlFor="is_active" className={isMobile ? 'text-sm' : ''}>Active</Label>
+          <Switch id="is_active" name="is_active" defaultChecked={editingCategory?.is_active ?? true} />
+          <Label htmlFor="is_active">Active</Label>
         </div>
-        <div className={`flex gap-2 ${isMobile ? 'flex-col pt-2' : 'justify-end'}`}>
-          <Button type="button" variant="outline" onClick={handleBack} className={isMobile ? 'w-full h-10' : ''}>
-            Cancel
-          </Button>
-          <Button type="submit" className={isMobile ? 'w-full h-10' : ''}>
-            {editingCategory?.id ? 'Update' : 'Create'}
-          </Button>
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={handleBack}>Cancel</Button>
+          <Button type="submit">{editingCategory?.id ? 'Update' : 'Create'}</Button>
         </div>
       </form>
     </div>
   );
 
-  const renderArticleForm = () => {
-    const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const url = await handleFileUpload(file, 'video');
-        if (url) {
-          const videoInput = document.getElementById('video_url') as HTMLInputElement;
-          if (videoInput) videoInput.value = url;
-        }
-      }
-    };
-
-    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const url = await handleFileUpload(file, 'image');
-        if (url) {
-          const imageInput = document.getElementById('image_url') as HTMLInputElement;
-          if (imageInput) imageInput.value = url;
-        }
-      }
-    };
-
-    return (
-      <div className={`space-y-${isMobile ? '3' : '4'}`}>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleBack} className={isMobile ? 'h-8 w-8 p-0' : ''}>
-            <ArrowLeft className="h-4 w-4" />
-            {!isMobile && <span className="ml-1">Back</span>}
-          </Button>
-          <h3 className={`font-semibold ${isMobile ? 'text-base' : 'text-lg'}`}>
-            {editingArticle?.id ? 'Edit Article' : 'Create Article'}
-          </h3>
+  const renderArticleForm = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={handleBack} className="h-8 w-8 p-0">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h3 className="font-semibold text-lg">
+          {editingArticle?.id ? 'Edit Article' : 'Create Article'}
+        </h3>
+      </div>
+      <form onSubmit={handleArticleSubmit} className="space-y-4">
+        <div>
+          <Label htmlFor="category_id">Category</Label>
+          <Select name="category_id" defaultValue={editingArticle?.category_id} required>
+            <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
+            <SelectContent>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="title">Title</Label>
+          <Input id="title" name="title" defaultValue={editingArticle?.title} required />
+        </div>
+        <div>
+          <Label htmlFor="content">Content (Instructions)</Label>
+          <Textarea id="content" name="content" defaultValue={editingArticle?.content} rows={6} placeholder="Write detailed instructions here..." required />
         </div>
 
-        <form onSubmit={handleArticleSubmit} className={`space-y-${isMobile ? '3' : '4'}`}>
-          <div>
-            <Label htmlFor="category_id" className={isMobile ? 'text-sm' : ''}>Category</Label>
-            <Select name="category_id" defaultValue={editingArticle?.category_id} required>
-              <SelectTrigger className={isMobile ? 'h-10 text-sm mt-1' : ''}>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="title" className={isMobile ? 'text-sm' : ''}>Title</Label>
-            <Input
-              id="title"
-              name="title"
-              defaultValue={editingArticle?.title}
-              required
-              className={isMobile ? 'h-10 text-sm mt-1' : ''}
-            />
-          </div>
-          <div>
-            <Label htmlFor="content" className={isMobile ? 'text-sm' : ''}>Content (Instructions)</Label>
-            <Textarea
-              id="content"
-              name="content"
-              defaultValue={editingArticle?.content}
-              rows={isMobile ? 4 : 6}
-              placeholder="Write detailed instructions here..."
-              required
-              className={isMobile ? 'text-sm mt-1' : ''}
-            />
-          </div>
-          <div>
-            <Label className={isMobile ? 'text-sm' : ''}>Video</Label>
-            <div className={`${isMobile ? 'flex flex-col gap-2 mt-1' : 'flex gap-2'}`}>
-              <Input
-                id="video_url"
-                name="video_url"
-                type="url"
-                defaultValue={editingArticle?.video_url}
-                placeholder="Video URL or upload below"
-                className={isMobile ? 'h-10 text-sm' : ''}
-              />
-              <div>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoUpload}
-                  className="hidden"
-                  id="video-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={isMobile ? 'w-full h-10 text-sm' : ''}
-                  onClick={() => document.getElementById('video-upload')?.click()}
-                >
-                  <Upload className="h-4 w-4 mr-1" />
-                  Upload Video
+        {/* Video Upload */}
+        <div>
+          <Label className="flex items-center gap-2"><FileVideo className="h-4 w-4" />Video</Label>
+          <div className="mt-2">
+            {videoPath ? (
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <Video className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm truncate flex-1">{videoPath}</span>
+                <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setVideoPath('')}>
+                  <X className="h-3 w-3" />
                 </Button>
               </div>
-            </div>
+            ) : (
+              <>
+                <input type="file" accept="video/*" className="hidden" id="help-video-upload"
+                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleFileUpload(f, 'video'); }} />
+                <Button type="button" variant="outline" disabled={uploadingVideo}
+                  onClick={() => document.getElementById('help-video-upload')?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploadingVideo ? 'Uploading...' : 'Upload Video'}
+                </Button>
+              </>
+            )}
           </div>
-          <div>
-            <Label className={isMobile ? 'text-sm' : ''}>Image</Label>
-            <div className={`${isMobile ? 'flex flex-col gap-2 mt-1' : 'flex gap-2'}`}>
-              <Input
-                id="image_url"
-                name="image_url"
-                type="url"
-                defaultValue={editingArticle?.image_url}
-                placeholder="Image URL or upload below"
-                className={isMobile ? 'h-10 text-sm' : ''}
-              />
-              <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={isMobile ? 'w-full h-10 text-sm' : ''}
-                  onClick={() => document.getElementById('image-upload')?.click()}
-                >
-                  <Upload className="h-4 w-4 mr-1" />
-                  Upload Image
+        </div>
+
+        {/* Image Upload */}
+        <div>
+          <Label className="flex items-center gap-2"><FileImage className="h-4 w-4" />Image</Label>
+          <div className="mt-2">
+            {imagePath ? (
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <Image className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm truncate flex-1">{imagePath}</span>
+                <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setImagePath('')}>
+                  <X className="h-3 w-3" />
                 </Button>
               </div>
-            </div>
+            ) : (
+              <>
+                <input type="file" accept="image/*" className="hidden" id="help-image-upload"
+                  onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleFileUpload(f, 'image'); }} />
+                <Button type="button" variant="outline" disabled={uploadingImage}
+                  onClick={() => document.getElementById('help-image-upload')?.click()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                </Button>
+              </>
+            )}
           </div>
-          <div>
-            <Label htmlFor="tags" className={isMobile ? 'text-sm' : ''}>Tags (comma-separated)</Label>
-            <Input
-              id="tags"
-              name="tags"
-              defaultValue={editingArticle?.tags.join(', ')}
-              placeholder="tag1, tag2, tag3"
-              className={isMobile ? 'h-10 text-sm mt-1' : ''}
-            />
-          </div>
-          <div>
-            <Label htmlFor="display_order" className={isMobile ? 'text-sm' : ''}>Display Order</Label>
-            <Input
-              id="display_order"
-              name="display_order"
-              type="number"
-              defaultValue={editingArticle?.display_order || 0}
-              className={isMobile ? 'h-10 text-sm mt-1' : ''}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="is_published"
-              name="is_published"
-              defaultChecked={editingArticle?.is_published ?? true}
-            />
-            <Label htmlFor="is_published" className={isMobile ? 'text-sm' : ''}>Published</Label>
-          </div>
-          <div className={`flex gap-2 ${isMobile ? 'flex-col pt-2' : 'justify-end'}`}>
-            <Button type="button" variant="outline" onClick={handleBack} className={isMobile ? 'w-full h-10' : ''}>
-              Cancel
-            </Button>
-            <Button type="submit" className={isMobile ? 'w-full h-10' : ''}>
-              {editingArticle?.id ? 'Update' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    );
-  };
+        </div>
+
+        <div>
+          <Label htmlFor="tags">Tags (comma-separated)</Label>
+          <Input id="tags" name="tags" defaultValue={editingArticle?.tags.join(', ')} placeholder="tag1, tag2, tag3" />
+        </div>
+        <div>
+          <Label htmlFor="display_order">Display Order</Label>
+          <Input id="display_order" name="display_order" type="number" defaultValue={editingArticle?.display_order || 0} />
+        </div>
+        <div className="flex items-center space-x-2">
+          <Switch id="is_published" name="is_published" defaultChecked={editingArticle?.is_published ?? true} />
+          <Label htmlFor="is_published">Published</Label>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={handleBack}>Cancel</Button>
+          <Button type="submit">{editingArticle?.id ? 'Update' : 'Create'}</Button>
+        </div>
+      </form>
+    </div>
+  );
 
   const dialogClass = isMobile
     ? 'max-w-[calc(100vw-1.5rem)] w-[calc(100vw-1.5rem)] p-4 max-h-[90vh] overflow-hidden flex flex-col'
-    : 'max-w-4xl max-h-[80vh]';
+    : 'max-w-2xl max-h-[80vh]';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={dialogClass}>
         <DialogHeader>
-          <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : ''}`}>
-            <BookOpen className={isMobile ? 'h-4 w-4' : 'h-5 w-5'} />
-            Help & Documentation
+          <DialogTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <span>Help & Documentation</span>
             {currentEmployee?.role === 'admin' && !managementMode && !editingCategory && !editingArticle && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleManageClick}
-                className={isMobile ? 'h-7 text-xs px-2 ml-auto' : ''}
+                className="ml-auto"
               >
                 <Settings className="h-3.5 w-3.5 mr-1" />
                 Manage
@@ -857,10 +728,11 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
         </DialogHeader>
 
         <ScrollArea className={isMobile ? 'flex-1 min-h-0' : 'max-h-[60vh]'}>
-          <div className={isMobile ? 'pr-1' : ''}>
+          <div className="pr-2">
             {loading ? (
-              <div className={`flex items-center justify-center ${isMobile ? 'py-6' : 'py-8'}`}>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+                <p className="text-xs text-muted-foreground mt-3">Loading...</p>
               </div>
             ) : editingCategory ? (
               renderCategoryForm()

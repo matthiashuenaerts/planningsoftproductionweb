@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Upload, Video, Image } from 'lucide-react';
+import { Plus, Edit, Trash2, Upload, Video, Image, X, FileVideo, FileImage } from 'lucide-react';
 import { helpService, HelpCategory, HelpArticle, HelpArticleWithCategory } from '@/services/helpService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,11 +22,23 @@ export const HelpManagement: React.FC = () => {
   const [articleDialogOpen, setArticleDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<HelpCategory | null>(null);
   const [editingArticle, setEditingArticle] = useState<HelpArticleWithCategory | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [videoPath, setVideoPath] = useState('');
+  const [imagePath, setImagePath] = useState('');
   const { toast } = useToast();
 
+  useEffect(() => { loadData(); }, []);
+
   useEffect(() => {
-    loadData();
-  }, []);
+    if (articleDialogOpen && editingArticle) {
+      setVideoPath(editingArticle.video_url || '');
+      setImagePath(editingArticle.image_url || '');
+    } else if (!articleDialogOpen) {
+      setVideoPath('');
+      setImagePath('');
+    }
+  }, [articleDialogOpen, editingArticle]);
 
   const loadData = async () => {
     try {
@@ -38,20 +50,30 @@ export const HelpManagement: React.FC = () => {
       setCategories(categoriesData);
       setArticles(articlesData);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load help data",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load help data", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
+    const setUploading = type === 'video' ? setUploadingVideo : setUploadingImage;
+    const setPath = type === 'video' ? setVideoPath : setImagePath;
+    try {
+      setUploading(true);
+      const path = await helpService.uploadHelpMedia(file, type + 's');
+      setPath(path);
+      toast({ title: "Success", description: `${type === 'video' ? 'Video' : 'Image'} uploaded` });
+    } catch (error) {
+      toast({ title: "Error", description: `Failed to upload ${type}`, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleCategorySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
     const categoryData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
@@ -68,31 +90,24 @@ export const HelpManagement: React.FC = () => {
         await helpService.createCategory(categoryData);
         toast({ title: "Success", description: "Category created successfully" });
       }
-      
       setCategoryDialogOpen(false);
       setEditingCategory(null);
       loadData();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save category",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to save category", variant: "destructive" });
     }
   };
 
   const handleArticleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    
     const tags = (formData.get('tags') as string).split(',').map(tag => tag.trim()).filter(tag => tag);
-    
     const articleData = {
       category_id: formData.get('category_id') as string,
       title: formData.get('title') as string,
       content: formData.get('content') as string,
-      video_url: formData.get('video_url') as string || undefined,
-      image_url: formData.get('image_url') as string || undefined,
+      video_url: videoPath || undefined,
+      image_url: imagePath || undefined,
       tags,
       display_order: parseInt(formData.get('display_order') as string),
       is_published: formData.get('is_published') === 'on',
@@ -107,16 +122,11 @@ export const HelpManagement: React.FC = () => {
         await helpService.createArticle(articleData);
         toast({ title: "Success", description: "Article created successfully" });
       }
-      
       setArticleDialogOpen(false);
       setEditingArticle(null);
       loadData();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save article",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to save article", variant: "destructive" });
     }
   };
 
@@ -126,11 +136,7 @@ export const HelpManagement: React.FC = () => {
       toast({ title: "Success", description: "Category deleted successfully" });
       loadData();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete category",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
     }
   };
 
@@ -140,26 +146,7 @@ export const HelpManagement: React.FC = () => {
       toast({ title: "Success", description: "Article deleted successfully" });
       loadData();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete article",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
-    try {
-      const url = await helpService.uploadHelpMedia(file, type + 's');
-      toast({ title: "Success", description: `${type} uploaded successfully` });
-      return url;
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to upload ${type}`,
-        variant: "destructive"
-      });
-      return null;
+      toast({ title: "Error", description: "Failed to delete article", variant: "destructive" });
     }
   };
 
@@ -167,53 +154,28 @@ export const HelpManagement: React.FC = () => {
     <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {editingCategory ? 'Edit Category' : 'Create Category'}
-          </DialogTitle>
+          <DialogTitle>{editingCategory ? 'Edit Category' : 'Create Category'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleCategorySubmit} className="space-y-4">
           <div>
             <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              name="name"
-              defaultValue={editingCategory?.name}
-              required
-            />
+            <Input id="name" name="name" defaultValue={editingCategory?.name} required />
           </div>
           <div>
             <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              name="description"
-              defaultValue={editingCategory?.description}
-            />
+            <Textarea id="description" name="description" defaultValue={editingCategory?.description} />
           </div>
           <div>
             <Label htmlFor="display_order">Display Order</Label>
-            <Input
-              id="display_order"
-              name="display_order"
-              type="number"
-              defaultValue={editingCategory?.display_order || 0}
-              required
-            />
+            <Input id="display_order" name="display_order" type="number" defaultValue={editingCategory?.display_order || 0} required />
           </div>
           <div className="flex items-center space-x-2">
-            <Switch
-              id="is_active"
-              name="is_active"
-              defaultChecked={editingCategory?.is_active ?? true}
-            />
+            <Switch id="is_active" name="is_active" defaultChecked={editingCategory?.is_active ?? true} />
             <Label htmlFor="is_active">Active</Label>
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setCategoryDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {editingCategory ? 'Update' : 'Create'}
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+            <Button type="submit">{editingCategory ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -224,99 +186,96 @@ export const HelpManagement: React.FC = () => {
     <Dialog open={articleDialogOpen} onOpenChange={setArticleDialogOpen}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editingArticle ? 'Edit Article' : 'Create Article'}
-          </DialogTitle>
+          <DialogTitle>{editingArticle ? 'Edit Article' : 'Create Article'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleArticleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="category_id">Category</Label>
             <Select name="category_id" defaultValue={editingArticle?.category_id} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
               <SelectContent>
                 {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
+                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              name="title"
-              defaultValue={editingArticle?.title}
-              required
-            />
+            <Input id="title" name="title" defaultValue={editingArticle?.title} required />
           </div>
           <div>
             <Label htmlFor="content">Content</Label>
-            <Textarea
-              id="content"
-              name="content"
-              defaultValue={editingArticle?.content}
-              rows={6}
-              required
-            />
+            <Textarea id="content" name="content" defaultValue={editingArticle?.content} rows={6} required />
           </div>
+
+          {/* Video Upload */}
           <div>
-            <Label htmlFor="video_url">Video URL</Label>
-            <Input
-              id="video_url"
-              name="video_url"
-              type="url"
-              defaultValue={editingArticle?.video_url}
-              placeholder="https://example.com/video.mp4"
-            />
+            <Label className="flex items-center gap-2"><FileVideo className="h-4 w-4" />Video</Label>
+            <div className="mt-2">
+              {videoPath ? (
+                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                  <Video className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm truncate flex-1">{videoPath}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setVideoPath('')}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <input type="file" accept="video/*" className="hidden" id="mgmt-video-upload"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleFileUpload(f, 'video'); }} />
+                  <Button type="button" variant="outline" disabled={uploadingVideo}
+                    onClick={() => document.getElementById('mgmt-video-upload')?.click()}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploadingVideo ? 'Uploading...' : 'Upload Video'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Image Upload */}
           <div>
-            <Label htmlFor="image_url">Image URL</Label>
-            <Input
-              id="image_url"
-              name="image_url"
-              type="url"
-              defaultValue={editingArticle?.image_url}
-              placeholder="https://example.com/image.jpg"
-            />
+            <Label className="flex items-center gap-2"><FileImage className="h-4 w-4" />Image</Label>
+            <div className="mt-2">
+              {imagePath ? (
+                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                  <Image className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm truncate flex-1">{imagePath}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setImagePath('')}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <input type="file" accept="image/*" className="hidden" id="mgmt-image-upload"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleFileUpload(f, 'image'); }} />
+                  <Button type="button" variant="outline" disabled={uploadingImage}
+                    onClick={() => document.getElementById('mgmt-image-upload')?.click()}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
+
           <div>
             <Label htmlFor="tags">Tags (comma-separated)</Label>
-            <Input
-              id="tags"
-              name="tags"
-              defaultValue={editingArticle?.tags.join(', ')}
-              placeholder="tag1, tag2, tag3"
-            />
+            <Input id="tags" name="tags" defaultValue={editingArticle?.tags.join(', ')} placeholder="tag1, tag2, tag3" />
           </div>
           <div>
             <Label htmlFor="display_order">Display Order</Label>
-            <Input
-              id="display_order"
-              name="display_order"
-              type="number"
-              defaultValue={editingArticle?.display_order || 0}
-              required
-            />
+            <Input id="display_order" name="display_order" type="number" defaultValue={editingArticle?.display_order || 0} required />
           </div>
           <div className="flex items-center space-x-2">
-            <Switch
-              id="is_published"
-              name="is_published"
-              defaultChecked={editingArticle?.is_published ?? true}
-            />
+            <Switch id="is_published" name="is_published" defaultChecked={editingArticle?.is_published ?? true} />
             <Label htmlFor="is_published">Published</Label>
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setArticleDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              {editingArticle ? 'Update' : 'Create'}
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setArticleDialogOpen(false)}>Cancel</Button>
+            <Button type="submit">{editingArticle ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -338,17 +297,10 @@ export const HelpManagement: React.FC = () => {
         <TabsContent value="categories" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Help Categories</h3>
-            <Button
-              onClick={() => {
-                setEditingCategory(null);
-                setCategoryDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Category
+            <Button onClick={() => { setEditingCategory(null); setCategoryDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" /> Add Category
             </Button>
           </div>
-
           <div className="grid gap-4">
             {categories.map((category) => (
               <Card key={category.id}>
@@ -357,28 +309,17 @@ export const HelpManagement: React.FC = () => {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         {category.name}
-                        {!category.is_active && (
-                          <Badge variant="secondary">Inactive</Badge>
-                        )}
+                        {!category.is_active && <Badge variant="secondary">Inactive</Badge>}
                       </CardTitle>
                       <CardDescription>{category.description}</CardDescription>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingCategory(category);
-                          setCategoryDialogOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => { setEditingCategory(category); setCategoryDialogOpen(true); }}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" /></Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -389,9 +330,7 @@ export const HelpManagement: React.FC = () => {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteCategory(category.id)}>
-                              Delete
-                            </AlertDialogAction>
+                            <AlertDialogAction onClick={() => handleDeleteCategory(category.id)}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -406,17 +345,10 @@ export const HelpManagement: React.FC = () => {
         <TabsContent value="articles" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Help Articles</h3>
-            <Button
-              onClick={() => {
-                setEditingArticle(null);
-                setArticleDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Article
+            <Button onClick={() => { setEditingArticle(null); setArticleDialogOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" /> Add Article
             </Button>
           </div>
-
           <div className="grid gap-4">
             {articles.map((article) => (
               <Card key={article.id}>
@@ -425,45 +357,26 @@ export const HelpManagement: React.FC = () => {
                     <div className="flex-1">
                       <CardTitle className="flex items-center gap-2">
                         {article.title}
-                        {!article.is_published && (
-                          <Badge variant="secondary">Draft</Badge>
-                        )}
-                        {article.video_url && (
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        {article.image_url && (
-                          <Image className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {!article.is_published && <Badge variant="secondary">Draft</Badge>}
+                        {article.video_url && <Video className="h-4 w-4 text-muted-foreground" />}
+                        {article.image_url && <Image className="h-4 w-4 text-muted-foreground" />}
                       </CardTitle>
-                      <CardDescription>
-                        Category: {article.category.name}
-                      </CardDescription>
+                      <CardDescription>Category: {article.category.name}</CardDescription>
                       {article.tags.length > 0 && (
                         <div className="flex gap-1 mt-2">
                           {article.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {tag}
-                            </Badge>
+                            <Badge key={index} variant="outline" className="text-xs">{tag}</Badge>
                           ))}
                         </div>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingArticle(article);
-                          setArticleDialogOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => { setEditingArticle(article); setArticleDialogOpen(true); }}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Button variant="outline" size="sm"><Trash2 className="h-4 w-4" /></Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -474,9 +387,7 @@ export const HelpManagement: React.FC = () => {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>
-                              Delete
-                            </AlertDialogAction>
+                            <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Globe, Video, Image } from 'lucide-react';
+import { Plus, Edit, Trash2, Globe, Video, Image, Upload, X, FileVideo, FileImage } from 'lucide-react';
 import { helpService, HelpCategory, HelpArticle, HelpArticleWithCategory } from '@/services/helpService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,11 +23,25 @@ const DevHelpManagement: React.FC = () => {
   const [articleDialogOpen, setArticleDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<HelpCategory | null>(null);
   const [editingArticle, setEditingArticle] = useState<HelpArticleWithCategory | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [videoPath, setVideoPath] = useState('');
+  const [imagePath, setImagePath] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (editingArticle) {
+      setVideoPath(editingArticle.video_url || '');
+      setImagePath(editingArticle.image_url || '');
+    } else {
+      setVideoPath('');
+      setImagePath('');
+    }
+  }, [editingArticle]);
 
   const loadData = async () => {
     try {
@@ -42,6 +56,21 @@ const DevHelpManagement: React.FC = () => {
       toast({ title: "Error", description: "Failed to load global help data", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: 'image' | 'video') => {
+    const setUploading = type === 'video' ? setUploadingVideo : setUploadingImage;
+    const setPath = type === 'video' ? setVideoPath : setImagePath;
+    try {
+      setUploading(true);
+      const path = await helpService.uploadHelpMedia(file, type + 's');
+      setPath(path);
+      toast({ title: "Success", description: `${type === 'video' ? 'Video' : 'Image'} uploaded successfully` });
+    } catch (error) {
+      toast({ title: "Error", description: `Failed to upload ${type}`, variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -61,7 +90,6 @@ const DevHelpManagement: React.FC = () => {
         await helpService.updateCategory(editingCategory.id, categoryData);
         toast({ title: "Success", description: "Global category updated" });
       } else {
-        // For global items, we need to set a tenant_id anyway (RLS trigger sets it)
         await helpService.createCategory(categoryData);
         toast({ title: "Success", description: "Global category created" });
       }
@@ -81,8 +109,8 @@ const DevHelpManagement: React.FC = () => {
       category_id: formData.get('category_id') as string,
       title: formData.get('title') as string,
       content: formData.get('content') as string,
-      video_url: formData.get('video_url') as string || undefined,
-      image_url: formData.get('image_url') as string || undefined,
+      video_url: videoPath || undefined,
+      image_url: imagePath || undefined,
       tags,
       display_order: parseInt(formData.get('display_order') as string) || 0,
       is_published: formData.get('is_published') === 'on',
@@ -320,14 +348,91 @@ const DevHelpManagement: React.FC = () => {
               <Label htmlFor="content">Content</Label>
               <Textarea id="content" name="content" defaultValue={editingArticle?.content} rows={6} required />
             </div>
+            
+            {/* Video Upload */}
             <div>
-              <Label htmlFor="video_url">Video URL</Label>
-              <Input id="video_url" name="video_url" type="url" defaultValue={editingArticle?.video_url} />
+              <Label className="flex items-center gap-2">
+                <FileVideo className="h-4 w-4" />
+                Video
+              </Label>
+              <div className="mt-2 space-y-2">
+                {videoPath ? (
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Video className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm truncate flex-1">{videoPath}</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0"
+                      onClick={() => setVideoPath('')}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      id="dev-video-upload"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) await handleFileUpload(file, 'video');
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={uploadingVideo}
+                      onClick={() => document.getElementById('dev-video-upload')?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingVideo ? 'Uploading...' : 'Upload Video'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Image Upload */}
             <div>
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input id="image_url" name="image_url" type="url" defaultValue={editingArticle?.image_url} />
+              <Label className="flex items-center gap-2">
+                <FileImage className="h-4 w-4" />
+                Image
+              </Label>
+              <div className="mt-2 space-y-2">
+                {imagePath ? (
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Image className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm truncate flex-1">{imagePath}</span>
+                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0"
+                      onClick={() => setImagePath('')}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="dev-image-upload"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) await handleFileUpload(file, 'image');
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={uploadingImage}
+                      onClick={() => document.getElementById('dev-image-upload')?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
+
             <div>
               <Label htmlFor="tags">Tags (comma-separated)</Label>
               <Input id="tags" name="tags" defaultValue={editingArticle?.tags?.join(', ')} />
