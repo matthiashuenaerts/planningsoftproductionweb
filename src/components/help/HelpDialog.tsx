@@ -70,6 +70,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
   const [uploadingImage, setUploadingImage] = useState(false);
   const [videoPath, setVideoPath] = useState('');
   const [imagePath, setImagePath] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
   const { currentEmployee } = useAuth();
   const isMobile = useIsMobile();
