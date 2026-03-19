@@ -267,50 +267,51 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     }
   };
 
+  const isInBrowseMode = !editingCategory && !editingArticle && !managementMode && !selectedArticle;
+
+  const renderSearchBar = () => (
+    <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-2xl p-5 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <HelpCircle className="h-5 w-5 text-primary" />
+        <h3 className="font-semibold text-foreground">How can we help you?</h3>
+      </div>
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search articles, topics, guides..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (!e.target.value.trim()) {
+              setArticles([]);
+              setSelectedCategory(null);
+            }
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          className="pl-10 h-11 bg-background/80 backdrop-blur-sm border-border/60 rounded-xl text-sm shadow-sm focus-visible:ring-primary/30"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+            onClick={() => {
+              setSearchQuery('');
+              setArticles([]);
+              setSelectedCategory(null);
+            }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   // ─── USER-FACING VIEWS ───
 
   const renderCategories = () => (
     <div className="space-y-5">
-      {/* Hero Search */}
-      <div className="relative">
-        <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-2xl p-6 pb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <HelpCircle className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-foreground">How can we help you?</h3>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search articles, topics, guides..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (!e.target.value.trim()) {
-                  setArticles([]);
-                  setSelectedCategory(null);
-                }
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="pl-10 h-11 bg-background/80 backdrop-blur-sm border-border/60 rounded-xl text-sm shadow-sm focus-visible:ring-primary/30"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                onClick={() => {
-                  setSearchQuery('');
-                  setArticles([]);
-                  setSelectedCategory(null);
-                }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Categories Grid */}
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">Browse by topic</p>
