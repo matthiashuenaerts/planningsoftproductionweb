@@ -730,6 +730,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
 
         <ScrollArea className={isMobile ? 'flex-1 min-h-0' : 'max-h-[60vh]'}>
           <div className="pr-2">
+            {isInBrowseMode && renderSearchBar()}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
@@ -743,7 +744,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
               renderManagement()
             ) : selectedArticle ? (
               renderArticleDetail()
-            ) : selectedCategory || searchQuery ? (
+            ) : selectedCategory || (searchQuery && articles.length >= 0 && searchQuery.length > 0 && articles !== null) ? (
               renderArticlesList()
             ) : (
               renderCategories()
