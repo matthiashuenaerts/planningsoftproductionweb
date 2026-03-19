@@ -749,7 +749,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
               renderManagement()
             ) : selectedArticle ? (
               renderArticleDetail()
-            ) : selectedCategory || (searchQuery && articles.length >= 0 && searchQuery.length > 0 && articles !== null) ? (
+            ) : selectedCategory || hasSearched ? (
               renderArticlesList()
             ) : (
               renderCategories()
