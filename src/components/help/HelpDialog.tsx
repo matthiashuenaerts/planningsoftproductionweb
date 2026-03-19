@@ -79,6 +79,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ open, onOpenChange }) =>
     if (open) {
       loadCategories();
       setSearchQuery('');
+      setHasSearched(false);
       setSelectedCategory(null);
       setSelectedArticle(null);
       setManagementMode(false);
