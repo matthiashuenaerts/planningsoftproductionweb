@@ -133,6 +133,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ─── Midnight auto-logout ───
+  useEffect(() => {
+    if (!session) return;
+
+    const scheduleMidnightLogout = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0); // next midnight
+      const msUntilMidnight = midnight.getTime() - now.getTime();
+
+      console.log(`Session will auto-expire at midnight (in ${Math.round(msUntilMidnight / 60000)} minutes)`);
+
+      return setTimeout(async () => {
+        console.log("Midnight reached – signing out");
+        await supabase.auth.signOut();
+        setCurrentEmployee(null);
+        setRoles([]);
+        setUser(null);
+        setSession(null);
+        // Navigate handled by auth state change
+      }, msUntilMidnight);
+    };
+
+    const timerId = scheduleMidnightLogout();
+    return () => clearTimeout(timerId);
+  }, [session]);
+
+  // ─── Auth state listener ───
   useEffect(() => {
     const {
       data: { subscription },
