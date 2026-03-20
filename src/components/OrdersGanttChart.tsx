@@ -255,6 +255,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
           .eq('id', assignmentId);
         if (error) throw error;
+        // Recalculate task due_dates based on the new start date
+        await recalculateTaskDueDates(project.id, format(newStartDate, 'yyyy-MM-dd'));
         toast.success('Project duration updated');
         fetchFullProjects();
       } catch (error) {
