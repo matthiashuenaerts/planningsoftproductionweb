@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
+import { recalculateTaskDueDates } from '@/services/taskDueDateService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 
@@ -254,6 +255,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
           .eq('id', assignmentId);
         if (error) throw error;
+        // Recalculate task due_dates based on the new start date
+        await recalculateTaskDueDates(project.id, format(newStartDate, 'yyyy-MM-dd'));
         toast.success('Project duration updated');
         fetchFullProjects();
       } catch (error) {
@@ -287,11 +290,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       ));
 
       try {
+        const newDateStr = format(newStartDate, 'yyyy-MM-dd');
         const { error } = await supabase
           .from('project_team_assignments')
-          .update({ start_date: format(newStartDate, 'yyyy-MM-dd') })
+          .update({ start_date: newDateStr })
           .eq('id', assignment.id);
         if (error) throw error;
+        // Recalculate task due_dates based on the new start date
+        await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project moved successfully');
         fetchFullProjects();
       } catch (error) {
