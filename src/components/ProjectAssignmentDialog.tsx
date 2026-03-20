@@ -389,6 +389,9 @@ export const ProjectAssignmentDialog: React.FC<ProjectAssignmentDialogProps> = (
           console.error('Project error:', projectError);
           throw projectError;
         }
+
+        // Recalculate task due_dates based on the new installation date
+        await recalculateTaskDueDates(projectId, startDate);
       } else {
         console.log('Skipping installation_date update for service team assignment.');
       }

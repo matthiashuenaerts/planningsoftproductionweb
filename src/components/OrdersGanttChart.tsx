@@ -290,11 +290,14 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       ));
 
       try {
+        const newDateStr = format(newStartDate, 'yyyy-MM-dd');
         const { error } = await supabase
           .from('project_team_assignments')
-          .update({ start_date: format(newStartDate, 'yyyy-MM-dd') })
+          .update({ start_date: newDateStr })
           .eq('id', assignment.id);
         if (error) throw error;
+        // Recalculate task due_dates based on the new start date
+        await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project moved successfully');
         fetchFullProjects();
       } catch (error) {
