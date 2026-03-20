@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
+import { recalculateTaskDueDates } from '@/services/taskDueDateService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 
