@@ -7,19 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Formula: due_date = installation_date - day_counter
  */
 export async function recalculateTaskDueDates(projectId: string, installationDate: string): Promise<void> {
-  // Fetch all tasks for the project that have a standard_task_id
-  const { data: tasks, error: tasksError } = await supabase
-    .from('tasks')
-    .select('id, standard_task_id, phase_id')
-    .in('phase_id', 
-      supabase
-        .from('phases')
-        .select('id')
-        .eq('project_id', projectId)
-        .then(r => r.data?.map(p => p.id) || [])
-    );
-
-  // Alternative approach: get phases first, then tasks
+  // Get phases for the project
   const { data: phases, error: phasesError } = await supabase
     .from('phases')
     .select('id')
@@ -43,7 +31,6 @@ export async function recalculateTaskDueDates(projectId: string, installationDat
     return;
   }
 
-  // Get unique standard_task_ids
   const standardTaskIds = [...new Set(projectTasks.map(t => t.standard_task_id).filter(Boolean))] as string[];
 
   const { data: standardTasks, error: stError } = await supabase
@@ -59,7 +46,6 @@ export async function recalculateTaskDueDates(projectId: string, installationDat
   const dayCounterMap = new Map(standardTasks.map(st => [st.id, st.day_counter || 0]));
   const installDate = new Date(installationDate + 'T00:00:00');
 
-  // Update each task's due_date
   const updates = projectTasks.map(task => {
     const dayCounter = dayCounterMap.get(task.standard_task_id!) || 0;
     const dueDate = new Date(installDate);
