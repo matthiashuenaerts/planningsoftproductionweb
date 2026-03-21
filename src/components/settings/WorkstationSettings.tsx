@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import {
   Card,
   CardContent,
