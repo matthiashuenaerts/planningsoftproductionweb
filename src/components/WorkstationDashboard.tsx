@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
