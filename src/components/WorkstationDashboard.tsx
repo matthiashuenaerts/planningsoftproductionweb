@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -608,8 +609,9 @@ const WorkstationDashboard = () => {
       <div key={data.workstation.id} className="border rounded-lg p-4 bg-white shadow mb-4">
         <div className="flex items-center mb-4">
           {data.workstation.icon_path ? (
-            <img 
-              src={data.workstation.icon_path} 
+            <SignedStorageImage 
+              bucket="product-images"
+              path={data.workstation.icon_path} 
               alt={`${data.workstation.name} icon`}
               className="w-8 h-8 object-contain mr-3"
             />

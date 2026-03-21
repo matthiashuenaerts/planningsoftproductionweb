@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -177,8 +178,9 @@ const Projects = () => {
     
     if (workstation?.icon_path) {
       return (
-        <img 
-          src={workstation.icon_path} 
+        <SignedStorageImage 
+          bucket="product-images"
+          path={workstation.icon_path} 
           alt={workstation.name} 
           className="h-4 w-4 object-contain"
         />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from '@/components/Navbar';
 import WorkstationView from '@/components/WorkstationView';
@@ -388,8 +389,9 @@ const Workstations: React.FC = () => {
                           >
                             <div className={`rounded-2xl bg-primary/8 group-hover:bg-primary/15 transition-colors ${isMobile ? 'p-3 mb-2.5' : 'p-4 mb-3'}`}>
                               {workstation.icon_path ? (
-                                <img 
-                                  src={workstation.icon_path} 
+                                <SignedStorageImage 
+                                  bucket="product-images"
+                                  path={workstation.icon_path} 
                                   alt={workstation.name} 
                                   className={`object-contain text-primary ${isMobile ? 'h-6 w-6' : 'h-7 w-7'}`}
                                 />
