@@ -1679,131 +1679,128 @@ const PDFViewerEditor: React.FC<PDFViewerEditorProps> = ({
     try {
       setSaving(true);
       
-      const { getEffectivePageSize, toNativeCoords } = await import('@/services/pdfCoordinateUtils');
       const newPdfDoc = await PDFDocument.load(originalPdfBytes);
       const font = await newPdfDoc.embedFont(StandardFonts.Helvetica);
       
       for (const [pageNum, annotations] of pageAnnotationsRef.current.entries()) {
         const page = newPdfDoc.getPage(pageNum - 1);
-        const { effWidth, effHeight, rawWidth, rawHeight, rotation } = getEffectivePageSize(page);
+        const { width, height } = page.getSize();
 
         for (const annotation of annotations) {
-          // Convert percentage-based positions to display-space coordinates
-          const dispX = (annotation.leftPct || 0) * effWidth;
-          const dispY = (annotation.topPct || 0) * effHeight;
+          // Convert percentage-based positions to PDF coordinates
+          const x = (annotation.leftPct || 0) * width;
+          const y = height - ((annotation.topPct || 0) * height);
 
           switch (annotation.type) {
             case 'textbox':
               if (annotation.text) {
-                const textFontSize = (annotation.fontSizePct || 0.03) * effHeight;
+                const textFontSize = (annotation.fontSizePct || 0.03) * height;
                 const colorArray = hexToRgb(annotation.fill || '#000000');
-                const pos = toNativeCoords(dispX, dispY + textFontSize, rawWidth, rawHeight, rotation);
                 page.drawText(annotation.text, {
-                  x: pos.x,
-                  y: pos.y,
+                  x,
+                  y: y - textFontSize,
                   size: textFontSize,
                   font,
                   color: rgb(colorArray.r / 255, colorArray.g / 255, colorArray.b / 255),
                 });
               }
               break;
-            case 'rect': {
-              const rectWidth = (annotation.widthPct || 0) * effWidth;
-              const rectHeight = (annotation.heightPct || 0) * effHeight;
+            case 'rect':
+              const rectWidth = (annotation.widthPct || 0) * width;
+              const rectHeight = (annotation.heightPct || 0) * height;
               const rectColorArray = hexToRgb(annotation.stroke || '#000000');
-              const rectPos = toNativeCoords(dispX, dispY + rectHeight, rawWidth, rawHeight, rotation);
-              const isRotated = rotation === 90 || rotation === 270;
               page.drawRectangle({
-                x: rectPos.x,
-                y: rectPos.y,
-                width: isRotated ? rectHeight : rectWidth,
-                height: isRotated ? rectWidth : rectHeight,
+                x,
+                y: y - rectHeight,
+                width: rectWidth,
+                height: rectHeight,
                 borderColor: rgb(rectColorArray.r / 255, rectColorArray.g / 255, rectColorArray.b / 255),
-                borderWidth: (annotation.strokeWidthPct || 0.002) * effWidth,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
-            }
-            case 'circle': {
-              const dlRadius = (annotation.radiusPct || 0) * effWidth;
+            case 'circle':
+              const dlRadius = (annotation.radiusPct || 0) * width;
               const dlCircleColorArray = hexToRgb(annotation.stroke || '#000000');
-              const circlePos = toNativeCoords(dispX + dlRadius, dispY + dlRadius, rawWidth, rawHeight, rotation);
               page.drawCircle({
-                x: circlePos.x,
-                y: circlePos.y,
+                x: x + dlRadius,
+                y: y - dlRadius,
                 size: dlRadius,
                 borderColor: rgb(dlCircleColorArray.r / 255, dlCircleColorArray.g / 255, dlCircleColorArray.b / 255),
-                borderWidth: (annotation.strokeWidthPct || 0.002) * effWidth,
+                borderWidth: (annotation.strokeWidthPct || 0.002) * width,
               });
               break;
-            }
             case 'path':
               if (annotation.path && Array.isArray(annotation.path)) {
                 const dlPathColor = hexToRgb(annotation.stroke || '#000000');
-                const dlPathStrokeWidth = (annotation.strokeWidthPct || 0.005) * effWidth;
+                const dlPathStrokeWidth = (annotation.strokeWidthPct || 0.005) * width;
                 
-                const pathLeft = (annotation.leftPct || 0) * effWidth;
-                const pathTop = (annotation.topPct || 0) * effHeight;
-                const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * effWidth : 0;
-                const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * effHeight : 0;
+                const pathLeft = (annotation.leftPct || 0) * width;
+                const pathTop = (annotation.topPct || 0) * height;
                 
-                let lastDispX = 0, lastDispY = 0;
-                const steps = 24;
+                // Account for pathOffset (Fabric.js centers paths around their bounding box center)
+                const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * width : 0;
+                const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * height : 0;
+                
+                let lastX = 0, lastY = 0;
+                const steps = 24; // bezier approximation steps
                 
                 for (const cmd of annotation.path) {
                   if (cmd[0] === 'M') {
-                    lastDispX = pathLeft + cmd[1] * effWidth - offsetX;
-                    lastDispY = pathTop + cmd[2] * effHeight - offsetY;
+                    lastX = pathLeft + cmd[1] * width - offsetX;
+                    lastY = pathTop + cmd[2] * height - offsetY;
                   } else if (cmd[0] === 'L') {
-                    const lx = pathLeft + cmd[1] * effWidth - offsetX;
-                    const ly = pathTop + cmd[2] * effHeight - offsetY;
-                    const start = toNativeCoords(lastDispX, lastDispY, rawWidth, rawHeight, rotation);
-                    const end = toNativeCoords(lx, ly, rawWidth, rawHeight, rotation);
+                    const lx = pathLeft + cmd[1] * width - offsetX;
+                    const ly = pathTop + cmd[2] * height - offsetY;
                     page.drawLine({
-                      start, end,
+                      start: { x: lastX, y: height - lastY },
+                      end: { x: lx, y: height - ly },
                       thickness: dlPathStrokeWidth,
                       color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
                     });
-                    lastDispX = lx; lastDispY = ly;
+                    lastX = lx;
+                    lastY = ly;
                   } else if (cmd[0] === 'Q') {
-                    const cpx = pathLeft + cmd[1] * effWidth - offsetX;
-                    const cpy = pathTop + cmd[2] * effHeight - offsetY;
-                    const endx = pathLeft + cmd[3] * effWidth - offsetX;
-                    const endy = pathTop + cmd[4] * effHeight - offsetY;
-                    const sx = lastDispX, sy = lastDispY;
+                    // Quadratic bezier - approximate with line segments
+                    const cpx = pathLeft + cmd[1] * width - offsetX;
+                    const cpy = pathTop + cmd[2] * height - offsetY;
+                    const endx = pathLeft + cmd[3] * width - offsetX;
+                    const endy = pathTop + cmd[4] * height - offsetY;
+                    const sx = lastX, sy = lastY;
                     for (let t = 1; t <= steps; t++) {
                       const tt = t / steps;
                       const px = (1 - tt) * (1 - tt) * sx + 2 * (1 - tt) * tt * cpx + tt * tt * endx;
                       const py = (1 - tt) * (1 - tt) * sy + 2 * (1 - tt) * tt * cpy + tt * tt * endy;
-                      const start = toNativeCoords(lastDispX, lastDispY, rawWidth, rawHeight, rotation);
-                      const end = toNativeCoords(px, py, rawWidth, rawHeight, rotation);
                       page.drawLine({
-                        start, end,
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
                         thickness: dlPathStrokeWidth,
                         color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
                       });
-                      lastDispX = px; lastDispY = py;
+                      lastX = px;
+                      lastY = py;
                     }
                   } else if (cmd[0] === 'C') {
-                    const cp1x = pathLeft + cmd[1] * effWidth - offsetX;
-                    const cp1y = pathTop + cmd[2] * effHeight - offsetY;
-                    const cp2x = pathLeft + cmd[3] * effWidth - offsetX;
-                    const cp2y = pathTop + cmd[4] * effHeight - offsetY;
-                    const endx = pathLeft + cmd[5] * effWidth - offsetX;
-                    const endy = pathTop + cmd[6] * effHeight - offsetY;
-                    const sx = lastDispX, sy = lastDispY;
+                    // Cubic bezier - approximate with line segments
+                    const cp1x = pathLeft + cmd[1] * width - offsetX;
+                    const cp1y = pathTop + cmd[2] * height - offsetY;
+                    const cp2x = pathLeft + cmd[3] * width - offsetX;
+                    const cp2y = pathTop + cmd[4] * height - offsetY;
+                    const endx = pathLeft + cmd[5] * width - offsetX;
+                    const endy = pathTop + cmd[6] * height - offsetY;
+                    const sx = lastX, sy = lastY;
                     for (let t = 1; t <= steps; t++) {
                       const tt = t / steps;
                       const mt = 1 - tt;
                       const px = mt * mt * mt * sx + 3 * mt * mt * tt * cp1x + 3 * mt * tt * tt * cp2x + tt * tt * tt * endx;
                       const py = mt * mt * mt * sy + 3 * mt * mt * tt * cp1y + 3 * mt * tt * tt * cp2y + tt * tt * tt * endy;
-                      const start = toNativeCoords(lastDispX, lastDispY, rawWidth, rawHeight, rotation);
-                      const end = toNativeCoords(px, py, rawWidth, rawHeight, rotation);
                       page.drawLine({
-                        start, end,
+                        start: { x: lastX, y: height - lastY },
+                        end: { x: px, y: height - py },
                         thickness: dlPathStrokeWidth,
                         color: rgb(dlPathColor.r / 255, dlPathColor.g / 255, dlPathColor.b / 255),
                       });
-                      lastDispX = px; lastDispY = py;
+                      lastX = px;
+                      lastY = py;
                     }
                   }
                 }
