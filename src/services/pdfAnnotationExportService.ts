@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { supabase } from '@/integrations/supabase/client';
+import { getEffectivePageSize, toNativeCoords, toNativeSize } from './pdfCoordinateUtils';
 
 interface AnnotationData {
   type: string;
@@ -38,29 +39,15 @@ function hexToRgb(hex: string) {
     : { r: 0, g: 0, b: 0 };
 }
 
-/**
- * Detects whether annotations use the legacy percentage-based format (leftPct/topPct)
- * or the current pixel-based format (left/top in PDF points at scale=1).
- */
 function isLegacyFormat(annotations: AnnotationData[]): boolean {
   return annotations.some(a => a.leftPct !== undefined || a.topPct !== undefined);
 }
 
-/**
- * Generates an annotated PDF by overlaying stored annotations onto the raw PDF bytes.
- * 
- * Annotations are stored as pixel coordinates at scale=1, which corresponds to
- * PDF points (since pdfjs viewport at scale=1 returns dimensions in points).
- * The canvas base size equals the PDF page size, so scaleX/scaleY = 1.
- * 
- * Returns the annotated PDF as a Uint8Array, or null if no annotations exist.
- */
 export async function generateAnnotatedPdf(
   projectId: string,
   fileName: string,
   pdfBytes: ArrayBuffer
 ): Promise<Uint8Array | null> {
-  // Fetch annotations from database
   const { data, error } = await supabase
     .from('pdf_annotations')
     .select('page_number, annotations')
@@ -68,7 +55,7 @@ export async function generateAnnotatedPdf(
     .eq('file_name', fileName);
 
   if (error || !data || data.length === 0) {
-    return null; // No annotations, use raw file
+    return null;
   }
 
   const annotationsMap = new Map<number, AnnotationData[]>();
@@ -81,22 +68,19 @@ export async function generateAnnotatedPdf(
 
   for (const [pageNum, annotations] of annotationsMap.entries()) {
     const page = pdfDoc.getPage(pageNum - 1);
-    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const { effWidth, effHeight, rawWidth, rawHeight, rotation } = getEffectivePageSize(page);
 
-    // Detect format: legacy (percentage 0-1) or current (PDF points)
     const legacy = isLegacyFormat(annotations);
 
     for (const annotation of annotations) {
-      // Resolve coordinates: legacy uses Pct fields as 0-1 fractions; current uses direct points
-      let x: number, y: number;
+      // Resolve display-space coordinates
+      let dispX: number, dispY: number;
       if (legacy) {
-        x = (annotation.leftPct || 0) * pageWidth;
-        y = pageHeight - ((annotation.topPct || 0) * pageHeight);
+        dispX = (annotation.leftPct || 0) * effWidth;
+        dispY = (annotation.topPct || 0) * effHeight;
       } else {
-        // Annotations are in PDF points (scale=1 canvas coords)
-        // PDF y-axis is bottom-up, canvas y-axis is top-down
-        x = annotation.left || 0;
-        y = pageHeight - (annotation.top || 0);
+        dispX = annotation.left || 0;
+        dispY = annotation.top || 0;
       }
 
       switch (annotation.type) {
@@ -104,14 +88,15 @@ export async function generateAnnotatedPdf(
           if (annotation.text) {
             let fontSize: number;
             if (legacy) {
-              fontSize = (annotation.fontSizePct || 0.03) * pageHeight;
+              fontSize = (annotation.fontSizePct || 0.03) * effHeight;
             } else {
               fontSize = annotation.fontSize || 18;
             }
             const c = hexToRgb(annotation.fill || '#000000');
+            const textPos = toNativeCoords(dispX, dispY + fontSize, rawWidth, rawHeight, rotation);
             page.drawText(annotation.text, {
-              x,
-              y: y - fontSize,
+              x: textPos.x,
+              y: textPos.y,
               size: fontSize,
               font,
               color: rgb(c.r / 255, c.g / 255, c.b / 255),
@@ -122,20 +107,23 @@ export async function generateAnnotatedPdf(
         case 'rect': {
           let rw: number, rh: number, borderWidth: number;
           if (legacy) {
-            rw = (annotation.widthPct || 0) * pageWidth;
-            rh = (annotation.heightPct || 0) * pageHeight;
-            borderWidth = (annotation.strokeWidthPct || 0.002) * pageWidth;
+            rw = (annotation.widthPct || 0) * effWidth;
+            rh = (annotation.heightPct || 0) * effHeight;
+            borderWidth = (annotation.strokeWidthPct || 0.002) * effWidth;
           } else {
             rw = annotation.width || 0;
             rh = annotation.height || 0;
             borderWidth = annotation.strokeWidth || 1;
           }
           const rc = hexToRgb(annotation.stroke || '#000000');
+          // Bottom-left corner in display space is (dispX, dispY + rh)
+          const rectPos = toNativeCoords(dispX, dispY + rh, rawWidth, rawHeight, rotation);
+          const nativeSize = toNativeSize(rw, rh, rotation);
           page.drawRectangle({
-            x,
-            y: y - rh,
-            width: rw,
-            height: rh,
+            x: rectPos.x,
+            y: rectPos.y,
+            width: nativeSize.w,
+            height: nativeSize.h,
             borderColor: rgb(rc.r / 255, rc.g / 255, rc.b / 255),
             borderWidth,
           });
@@ -145,16 +133,18 @@ export async function generateAnnotatedPdf(
         case 'circle': {
           let r: number, borderWidth: number;
           if (legacy) {
-            r = (annotation.radiusPct || 0) * pageWidth;
-            borderWidth = (annotation.strokeWidthPct || 0.002) * pageWidth;
+            r = (annotation.radiusPct || 0) * effWidth;
+            borderWidth = (annotation.strokeWidthPct || 0.002) * effWidth;
           } else {
             r = annotation.radius || 0;
             borderWidth = annotation.strokeWidth || 1;
           }
           const cc = hexToRgb(annotation.stroke || '#000000');
+          // Center in display space is (dispX + r, dispY + r)
+          const circleCenter = toNativeCoords(dispX + r, dispY + r, rawWidth, rawHeight, rotation);
           page.drawCircle({
-            x: x + r,
-            y: y - r,
+            x: circleCenter.x,
+            y: circleCenter.y,
             size: r,
             borderColor: rgb(cc.r / 255, cc.g / 255, cc.b / 255),
             borderWidth,
@@ -165,9 +155,9 @@ export async function generateAnnotatedPdf(
         case 'path':
           if (annotation.path && Array.isArray(annotation.path)) {
             if (legacy) {
-              drawPathLegacy(page, annotation, pageWidth, pageHeight);
+              drawPathLegacy(page, annotation, effWidth, effHeight, rawWidth, rawHeight, rotation);
             } else {
-              drawPathOnPage(page, annotation, pageHeight);
+              drawPathOnPage(page, annotation, rawWidth, rawHeight, rotation);
             }
           }
           break;
@@ -178,20 +168,14 @@ export async function generateAnnotatedPdf(
   return new Uint8Array(await pdfDoc.save());
 }
 
-/**
- * Draw path using current format: coordinates are in PDF points at scale=1.
- * Mirrors the drawPathOnPage logic from EnhancedPDFEditor.
- */
-function drawPathOnPage(page: any, annotation: AnnotationData, pageHeight: number) {
+function drawPathOnPage(page: any, annotation: AnnotationData, rawW: number, rawH: number, rotation: number) {
   if (!annotation.path || !Array.isArray(annotation.path)) return;
 
   const pc = hexToRgb(annotation.stroke || '#ff0000');
   const borderWidth = annotation.strokeWidth || 2;
   const color = rgb(pc.r / 255, pc.g / 255, pc.b / 255);
 
-  // Path coordinates are already in PDF points (scale=1)
-  // No additional scaling needed (scaleX = scaleY = 1)
-  let lastX = 0, lastY = 0;
+  let lastDispX = 0, lastDispY = 0;
 
   for (const segment of annotation.path) {
     if (!Array.isArray(segment)) continue;
@@ -199,44 +183,39 @@ function drawPathOnPage(page: any, annotation: AnnotationData, pageHeight: numbe
 
     switch (command) {
       case 'M':
-        lastX = coords[0];
-        lastY = coords[1];
+        lastDispX = coords[0];
+        lastDispY = coords[1];
         break;
-      case 'L':
-        page.drawLine({
-          start: { x: lastX, y: pageHeight - lastY },
-          end: { x: coords[0], y: pageHeight - coords[1] },
-          thickness: borderWidth,
-          color,
-        });
-        lastX = coords[0];
-        lastY = coords[1];
+      case 'L': {
+        const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+        const end = toNativeCoords(coords[0], coords[1], rawW, rawH, rotation);
+        page.drawLine({ start, end, thickness: borderWidth, color });
+        lastDispX = coords[0];
+        lastDispY = coords[1];
         break;
+      }
       case 'Q':
         if (coords.length >= 4) {
           const steps = 24;
-          const sx = lastX, sy = lastY;
+          const sx = lastDispX, sy = lastDispY;
           const cpx = coords[0], cpy = coords[1];
           const endX = coords[2], endY = coords[3];
           for (let t = 1; t <= steps; t++) {
             const tt = t / steps, mt = 1 - tt;
             const px = mt * mt * sx + 2 * mt * tt * cpx + tt * tt * endX;
             const py = mt * mt * sy + 2 * mt * tt * cpy + tt * tt * endY;
-            page.drawLine({
-              start: { x: lastX, y: pageHeight - lastY },
-              end: { x: px, y: pageHeight - py },
-              thickness: borderWidth,
-              color,
-            });
-            lastX = px;
-            lastY = py;
+            const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+            const end = toNativeCoords(px, py, rawW, rawH, rotation);
+            page.drawLine({ start, end, thickness: borderWidth, color });
+            lastDispX = px;
+            lastDispY = py;
           }
         }
         break;
       case 'C':
         if (coords.length >= 6) {
           const steps = 24;
-          const sx = lastX, sy = lastY;
+          const sx = lastDispX, sy = lastDispY;
           const c1x = coords[0], c1y = coords[1];
           const c2x = coords[2], c2y = coords[3];
           const endX = coords[4], endY = coords[5];
@@ -244,14 +223,11 @@ function drawPathOnPage(page: any, annotation: AnnotationData, pageHeight: numbe
             const tt = t / steps, mt = 1 - tt;
             const px = mt**3 * sx + 3 * mt**2 * tt * c1x + 3 * mt * tt**2 * c2x + tt**3 * endX;
             const py = mt**3 * sy + 3 * mt**2 * tt * c1y + 3 * mt * tt**2 * c2y + tt**3 * endY;
-            page.drawLine({
-              start: { x: lastX, y: pageHeight - lastY },
-              end: { x: px, y: pageHeight - py },
-              thickness: borderWidth,
-              color,
-            });
-            lastX = px;
-            lastY = py;
+            const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+            const end = toNativeCoords(px, py, rawW, rawH, rotation);
+            page.drawLine({ start, end, thickness: borderWidth, color });
+            lastDispX = px;
+            lastDispY = py;
           }
         }
         break;
@@ -259,56 +235,62 @@ function drawPathOnPage(page: any, annotation: AnnotationData, pageHeight: numbe
   }
 }
 
-/**
- * Legacy path drawing using percentage-based coordinates (backward compatibility).
- */
-function drawPathLegacy(page: any, annotation: AnnotationData, pageWidth: number, pageHeight: number) {
+function drawPathLegacy(
+  page: any, annotation: AnnotationData,
+  effW: number, effH: number, rawW: number, rawH: number, rotation: number
+) {
   const pc = hexToRgb(annotation.stroke || '#000000');
-  const sw = (annotation.strokeWidthPct || 0.005) * pageWidth;
-  const pathLeft = (annotation.leftPct || 0) * pageWidth;
-  const pathTop = (annotation.topPct || 0) * pageHeight;
-  const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * pageWidth : 0;
-  const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * pageHeight : 0;
-  let lastX = 0, lastY = 0;
+  const sw = (annotation.strokeWidthPct || 0.005) * effW;
+  const pathLeft = (annotation.leftPct || 0) * effW;
+  const pathTop = (annotation.topPct || 0) * effH;
+  const offsetX = annotation.pathOffsetXPct != null ? annotation.pathOffsetXPct * effW : 0;
+  const offsetY = annotation.pathOffsetYPct != null ? annotation.pathOffsetYPct * effH : 0;
+  let lastDispX = 0, lastDispY = 0;
   const steps = 24;
   const color = rgb(pc.r / 255, pc.g / 255, pc.b / 255);
 
   for (const cmd of annotation.path!) {
     if (cmd[0] === 'M') {
-      lastX = pathLeft + cmd[1] * pageWidth - offsetX;
-      lastY = pathTop + cmd[2] * pageHeight - offsetY;
+      lastDispX = pathLeft + cmd[1] * effW - offsetX;
+      lastDispY = pathTop + cmd[2] * effH - offsetY;
     } else if (cmd[0] === 'L') {
-      const lx = pathLeft + cmd[1] * pageWidth - offsetX;
-      const ly = pathTop + cmd[2] * pageHeight - offsetY;
-      page.drawLine({ start: { x: lastX, y: pageHeight - lastY }, end: { x: lx, y: pageHeight - ly }, thickness: sw, color });
-      lastX = lx; lastY = ly;
+      const lx = pathLeft + cmd[1] * effW - offsetX;
+      const ly = pathTop + cmd[2] * effH - offsetY;
+      const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+      const end = toNativeCoords(lx, ly, rawW, rawH, rotation);
+      page.drawLine({ start, end, thickness: sw, color });
+      lastDispX = lx; lastDispY = ly;
     } else if (cmd[0] === 'Q') {
-      const cpx = pathLeft + cmd[1] * pageWidth - offsetX;
-      const cpy = pathTop + cmd[2] * pageHeight - offsetY;
-      const ex = pathLeft + cmd[3] * pageWidth - offsetX;
-      const ey = pathTop + cmd[4] * pageHeight - offsetY;
-      const sx = lastX, sy = lastY;
+      const cpx = pathLeft + cmd[1] * effW - offsetX;
+      const cpy = pathTop + cmd[2] * effH - offsetY;
+      const ex = pathLeft + cmd[3] * effW - offsetX;
+      const ey = pathTop + cmd[4] * effH - offsetY;
+      const sx = lastDispX, sy = lastDispY;
       for (let t = 1; t <= steps; t++) {
         const tt = t / steps, mt = 1 - tt;
         const px = mt * mt * sx + 2 * mt * tt * cpx + tt * tt * ex;
         const py = mt * mt * sy + 2 * mt * tt * cpy + tt * tt * ey;
-        page.drawLine({ start: { x: lastX, y: pageHeight - lastY }, end: { x: px, y: pageHeight - py }, thickness: sw, color });
-        lastX = px; lastY = py;
+        const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+        const end = toNativeCoords(px, py, rawW, rawH, rotation);
+        page.drawLine({ start, end, thickness: sw, color });
+        lastDispX = px; lastDispY = py;
       }
     } else if (cmd[0] === 'C') {
-      const c1x = pathLeft + cmd[1] * pageWidth - offsetX;
-      const c1y = pathTop + cmd[2] * pageHeight - offsetY;
-      const c2x = pathLeft + cmd[3] * pageWidth - offsetX;
-      const c2y = pathTop + cmd[4] * pageHeight - offsetY;
-      const ex = pathLeft + cmd[5] * pageWidth - offsetX;
-      const ey = pathTop + cmd[6] * pageHeight - offsetY;
-      const sx = lastX, sy = lastY;
+      const c1x = pathLeft + cmd[1] * effW - offsetX;
+      const c1y = pathTop + cmd[2] * effH - offsetY;
+      const c2x = pathLeft + cmd[3] * effW - offsetX;
+      const c2y = pathTop + cmd[4] * effH - offsetY;
+      const ex = pathLeft + cmd[5] * effW - offsetX;
+      const ey = pathTop + cmd[6] * effH - offsetY;
+      const sx = lastDispX, sy = lastDispY;
       for (let t = 1; t <= steps; t++) {
         const tt = t / steps, mt = 1 - tt;
         const px = mt*mt*mt*sx + 3*mt*mt*tt*c1x + 3*mt*tt*tt*c2x + tt*tt*tt*ex;
         const py = mt*mt*mt*sy + 3*mt*mt*tt*c1y + 3*mt*tt*tt*c2y + tt*tt*tt*ey;
-        page.drawLine({ start: { x: lastX, y: pageHeight - lastY }, end: { x: px, y: pageHeight - py }, thickness: sw, color });
-        lastX = px; lastY = py;
+        const start = toNativeCoords(lastDispX, lastDispY, rawW, rawH, rotation);
+        const end = toNativeCoords(px, py, rawW, rawH, rotation);
+        page.drawLine({ start, end, thickness: sw, color });
+        lastDispX = px; lastDispY = py;
       }
     }
   }
