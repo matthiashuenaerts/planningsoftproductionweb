@@ -609,8 +609,9 @@ const WorkstationDashboard = () => {
       <div key={data.workstation.id} className="border rounded-lg p-4 bg-white shadow mb-4">
         <div className="flex items-center mb-4">
           {data.workstation.icon_path ? (
-            <img 
-              src={data.workstation.icon_path} 
+            <SignedStorageImage 
+              bucket="product-images"
+              path={data.workstation.icon_path} 
               alt={`${data.workstation.name} icon`}
               className="w-8 h-8 object-contain mr-3"
             />

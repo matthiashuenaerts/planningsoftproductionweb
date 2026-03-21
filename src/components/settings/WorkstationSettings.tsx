@@ -591,8 +591,9 @@ const WorkstationSettings: React.FC = () => {
               {selectedWorkstation.icon_path && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Current icon:</p>
-                  <img 
-                    src={selectedWorkstation.icon_path} 
+                  <SignedStorageImage 
+                    bucket="product-images"
+                    path={selectedWorkstation.icon_path} 
                     alt={`${selectedWorkstation.name} icon`}
                     className="w-8 h-8 object-contain border rounded"
                   />

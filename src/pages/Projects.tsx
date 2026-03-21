@@ -178,8 +178,9 @@ const Projects = () => {
     
     if (workstation?.icon_path) {
       return (
-        <img 
-          src={workstation.icon_path} 
+        <SignedStorageImage 
+          bucket="product-images"
+          path={workstation.icon_path} 
           alt={workstation.name} 
           className="h-4 w-4 object-contain"
         />
