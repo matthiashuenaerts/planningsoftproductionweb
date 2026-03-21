@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import SignedStorageImage from '@/components/SignedStorageImage';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
