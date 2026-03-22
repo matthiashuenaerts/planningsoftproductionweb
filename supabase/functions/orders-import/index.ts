@@ -27,7 +27,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    let { projectLinkId, baseUrl, username, password } = body;
+    const { projectLinkId, tenant_id } = body;
     
     console.log(`Orders Import - Project Link ID: ${projectLinkId}`);
     
@@ -35,25 +35,28 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
     
-    // Load external DB credentials from database if not provided in request
-    if (!baseUrl || !username || !password) {
-      console.log('Loading orders API config from database...');
-      const { data: configData, error: configError } = await supabase
-        .from('external_api_configs')
-        .select('*')
-        .eq('api_type', 'orders')
-        .single();
-      
-      if (configError || !configData) {
-        console.error('Failed to load orders API config from database:', configError);
-        throw new Error('Orders API configuration not found. Please save the configuration in Settings first.');
-      }
-      
-      baseUrl = configData.base_url;
-      username = configData.username;
-      password = configData.password;
-      console.log('Loaded orders API config from database');
+    // Always load credentials from database — never accept client-supplied credentials
+    console.log('Loading orders API config from database...');
+    let configQuery = supabase
+      .from('external_api_configs')
+      .select('*')
+      .eq('api_type', 'orders');
+    
+    if (tenant_id) {
+      configQuery = configQuery.eq('tenant_id', tenant_id);
     }
+    
+    const { data: configData, error: configError } = await configQuery.single();
+    
+    if (configError || !configData) {
+      console.error('Failed to load orders API config from database:', configError);
+      throw new Error('Orders API configuration not found. Please save the configuration in Settings first.');
+    }
+    
+    const baseUrl = configData.base_url;
+    const username = configData.username;
+    const password = configData.password;
+    console.log('Loaded orders API config from database');
     
     // Step 1: Authenticate with Orders API
     console.log('Authenticating with Orders API...');

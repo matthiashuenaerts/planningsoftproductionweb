@@ -41,34 +41,28 @@ serve(async (req) => {
 
     console.log(`Starting ${automated ? 'automated' : 'manual'} orders sync...`);
 
-    // Determine configs to use — support multi-tenant
+    // Always load credentials from database — never accept client-supplied credentials
     let configsToProcess: Array<{ tenantId: string; baseUrl: string; username: string; password: string }> = [];
 
-    if (body.baseUrl && body.username && body.password) {
-      // Manual call with explicit credentials (legacy)
-      configsToProcess.push({ tenantId: '', baseUrl: body.baseUrl, username: body.username, password: body.password });
-    } else {
-      // Load ALL tenant configs for 'orders' API type
-      console.log('Loading ALL tenant orders API configs from database...');
-      const { data: allConfigs, error: configError } = await supabase
-        .from('external_api_configs')
-        .select('*')
-        .eq('api_type', 'orders');
+    console.log('Loading ALL tenant orders API configs from database...');
+    const { data: allConfigs, error: configError } = await supabase
+      .from('external_api_configs')
+      .select('*')
+      .eq('api_type', 'orders');
 
-      if (configError || !allConfigs || allConfigs.length === 0) {
-        console.error('No orders API configs found:', configError);
-        throw new Error('Orders API configuration not found. Please save the configuration in Settings first.');
-      }
+    if (configError || !allConfigs || allConfigs.length === 0) {
+      console.error('No orders API configs found:', configError);
+      throw new Error('Orders API configuration not found. Please save the configuration in Settings first.');
+    }
 
-      console.log(`Found ${allConfigs.length} tenant orders API configs`);
-      for (const cfg of allConfigs) {
-        configsToProcess.push({
-          tenantId: cfg.tenant_id,
-          baseUrl: cfg.base_url,
-          username: cfg.username,
-          password: cfg.password
-        });
-      }
+    console.log(`Found ${allConfigs.length} tenant orders API configs`);
+    for (const cfg of allConfigs) {
+      configsToProcess.push({
+        tenantId: cfg.tenant_id,
+        baseUrl: cfg.base_url,
+        username: cfg.username,
+        password: cfg.password
+      });
     }
 
     let totalSyncedCount = 0;

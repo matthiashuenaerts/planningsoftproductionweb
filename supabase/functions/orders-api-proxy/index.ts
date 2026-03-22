@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -17,20 +17,54 @@ serve(async (req) => {
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-    const authClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: authHeader } } });
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { action, baseUrl, username, password, token, orderNumber, projectLinkId } = await req.json();
+    const body = await req.json();
+    const { action, token, orderNumber, projectLinkId, tenant_id } = body;
+
+    // Always load credentials from the database using service role
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Determine tenant_id
+    let effectiveTenantId = tenant_id;
+    if (!effectiveTenantId) {
+      const { data: empData } = await serviceClient
+        .from('employees')
+        .select('tenant_id')
+        .eq('auth_user_id', user.id)
+        .single();
+      effectiveTenantId = empData?.tenant_id;
+    }
+
+    if (!effectiveTenantId) {
+      return new Response(JSON.stringify({ error: 'Could not determine tenant' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Load config from database
+    const { data: configData, error: configError } = await serviceClient
+      .from('external_api_configs')
+      .select('base_url, username, password')
+      .eq('api_type', 'orders')
+      .eq('tenant_id', effectiveTenantId)
+      .single();
+
+    if (configError || !configData) {
+      return new Response(JSON.stringify({ error: 'Orders API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const { base_url: baseUrl, username, password } = configData;
     
     console.log(`Orders API Proxy - Action: ${action}`);
     
     if (action === 'authenticate') {
-      // Authentication request - create session and get token
-      console.log(`Authenticating with baseUrl: ${baseUrl}, username: ${username}`);
+      console.log(`Authenticating with baseUrl: ${baseUrl}`);
       
       const authResponse = await fetch(`${baseUrl}/sessions`, {
         method: 'POST',
@@ -50,33 +84,27 @@ serve(async (req) => {
       }
 
       const authData = await authResponse.json();
-      const token = authData?.response?.token;
-      if (!token) {
+      const sessionToken = authData?.response?.token;
+      if (!sessionToken) {
         console.error('No token in Orders auth response:', authData);
         throw new Error('No token received from Orders API');
       }
       console.log('Orders authentication successful, token received');
       
       return new Response(
-        JSON.stringify({ response: { token } }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
+        JSON.stringify({ response: { token: sessionToken } }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
       
     } else if (action === 'query') {
-      // Query request - fetch orders data using the specific endpoint
-      console.log(`Querying orders for projectLinkId: ${projectLinkId ?? orderNumber} with token: ${token}`);
+      console.log(`Querying orders for projectLinkId: ${projectLinkId ?? orderNumber}`);
 
       const layout = encodeURIComponent('API_order');
       const scriptName = encodeURIComponent('FindSupplierOrderByOrderNumber');
       const param = encodeURIComponent(String(projectLinkId ?? orderNumber));
 
       const queryUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
-      console.log(`Query URL (GET): ${queryUrl}`);
 
-      // Perform GET request to run the layout script with script.param
       const queryResponse = await fetch(queryUrl, {
         method: 'GET',
         headers: {
@@ -97,7 +125,6 @@ serve(async (req) => {
       const queryData = await queryResponse.json();
       console.log('Orders query successful');
 
-      // Try to parse scriptResult if present so the client directly receives the business JSON
       let resultBody: any = queryData;
       try {
         const scriptResult = queryData?.response?.scriptResult;
@@ -111,10 +138,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify(resultBody),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
     
@@ -123,13 +147,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Orders API Proxy error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
+      JSON.stringify({ error: 'An internal error occurred.' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 })
