@@ -108,6 +108,20 @@ export const helpService = {
         category:help_categories(*)
       `)
       .eq('is_published', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as unknown as HelpArticleWithCategory[];
+  },
+
+  async getTenantArticles(): Promise<HelpArticleWithCategory[]> {
+    const { data, error } = await supabase
+      .from('help_articles')
+      .select(`
+        *,
+        category:help_categories(*)
+      `)
+      .eq('is_published', true)
       .eq('is_global', false)
       .order('display_order', { ascending: true });
 
