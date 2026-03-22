@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
@@ -48,40 +48,33 @@ const tabConfig = [
   { value: 'order-task-groups', labelKey: 'set_order_task_groups' },
 ];
 
+const SETTINGS_ALLOWED_ROLES = ['admin', 'manager', 'teamleader'];
+
 const Settings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { currentEmployee } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
-  const isAdmin = currentEmployee?.role === 'admin';
   const defaultTab = searchParams.get('tab') || 'workstations';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
+  const canAccessSettings = useMemo(
+    () => !!currentEmployee && SETTINGS_ALLOWED_ROLES.includes(currentEmployee.role),
+    [currentEmployee]
+  );
+
   useEffect(() => {
-    if (currentEmployee && currentEmployee.role !== 'admin') {
+    if (currentEmployee && !canAccessSettings) {
       toast({
         title: t('set_access_denied'),
         description: t('set_no_permission'),
-        variant: "destructive"
+        variant: 'destructive'
       });
     }
-    setLoading(false);
-  }, [currentEmployee, toast, t]);
+  }, [canAccessSettings, currentEmployee, toast, t]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen bg-background">
-        <Navbar />
-        <div className={`flex-1 min-w-0 p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
+  if (!canAccessSettings) {
     return (
       <div className="flex min-h-screen bg-background">
         <Navbar />
