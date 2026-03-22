@@ -167,7 +167,7 @@ const NavbarContent = ({
             <span>{t('Tasks_Notes')}</span>
           </NavLink>
 
-          {(isDeveloper || isServiceMember || (currentEmployee && ['admin', 'teamleader'].includes(currentEmployee.role))) && (
+          {(isDeveloper || isServiceMember || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
             <NavLink to={createLocalizedPath("/service-installation")} className={navLinkClass("/service-installation")} onClick={handleItemClick}>
               <Wrench className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('service_installation')}</span>
