@@ -38,6 +38,17 @@ export const helpService = {
       .from('help_categories')
       .select('*')
       .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as unknown as HelpCategory[];
+  },
+
+  async getTenantCategories(): Promise<HelpCategory[]> {
+    const { data, error } = await supabase
+      .from('help_categories')
+      .select('*')
+      .eq('is_active', true)
       .eq('is_global', false)
       .order('display_order', { ascending: true });
 
