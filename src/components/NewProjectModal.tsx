@@ -414,9 +414,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           const { data: authData, error: authError } = await supabase.functions.invoke('external-db-proxy', {
             body: {
               action: 'authenticate',
-              baseUrl: projectsConfig.base_url,
-              username: projectsConfig.username,
-              password: projectsConfig.password
+              tenant_id: tenant?.id
             }
           });
           
@@ -428,9 +426,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             const { data: queryData, error: queryError } = await supabase.functions.invoke('external-db-proxy', {
               body: {
                 action: 'query',
-                baseUrl: projectsConfig.base_url,
                 token: projToken,
-                orderNumber: linkId.trim()
+                orderNumber: linkId.trim(),
+                tenant_id: tenant?.id
               }
             });
             
@@ -551,9 +549,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           const { data: authData, error: authErr } = await supabase.functions.invoke('orders-api-proxy', {
             body: {
               action: 'authenticate',
-              baseUrl: ordersConfig.base_url,
-              username: ordersConfig.username,
-              password: ordersConfig.password
+              tenant_id: tenant?.id
             }
           });
           if (authErr) throw authErr;
@@ -563,9 +559,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             const { data: ordersData, error: queryErr } = await supabase.functions.invoke('orders-api-proxy', {
               body: {
                 action: 'query',
-                baseUrl: ordersConfig.base_url,
                 token: ordToken,
-                projectLinkId: linkId.trim()
+                projectLinkId: linkId.trim(),
+                tenant_id: tenant?.id
               }
             });
             if (queryErr) throw queryErr;

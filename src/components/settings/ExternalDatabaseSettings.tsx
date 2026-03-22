@@ -175,9 +175,7 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'authenticate',
-          baseUrl: config.baseUrl,
-          username: config.username,
-          password: config.password
+          tenant_id: tenant?.id
         }
       });
 
@@ -249,9 +247,9 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'query',
-          baseUrl: config.baseUrl,
           token: token,
-          orderNumber: config.testOrderNumber
+          orderNumber: config.testOrderNumber,
+          tenant_id: tenant?.id
         }
       });
 
@@ -382,9 +380,7 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('orders-api-proxy', {
         body: {
           action: 'authenticate',
-          baseUrl: ordersConfig.baseUrl,
-          username: ordersConfig.username,
-          password: ordersConfig.password
+          tenant_id: tenant?.id
         }
       });
 
@@ -456,9 +452,9 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('orders-api-proxy', {
         body: {
           action: 'query',
-          baseUrl: ordersConfig.baseUrl,
           token: ordersToken,
-          projectLinkId: ordersConfig.testOrderNumber
+          projectLinkId: ordersConfig.testOrderNumber,
+          tenant_id: tenant?.id
         }
       });
 
