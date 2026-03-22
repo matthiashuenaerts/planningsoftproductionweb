@@ -247,9 +247,9 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'query',
-          baseUrl: config.baseUrl,
           token: token,
-          orderNumber: config.testOrderNumber
+          orderNumber: config.testOrderNumber,
+          tenant_id: tenant?.id
         }
       });
 
