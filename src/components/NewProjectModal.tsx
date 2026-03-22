@@ -414,9 +414,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           const { data: authData, error: authError } = await supabase.functions.invoke('external-db-proxy', {
             body: {
               action: 'authenticate',
-              baseUrl: projectsConfig.base_url,
-              username: projectsConfig.username,
-              password: projectsConfig.password
+              tenant_id: tenant?.id
             }
           });
           
