@@ -57,7 +57,7 @@ const OneDriveCallback: React.FC = () => {
           expires_at: Date.now() + (data.expires_in * 1000),
         };
 
-        localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
+        sessionStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
         sessionStorage.removeItem('onedrive_oauth_state');
         sessionStorage.removeItem('onedrive_code_verifier');
         sessionStorage.removeItem('onedrive_client_id');
