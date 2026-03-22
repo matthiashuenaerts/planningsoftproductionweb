@@ -549,9 +549,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
           const { data: authData, error: authErr } = await supabase.functions.invoke('orders-api-proxy', {
             body: {
               action: 'authenticate',
-              baseUrl: ordersConfig.base_url,
-              username: ordersConfig.username,
-              password: ordersConfig.password
+              tenant_id: tenant?.id
             }
           });
           if (authErr) throw authErr;
