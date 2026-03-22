@@ -242,7 +242,7 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'teamleader'].includes(currentEmployee.role))) && (
+          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
             <NavLink to={createLocalizedPath("/settings")} className={navLinkClass("/settings")} onClick={handleItemClick}>
               <Settings className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('settings')}</span>
