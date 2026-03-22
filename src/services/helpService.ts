@@ -97,6 +97,7 @@ export const helpService = {
         category:help_categories(*)
       `)
       .eq('is_published', true)
+      .eq('is_global', false)
       .order('display_order', { ascending: true });
 
     if (error) throw error;
