@@ -559,9 +559,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             const { data: ordersData, error: queryErr } = await supabase.functions.invoke('orders-api-proxy', {
               body: {
                 action: 'query',
-                baseUrl: ordersConfig.base_url,
                 token: ordToken,
-                projectLinkId: linkId.trim()
+                projectLinkId: linkId.trim(),
+                tenant_id: tenant?.id
               }
             });
             if (queryErr) throw queryErr;
