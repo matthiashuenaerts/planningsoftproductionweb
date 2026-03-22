@@ -209,6 +209,24 @@ export const helpService = {
   },
 
   async deleteArticle(id: string): Promise<void> {
+    // Fetch article first to get media paths
+    const { data: article } = await supabase
+      .from('help_articles')
+      .select('video_url, image_url')
+      .eq('id', id)
+      .single();
+
+    // Collect media paths to delete
+    const pathsToDelete: string[] = [];
+    if (article?.video_url) pathsToDelete.push(article.video_url);
+    if (article?.image_url) pathsToDelete.push(article.image_url);
+
+    // Delete media files from storage
+    if (pathsToDelete.length > 0) {
+      await supabase.storage.from('help-media').remove(pathsToDelete);
+    }
+
+    // Delete the article record
     const { error } = await supabase
       .from('help_articles')
       .delete()
