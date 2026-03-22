@@ -974,38 +974,5 @@ export const workHoursService = {
     return data;
   }
 };
-
-// Insert initial employee data if needed
-export const seedInitialData = async () => {
-  const { data } = await supabase.from('employees').select('id');
-  
-  // Only seed if no employees exist
-  if (data && data.length === 0) {
-    await supabase.from('employees').insert([
-      {
-        name: 'Matthias Huenaerts',
-        email: null,
-        password: 'mh310801',
-        role: 'admin'
-      },
-      {
-        name: 'Manager User',
-        email: 'manager@kitchenpro.com',
-        password: 'manager123',
-        role: 'manager'
-      },
-      {
-        name: 'Worker 1',
-        email: 'worker1@kitchenpro.com',
-        password: 'worker123',
-        role: 'worker'
-      },
-      {
-        name: 'Worker 2',
-        email: 'worker2@kitchenpro.com',
-        password: 'worker123',
-        role: 'worker'
-      }
-    ]);
-  }
-};
+// seedInitialData has been removed for security reasons.
+// Use the create-employee edge function to create employees with properly hashed passwords.
