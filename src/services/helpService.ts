@@ -38,6 +38,7 @@ export const helpService = {
       .from('help_categories')
       .select('*')
       .eq('is_active', true)
+      .eq('is_global', false)
       .order('display_order', { ascending: true });
 
     if (error) throw error;
