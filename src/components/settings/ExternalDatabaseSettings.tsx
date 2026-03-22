@@ -175,9 +175,7 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'authenticate',
-          baseUrl: config.baseUrl,
-          username: config.username,
-          password: config.password
+          tenant_id: tenant?.id
         }
       });
 
