@@ -168,7 +168,7 @@ function App() {
                     <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager', 'teamleader']}><TimeRegistrations /></R>} />
                     <Route path=":lang/invoices" element={<R roles={['admin', 'manager']}><Invoices /></R>} />
                     <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
-                    <Route path=":lang/settings" element={<R roles={['admin', 'teamleader']}><Settings /></R>} />
+                    <Route path=":lang/settings" element={<R roles={['admin', 'manager', 'teamleader']}><Settings /></R>} />
                     <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
                     <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
