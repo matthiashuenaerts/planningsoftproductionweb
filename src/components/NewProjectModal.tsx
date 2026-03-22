@@ -426,9 +426,9 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             const { data: queryData, error: queryError } = await supabase.functions.invoke('external-db-proxy', {
               body: {
                 action: 'query',
-                baseUrl: projectsConfig.base_url,
                 token: projToken,
-                orderNumber: linkId.trim()
+                orderNumber: linkId.trim(),
+                tenant_id: tenant?.id
               }
             });
             
