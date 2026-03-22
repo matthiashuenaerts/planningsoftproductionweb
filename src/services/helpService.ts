@@ -38,6 +38,7 @@ export const helpService = {
       .from('help_categories')
       .select('*')
       .eq('is_active', true)
+      .eq('is_global', false)
       .order('display_order', { ascending: true });
 
     if (error) throw error;
@@ -96,6 +97,7 @@ export const helpService = {
         category:help_categories(*)
       `)
       .eq('is_published', true)
+      .eq('is_global', false)
       .order('display_order', { ascending: true });
 
     if (error) throw error;
@@ -136,6 +138,7 @@ export const helpService = {
         category:help_categories(*)
       `)
       .eq('is_published', true)
+      .eq('is_global', false)
       .or(`title.ilike.%${query}%,content.ilike.%${query}%,tags.cs.{${query}}`)
       .order('display_order', { ascending: true });
 
