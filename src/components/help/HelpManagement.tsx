@@ -44,8 +44,8 @@ export const HelpManagement: React.FC = () => {
     try {
       setLoading(true);
       const [categoriesData, articlesData] = await Promise.all([
-        helpService.getCategories(),
-        helpService.getArticles()
+        helpService.getTenantCategories(),
+        helpService.getTenantArticles()
       ]);
       setCategories(categoriesData);
       setArticles(articlesData);
