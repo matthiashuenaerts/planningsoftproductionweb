@@ -89,7 +89,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
   // Check for stored tokens
   useEffect(() => {
-    const tokens = localStorage.getItem(TOKENS_STORAGE_KEY);
+    const tokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
     if (tokens) {
       const parsed = JSON.parse(tokens) as OneDriveTokens;
       if (parsed.expires_at > Date.now()) {
@@ -123,7 +123,7 @@ async function generatePKCE() {
 
   // Check if tokens were set by the callback page
   useEffect(() => {
-    const tokens = localStorage.getItem(TOKENS_STORAGE_KEY);
+    const tokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
     if (tokens) {
       const parsed = JSON.parse(tokens) as OneDriveTokens;
       if (parsed.expires_at > Date.now()) {
@@ -149,17 +149,17 @@ const { data, error } = await supabase.functions.invoke(
         expires_at: Date.now() + (data.expires_in * 1000),
       };
 
-      localStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
+      sessionStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Token refresh error:', error);
-      localStorage.removeItem(TOKENS_STORAGE_KEY);
+      sessionStorage.removeItem(TOKENS_STORAGE_KEY);
       setIsAuthenticated(false);
     }
   };
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
-    const stored = localStorage.getItem(TOKENS_STORAGE_KEY);
+    const stored = sessionStorage.getItem(TOKENS_STORAGE_KEY);
     if (!stored) return null;
 
     const tokens = JSON.parse(stored) as OneDriveTokens;
@@ -167,7 +167,7 @@ const { data, error } = await supabase.functions.invoke(
     // Refresh if expires in less than 5 minutes
     if (tokens.expires_at < Date.now() + 300000) {
       await refreshAccessToken(tokens.refresh_token);
-      const refreshed = localStorage.getItem(TOKENS_STORAGE_KEY);
+      const refreshed = sessionStorage.getItem(TOKENS_STORAGE_KEY);
       if (!refreshed) return null;
       return JSON.parse(refreshed).access_token;
     }
@@ -269,7 +269,7 @@ const { data, error } = await supabase.functions.invoke(
   }
 };
   const handleLogout = () => {
-    localStorage.removeItem(TOKENS_STORAGE_KEY);
+    sessionStorage.removeItem(TOKENS_STORAGE_KEY);
     setIsAuthenticated(false);
     setFiles([]);
   };
