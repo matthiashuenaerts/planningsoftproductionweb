@@ -192,6 +192,16 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
+    // Log to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        action_type: 'delivery_confirmation',
+        status: 'success',
+        summary: `Delivery confirmed for order ${order.external_order_number || orderId}`,
+        tenant_id: order.tenant_id || null,
+      });
+    } catch (_) {}
+
     return new Response(JSON.stringify({
       success: true,
       message: 'Delivery confirmation sent to external database',

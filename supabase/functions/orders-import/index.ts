@@ -301,6 +301,20 @@ serve(async (req) => {
 
     console.log(`Import completed. Imported: ${importedCount}, Errors: ${errors.length}`);
 
+    // Log to automation_logs
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const logClient = createClient(supabaseUrl, serviceKey);
+      await logClient.from('automation_logs').insert({
+        action_type: 'orders_import',
+        status: errors.length > 0 ? 'partial' : 'success',
+        summary: `${importedCount} orders imported, ${errors.length} errors`,
+        error_message: errors.length > 0 ? errors.join('; ') : null,
+        tenant_id: tenant_id || null,
+      });
+    } catch (_) {}
+
     return new Response(
       JSON.stringify({ 
         success: true, 

@@ -90,6 +90,16 @@ serve(async (req) => {
       console.log(`Error alert sent to ${recipients.length} recipients for ${action_type}`);
     }
 
+    // Log to automation_logs
+    try {
+      await supabase.from('automation_logs').insert({
+        action_type: 'error_alert',
+        status: emailError ? 'error' : 'success',
+        summary: `Error alert sent for ${action_type}: ${summary || 'No summary'}`,
+        error_message: emailError ? String(emailError) : null,
+      });
+    } catch (_) {}
+
     return new Response(JSON.stringify({ success: true, recipients: recipients.length }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
