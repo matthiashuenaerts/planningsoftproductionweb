@@ -155,6 +155,18 @@ serve(async (req) => {
       });
     }
 
+    // Log to automation_logs
+    try {
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const logClient = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+      await logClient.from('automation_logs').insert({
+        action_type: 'support_notification',
+        status: 'success',
+        summary: `Support notification: ${type} - ${ticket.subject}`,
+        tenant_id: ticket.tenant_id || null,
+      });
+    } catch (_) {}
+
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },

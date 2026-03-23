@@ -161,6 +161,16 @@ serve(async (req) => {
 
     console.log(`Successfully created employee: ${name} with ID: ${employee.id}`);
 
+    // Log to automation_logs
+    try {
+      await supabaseAdmin.from('automation_logs').insert({
+        action_type: 'employee_management',
+        status: 'success',
+        summary: `Employee created: ${name} (${role})`,
+        tenant_id: employee.tenant_id || null,
+      });
+    } catch (_) {}
+
     return new Response(
       JSON.stringify({
         message: 'Employee created successfully',

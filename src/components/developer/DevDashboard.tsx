@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Activity, AlertTriangle, Users, Building2, FolderOpen, 
   Clock, Server, Wifi, WifiOff, BarChart3, RefreshCw, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, ArrowRightLeft, Zap, Mail, CalendarClock,
+  CheckCircle2, XCircle, ArrowRightLeft, Zap, Mail, CalendarClock, LifeBuoy, UserPlus, Upload,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -467,6 +467,13 @@ const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string;
     forecast_email: <Mail className="h-3.5 w-3.5 text-teal-400" />,
     project_sync: <ArrowRightLeft className="h-3.5 w-3.5 text-cyan-400" />,
     order_sync: <ArrowRightLeft className="h-3.5 w-3.5 text-purple-400" />,
+    holiday_request_email: <Mail className="h-3.5 w-3.5 text-amber-400" />,
+    holiday_status_email: <Mail className="h-3.5 w-3.5 text-green-400" />,
+    support_notification: <LifeBuoy className="h-3.5 w-3.5 text-blue-400" />,
+    employee_management: <UserPlus className="h-3.5 w-3.5 text-emerald-400" />,
+    orders_import: <Upload className="h-3.5 w-3.5 text-orange-400" />,
+    delivery_confirmation: <CheckCircle2 className="h-3.5 w-3.5 text-lime-400" />,
+    error_alert: <AlertTriangle className="h-3.5 w-3.5 text-red-400" />,
   };
 
   const actionLabels: Record<string, string> = {
@@ -474,6 +481,13 @@ const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string;
     forecast_email: "Forecast Mail",
     project_sync: "Project Sync",
     order_sync: "Order Sync",
+    holiday_request_email: "Holiday Request",
+    holiday_status_email: "Holiday Status",
+    support_notification: "Support",
+    employee_management: "Employee",
+    orders_import: "Orders Import",
+    delivery_confirmation: "Delivery",
+    error_alert: "Error Alert",
   };
 
   const actionBadgeColors: Record<string, string> = {
@@ -481,6 +495,13 @@ const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string;
     forecast_email: "bg-teal-600/40 text-teal-300",
     project_sync: "bg-cyan-600/40 text-cyan-300",
     order_sync: "bg-purple-600/40 text-purple-300",
+    holiday_request_email: "bg-amber-600/40 text-amber-300",
+    holiday_status_email: "bg-green-600/40 text-green-300",
+    support_notification: "bg-blue-600/40 text-blue-300",
+    employee_management: "bg-emerald-600/40 text-emerald-300",
+    orders_import: "bg-orange-600/40 text-orange-300",
+    delivery_confirmation: "bg-lime-600/40 text-lime-300",
+    error_alert: "bg-red-600/40 text-red-300",
   };
 
   const statusIcon = (status: string) => {
@@ -502,6 +523,13 @@ const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string;
           <option value="forecast_email" className="bg-slate-800">Forecast Emails</option>
           <option value="project_sync" className="bg-slate-800">Project Sync</option>
           <option value="order_sync" className="bg-slate-800">Order Sync</option>
+          <option value="orders_import" className="bg-slate-800">Orders Import</option>
+          <option value="holiday_request_email" className="bg-slate-800">Holiday Requests</option>
+          <option value="holiday_status_email" className="bg-slate-800">Holiday Status</option>
+          <option value="support_notification" className="bg-slate-800">Support</option>
+          <option value="employee_management" className="bg-slate-800">Employee</option>
+          <option value="delivery_confirmation" className="bg-slate-800">Delivery</option>
+          <option value="error_alert" className="bg-slate-800">Error Alerts</option>
         </select>
         <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading} className="text-slate-400 hover:text-white text-xs">
           <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} /> Refresh
