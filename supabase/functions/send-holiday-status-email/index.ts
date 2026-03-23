@@ -195,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
       await logClient.from('automation_logs').insert({
         action_type: 'holiday_status_email',
         status: 'success',
-        summary: `Holiday ${newStatus} email sent to ${employeeName}`,
+        summary: `Holiday ${status} email sent to ${employeeName}`,
         tenant_id: tenantId || null,
       });
     } catch (_) {}
