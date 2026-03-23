@@ -523,6 +523,13 @@ const AutomationLogsPanel: React.FC<{ tenantMap?: Record<string, { name: string;
           <option value="forecast_email" className="bg-slate-800">Forecast Emails</option>
           <option value="project_sync" className="bg-slate-800">Project Sync</option>
           <option value="order_sync" className="bg-slate-800">Order Sync</option>
+          <option value="orders_import" className="bg-slate-800">Orders Import</option>
+          <option value="holiday_request_email" className="bg-slate-800">Holiday Requests</option>
+          <option value="holiday_status_email" className="bg-slate-800">Holiday Status</option>
+          <option value="support_notification" className="bg-slate-800">Support</option>
+          <option value="employee_management" className="bg-slate-800">Employee</option>
+          <option value="delivery_confirmation" className="bg-slate-800">Delivery</option>
+          <option value="error_alert" className="bg-slate-800">Error Alerts</option>
         </select>
         <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading} className="text-slate-400 hover:text-white text-xs">
           <RefreshCw className={`h-3 w-3 mr-1 ${isLoading ? "animate-spin" : ""}`} /> Refresh
