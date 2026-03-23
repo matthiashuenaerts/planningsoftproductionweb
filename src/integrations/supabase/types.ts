@@ -2641,7 +2641,7 @@ export type Database = {
           id: string
           sync_timestamp: string | null
           synced_count: number | null
-          tenant_id: string
+          tenant_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -2650,7 +2650,7 @@ export type Database = {
           id?: string
           sync_timestamp?: string | null
           synced_count?: number | null
-          tenant_id?: string
+          tenant_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -2659,7 +2659,7 @@ export type Database = {
           id?: string
           sync_timestamp?: string | null
           synced_count?: number | null
-          tenant_id?: string
+          tenant_id?: string | null
         }
         Relationships: [
           {
@@ -4153,7 +4153,7 @@ export type Database = {
           id: string
           sync_timestamp: string | null
           synced_count: number | null
-          tenant_id: string
+          tenant_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -4162,7 +4162,7 @@ export type Database = {
           id?: string
           sync_timestamp?: string | null
           synced_count?: number | null
-          tenant_id?: string
+          tenant_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -4171,7 +4171,7 @@ export type Database = {
           id?: string
           sync_timestamp?: string | null
           synced_count?: number | null
-          tenant_id?: string
+          tenant_id?: string | null
         }
         Relationships: [
           {
