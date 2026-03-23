@@ -162,7 +162,7 @@ serve(async (req) => {
       await logClient.from('automation_logs').insert({
         action_type: 'support_notification',
         status: 'success',
-        summary: `Support notification: ${action} - ${ticket.subject}`,
+        summary: `Support notification: ${type} - ${ticket.subject}`,
         tenant_id: ticket.tenant_id || null,
       });
     } catch (_) {}
