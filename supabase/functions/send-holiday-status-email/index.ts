@@ -187,6 +187,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Holiday status email sent successfully:", emailResponse);
 
+    // Log to automation_logs
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const logClient = createClient(supabaseUrl, serviceKey);
+      await logClient.from('automation_logs').insert({
+        action_type: 'holiday_status_email',
+        status: 'success',
+        summary: `Holiday ${newStatus} email sent to ${employeeName}`,
+        tenant_id: tenantId || null,
+      });
+    } catch (_) {}
+
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
       headers: {
