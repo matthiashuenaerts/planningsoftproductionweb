@@ -328,28 +328,34 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     };
 
-    // Log sync results
-    try {
-      await supabase.from('orders_sync_logs').insert({
-        synced_count: totalSyncedCount,
-        error_count: totalErrorCount,
-        details: syncResult
-      });
-    } catch (logErr) {
-      console.error('Failed to log sync results:', logErr);
-    }
+    // Log sync results per tenant
+    for (const tenantConfig of configsToProcess) {
+      const tenantDetails = allDetails.filter((d: any) => d.tenant_id === tenantConfig.tenantId);
+      const tenantErrors = tenantDetails.filter((d: any) => d.status === 'error');
+      const tenantSynced = tenantDetails.filter((d: any) => d.status === 'synced' && (d.orders_added > 0 || d.orders_updated > 0));
+      try {
+        await supabase.from('orders_sync_logs').insert({
+          synced_count: tenantSynced.length,
+          error_count: tenantErrors.length,
+          details: { ...syncResult, details: tenantDetails },
+          tenant_id: tenantConfig.tenantId || null,
+        });
+      } catch (logErr) {
+        console.error('Failed to log sync results for tenant:', logErr);
+      }
 
-    // Log to automation_logs
-    try {
-      await supabase.from('automation_logs').insert({
-        action_type: 'order_sync',
-        status: totalErrorCount > 0 ? 'partial' : 'success',
-        summary: `${totalSyncedCount} synced, ${totalErrorCount} errors (${automated ? 'automated' : 'manual'})`,
-        error_message: totalErrorCount > 0 ? allErrors.join('; ') : null,
-        details: { totalSyncedCount, totalErrorCount, automated },
-      });
-    } catch (logErr) {
-      console.error('Failed to log automation result:', logErr);
+      try {
+        await supabase.from('automation_logs').insert({
+          action_type: 'order_sync',
+          status: tenantErrors.length > 0 ? 'partial' : 'success',
+          summary: `${tenantSynced.length} synced, ${tenantErrors.length} errors (${automated ? 'automated' : 'manual'})`,
+          error_message: tenantErrors.length > 0 ? tenantErrors.map((d: any) => d.message).join('; ') : null,
+          details: { totalSyncedCount: tenantSynced.length, totalErrorCount: tenantErrors.length, automated },
+          tenant_id: tenantConfig.tenantId || null,
+        });
+      } catch (logErr) {
+        console.error('Failed to log automation result:', logErr);
+      }
     }
 
     // Send error alert if there were errors
