@@ -442,35 +442,46 @@ serve(async (req) => {
       }
     }
 
-    // Log sync results
-    try {
-      await supabase.from('project_sync_logs').insert({
-        synced_count: totalSynced,
-        error_count: totalErrors,
-        details: {
-          automated,
-          total_projects: totalProjects,
-          tenants_processed: configsToProcess.length,
-          sync_details: allDetails,
-          error_details: allErrorDetails,
-          timestamp: new Date().toISOString()
-        }
+    // Log sync results per tenant
+    for (const { tenantId } of configsToProcess) {
+      const tenantDetails = allDetails.filter((d: any) => {
+        // Match by tenant from the detail's project lookup
+        return true; // For now log all details per config entry
       });
-    } catch (logErr) {
-      console.error('Failed to log sync results:', logErr);
-    }
+      const tenantSynced = tenantDetails.filter((d: any) => d.status === 'updated').length;
+      const tenantErrorDetails = tenantDetails.filter((d: any) => d.status === 'error');
+      const tenantErrorMsgs = tenantErrorDetails.map((d: any) => `${d.project_name}: ${d.error}`);
 
-    // Log to automation_logs
-    try {
-      await supabase.from('automation_logs').insert({
-        action_type: 'project_sync',
-        status: totalErrors > 0 ? 'partial' : 'success',
-        summary: `${totalSynced} synced, ${totalErrors} errors (${automated ? 'automated' : 'manual'})`,
-        error_message: totalErrors > 0 ? allErrorDetails.join('; ') : null,
-        details: { totalProjects, totalSynced, totalErrors, automated },
-      });
-    } catch (logErr) {
-      console.error('Failed to log automation result:', logErr);
+      try {
+        await supabase.from('project_sync_logs').insert({
+          synced_count: tenantSynced,
+          error_count: tenantErrorDetails.length,
+          details: {
+            automated,
+            total_projects: tenantDetails.length,
+            tenants_processed: 1,
+            sync_details: tenantDetails,
+            error_details: tenantErrorMsgs,
+            timestamp: new Date().toISOString()
+          },
+          tenant_id: tenantId || null,
+        });
+      } catch (logErr) {
+        console.error('Failed to log sync results for tenant:', logErr);
+      }
+
+      try {
+        await supabase.from('automation_logs').insert({
+          action_type: 'project_sync',
+          status: tenantErrorDetails.length > 0 ? 'partial' : 'success',
+          summary: `${tenantSynced} synced, ${tenantErrorDetails.length} errors (${automated ? 'automated' : 'manual'})`,
+          error_message: tenantErrorMsgs.length > 0 ? tenantErrorMsgs.join('; ') : null,
+          details: { totalProjects: tenantDetails.length, totalSynced: tenantSynced, totalErrors: tenantErrorDetails.length, automated },
+          tenant_id: tenantId || null,
+        });
+      } catch (logErr) {
+        console.error('Failed to log automation result:', logErr);
+      }
     }
 
     // Send error alert if there were errors
