@@ -91,9 +91,6 @@ serve(async (req) => {
 
     // Handle resolve-share-link action (SharePoint sharing URLs)
     if (action === "resolve-share-link") {
-      const { shareUrl } = await req.json().catch(() => ({}));
-      const shareUrlParam = shareUrl || (await req.json().catch(() => ({}))).shareUrl;
-      
       if (!shareUrl) {
         return new Response(
           JSON.stringify({ error: "shareUrl is required" }),
