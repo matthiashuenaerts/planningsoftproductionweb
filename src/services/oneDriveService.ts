@@ -116,7 +116,7 @@ export const oneDriveService = {
       .maybeSingle();
     
     if (error) throw error;
-    return data as EmployeeOneDriveTokens | null;
+    return data as unknown as EmployeeOneDriveTokens | null;
   },
 
   async deleteTokens(employeeId: string): Promise<void> {
