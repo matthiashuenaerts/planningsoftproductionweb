@@ -387,5 +387,20 @@ export const orderService = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  /**
+   * Returns a viewable URL for an order attachment.
+   * Handles both legacy full URLs and new filename-only paths.
+   */
+  getAttachmentUrl(filePath: string): string {
+    if (filePath.startsWith('http')) {
+      return filePath;
+    }
+    // Build public URL for the public bucket
+    const { data } = supabase.storage
+      .from('order-attachments')
+      .getPublicUrl(filePath);
+    return data.publicUrl;
   }
 };
