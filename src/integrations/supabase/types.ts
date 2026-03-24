@@ -1462,6 +1462,57 @@ export type Database = {
           },
         ]
       }
+      employee_onedrive_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          employee_id: string
+          expires_at: number
+          id: string
+          microsoft_email: string | null
+          refresh_token: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          employee_id: string
+          expires_at: number
+          id?: string
+          microsoft_email?: string | null
+          refresh_token: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          employee_id?: string
+          expires_at?: number
+          id?: string
+          microsoft_email?: string | null
+          refresh_token?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onedrive_tokens_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_onedrive_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_standard_task_links: {
         Row: {
           created_at: string

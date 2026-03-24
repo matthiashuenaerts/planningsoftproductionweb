@@ -27,6 +27,18 @@ export interface OneDriveFile {
   };
 }
 
+export interface EmployeeOneDriveTokens {
+  id: string;
+  employee_id: string;
+  tenant_id: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  microsoft_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const oneDriveService = {
   // Save OneDrive folder link for a project
   async connectProjectToOneDrive(projectId: string, folderData: {
@@ -72,5 +84,52 @@ export const oneDriveService = {
       .eq('project_id', projectId);
     
     if (error) throw error;
-  }
+  },
+
+  // Token management - persistent per employee
+  async saveTokens(employeeId: string, tokens: {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+    microsoft_email?: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('employee_onedrive_tokens' as any)
+      .upsert([{
+        employee_id: employeeId,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: tokens.expires_at,
+        microsoft_email: tokens.microsoft_email || null,
+      }], {
+        onConflict: 'employee_id'
+      });
+    
+    if (error) throw error;
+  },
+
+  async getTokens(employeeId: string): Promise<EmployeeOneDriveTokens | null> {
+    const { data, error } = await supabase
+      .from('employee_onedrive_tokens' as any)
+      .select('*')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data as unknown as EmployeeOneDriveTokens | null;
+  },
+
+  async deleteTokens(employeeId: string): Promise<void> {
+    const { error } = await supabase
+      .from('employee_onedrive_tokens' as any)
+      .delete()
+      .eq('employee_id', employeeId);
+    
+    if (error) throw error;
+  },
+
+  async isAuthenticated(employeeId: string): Promise<boolean> {
+    const tokens = await this.getTokens(employeeId);
+    return !!tokens;
+  },
 };

@@ -8,10 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 import { oneDriveService, ProjectOneDriveConfig } from '@/services/oneDriveService';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/context/TenantContext';
+import { useAuth } from '@/context/AuthContext';
 import { 
   ExternalLink, Folder, Link2, Unlink, RefreshCw, HelpCircle, 
   File, FileText, FileImage, FileVideo, FileAudio, ChevronRight,
-  ArrowLeft, LogIn
+  ArrowLeft, LogIn, FolderPlus, LogOut
 } from 'lucide-react';
 import {
   Dialog,
@@ -44,18 +45,14 @@ interface OneDriveFile {
   childCount?: number;
   mimeType?: string;
   thumbnailUrl?: string;
-}
-
-interface OneDriveTokens {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
+  driveId?: string;
 }
 
 const TOKENS_STORAGE_KEY = 'onedrive_tokens';
 
 const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, projectName }) => {
   const { tenant } = useTenant();
+  const { currentEmployee } = useAuth();
   const [config, setConfig] = useState<ProjectOneDriveConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -69,7 +66,10 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const [tenantClientId, setTenantClientId] = useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const { toast } = useToast();
+
+  const employeeId = currentEmployee?.id;
 
   // Fetch tenant-specific Microsoft Client ID
   useEffect(() => {
@@ -87,109 +87,85 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
     fetchClientId();
   }, [tenant?.id]);
 
-  // Check for stored tokens
+  // Check for stored tokens in DB
   useEffect(() => {
-    const tokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
-    if (tokens) {
-      const parsed = JSON.parse(tokens) as OneDriveTokens;
-      if (parsed.expires_at > Date.now()) {
-        setIsAuthenticated(true);
-      } else {
-        // Try to refresh token
-        refreshAccessToken(parsed.refresh_token);
+    if (!employeeId) return;
+    const checkAuth = async () => {
+      const hasTokens = await oneDriveService.isAuthenticated(employeeId);
+      setIsAuthenticated(hasTokens);
+
+      // Also migrate any sessionStorage tokens to DB
+      const sessionTokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
+      if (sessionTokens && !hasTokens) {
+        try {
+          const parsed = JSON.parse(sessionTokens);
+          await oneDriveService.saveTokens(employeeId, {
+            access_token: parsed.access_token,
+            refresh_token: parsed.refresh_token,
+            expires_at: parsed.expires_at,
+          });
+          sessionStorage.removeItem(TOKENS_STORAGE_KEY);
+          setIsAuthenticated(true);
+        } catch (e) {
+          console.error('Failed to migrate tokens:', e);
+        }
       }
-    }
-  }, []);
+    };
+    checkAuth();
+  }, [employeeId]);
+
+  // Check if callback just set tokens in sessionStorage
+  useEffect(() => {
+    if (!employeeId) return;
+    const migrateCallbackTokens = async () => {
+      const sessionTokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
+      if (sessionTokens) {
+        try {
+          const parsed = JSON.parse(sessionTokens);
+          if (parsed.expires_at > Date.now()) {
+            await oneDriveService.saveTokens(employeeId, {
+              access_token: parsed.access_token,
+              refresh_token: parsed.refresh_token,
+              expires_at: parsed.expires_at,
+            });
+            sessionStorage.removeItem(TOKENS_STORAGE_KEY);
+            setIsAuthenticated(true);
+          }
+        } catch (e) {
+          console.error('Failed to save callback tokens:', e);
+        }
+      }
+    };
+    migrateCallbackTokens();
+  }, [employeeId]);
 
   function base64UrlEncode(buffer: ArrayBuffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-async function generatePKCE() {
-  const random = crypto.getRandomValues(new Uint8Array(32));
-  const codeVerifier = base64UrlEncode(random.buffer as ArrayBuffer);
-
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-
-  const codeChallenge = base64UrlEncode(digest);
-
-  return { codeVerifier, codeChallenge };
-}
-
-  // Check if tokens were set by the callback page
-  useEffect(() => {
-    const tokens = sessionStorage.getItem(TOKENS_STORAGE_KEY);
-    if (tokens) {
-      const parsed = JSON.parse(tokens) as OneDriveTokens;
-      if (parsed.expires_at > Date.now()) {
-        setIsAuthenticated(true);
-      }
-    }
-  }, []);
-
-  const refreshAccessToken = async (refreshToken: string) => {
-    try {
-const { data, error } = await supabase.functions.invoke(
-  'onedrive-auth?action=refresh-token',
-  {
-    body: { refreshToken, clientId: tenantClientId },
+    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   }
-);
 
-      if (error) throw error;
-
-      const tokens: OneDriveTokens = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: Date.now() + (data.expires_in * 1000),
-      };
-
-      sessionStorage.setItem(TOKENS_STORAGE_KEY, JSON.stringify(tokens));
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      sessionStorage.removeItem(TOKENS_STORAGE_KEY);
-      setIsAuthenticated(false);
-    }
-  };
-
-  const getAccessToken = useCallback(async (): Promise<string | null> => {
-    const stored = sessionStorage.getItem(TOKENS_STORAGE_KEY);
-    if (!stored) return null;
-
-    const tokens = JSON.parse(stored) as OneDriveTokens;
-    
-    // Refresh if expires in less than 5 minutes
-    if (tokens.expires_at < Date.now() + 300000) {
-      await refreshAccessToken(tokens.refresh_token);
-      const refreshed = sessionStorage.getItem(TOKENS_STORAGE_KEY);
-      if (!refreshed) return null;
-      return JSON.parse(refreshed).access_token;
-    }
-
-    return tokens.access_token;
-  }, []);
+  async function generatePKCE() {
+    const random = crypto.getRandomValues(new Uint8Array(32));
+    const codeVerifier = base64UrlEncode(random.buffer as ArrayBuffer);
+    const encoder = new TextEncoder();
+    const data = encoder.encode(codeVerifier);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    const codeChallenge = base64UrlEncode(digest);
+    return { codeVerifier, codeChallenge };
+  }
 
   const loadConfig = async () => {
     try {
       setLoading(true);
       const configData = await oneDriveService.getProjectOneDriveConfig(projectId);
       setConfig(configData);
-      if (configData && isAuthenticated) {
+      if (configData && isAuthenticated && employeeId) {
         loadFiles(configData.folder_id, configData.drive_id);
       }
     } catch (error) {
       console.error('Error loading OneDrive config:', error);
-      toast({
-        title: 'Fout',
-        description: 'Laden van OneDrive configuratie mislukt',
-        variant: 'destructive'
-      });
     } finally {
       setLoading(false);
     }
@@ -200,21 +176,31 @@ const { data, error } = await supabase.functions.invoke(
   }, [projectId, isAuthenticated]);
 
   const loadFiles = async (folderId?: string, driveId?: string) => {
-    const accessToken = await getAccessToken();
-    if (!accessToken) return;
+    if (!employeeId) return;
 
     setFilesLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('onedrive-files', {
         body: { 
-          accessToken, 
+          employeeId,
           folderId: folderId || currentFolderId || config?.folder_id,
-          driveId: driveId || config?.drive_id
+          driveId: driveId || config?.drive_id,
         },
       });
 
       if (error) throw error;
-      setFiles(data.files || []);
+      
+      if (data?.needsReauth) {
+        setIsAuthenticated(false);
+        toast({
+          title: 'Sessie verlopen',
+          description: 'Log opnieuw in met Microsoft.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setFiles(data?.files || []);
     } catch (error) {
       console.error('Error loading files:', error);
       toast({
@@ -228,47 +214,43 @@ const { data, error } = await supabase.functions.invoke(
   };
 
   const handleAuthenticate = async () => {
-  try {
-    const state = Math.random().toString(36).substring(7);
-    sessionStorage.setItem('onedrive_oauth_state', state);
+    try {
+      const state = Math.random().toString(36).substring(7);
+      sessionStorage.setItem('onedrive_oauth_state', state);
 
-    // ✅ Generate PKCE
-    const { codeVerifier, codeChallenge } = await generatePKCE();
+      const { codeVerifier, codeChallenge } = await generatePKCE();
+      sessionStorage.setItem('onedrive_code_verifier', codeVerifier);
+      sessionStorage.setItem('onedrive_return_path', window.location.pathname + window.location.search);
 
-    // ✅ Store verifier for later
-    sessionStorage.setItem('onedrive_code_verifier', codeVerifier);
+      const redirectUri = `${window.location.origin}/onedrive-callback`;
 
-    // ✅ Save current path to return after callback
-    sessionStorage.setItem('onedrive_return_path', window.location.pathname + window.location.search);
-
-    // ✅ Use fixed redirect URI
-    const redirectUri = `${window.location.origin}/onedrive-callback`;
-
-    // ✅ Store client ID for callback page
-    if (tenantClientId) {
-      sessionStorage.setItem('onedrive_client_id', tenantClientId);
-    }
-
-    const { data, error } = await supabase.functions.invoke(
-      'onedrive-auth?action=get-auth-url',
-      {
-        body: { redirectUri, state, codeChallenge, clientId: tenantClientId },
+      if (tenantClientId) {
+        sessionStorage.setItem('onedrive_client_id', tenantClientId);
       }
-    );
 
-    if (error) throw error;
+      const { data, error } = await supabase.functions.invoke(
+        'onedrive-auth?action=get-auth-url',
+        {
+          body: { redirectUri, state, codeChallenge, clientId: tenantClientId },
+        }
+      );
 
-    window.location.href = data.authUrl;
-  } catch (error) {
-    console.error('Auth error:', error);
-    toast({
-      title: 'Fout',
-      description: 'Kon niet verbinden met Microsoft',
-      variant: 'destructive',
-    });
-  }
-};
-  const handleLogout = () => {
+      if (error) throw error;
+      window.location.href = data.authUrl;
+    } catch (error) {
+      console.error('Auth error:', error);
+      toast({
+        title: 'Fout',
+        description: 'Kon niet verbinden met Microsoft',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLogout = async () => {
+    if (employeeId) {
+      await oneDriveService.deleteTokens(employeeId);
+    }
     sessionStorage.removeItem(TOKENS_STORAGE_KEY);
     setIsAuthenticated(false);
     setFiles([]);
@@ -277,14 +259,13 @@ const { data, error } = await supabase.functions.invoke(
   const navigateToFolder = (folder: OneDriveFile) => {
     setFolderStack([...folderStack, { id: folder.id, name: folder.name }]);
     setCurrentFolderId(folder.id);
-    loadFiles(folder.id);
+    loadFiles(folder.id, folder.driveId);
   };
 
   const navigateBack = () => {
     const newStack = [...folderStack];
     newStack.pop();
     setFolderStack(newStack);
-    
     const parentId = newStack.length > 0 ? newStack[newStack.length - 1].id : config?.folder_id;
     setCurrentFolderId(parentId || null);
     loadFiles(parentId);
@@ -302,9 +283,6 @@ const { data, error } = await supabase.functions.invoke(
       if (lastPart && lastPart.length > 5) {
         return { folderId: lastPart };
       }
-      if (urlObj.hostname === '1drv.ms') {
-        return { folderId: urlObj.pathname.replace(/\//g, '_') };
-      }
       return { folderId: 'root' };
     } catch {
       return null;
@@ -313,64 +291,82 @@ const { data, error } = await supabase.functions.invoke(
 
   const handleConnect = async () => {
     if (!folderUrl.trim()) {
-      toast({
-        title: 'Fout',
-        description: 'Voer een geldige OneDrive URL in',
-        variant: 'destructive'
-      });
+      toast({ title: 'Fout', description: 'Voer een geldige OneDrive URL in', variant: 'destructive' });
       return;
     }
 
     try {
       new URL(folderUrl);
     } catch {
-      toast({
-        title: 'Fout',
-        description: 'Voer een geldige URL in',
-        variant: 'destructive'
-      });
+      toast({ title: 'Fout', description: 'Voer een geldige URL in', variant: 'destructive' });
       return;
     }
 
     const info = extractOneDriveInfo(folderUrl);
     if (!info) {
-      toast({
-        title: 'Fout',
-        description: 'Kon OneDrive map informatie niet herkennen uit de URL',
-        variant: 'destructive'
-      });
+      toast({ title: 'Fout', description: 'Kon OneDrive map informatie niet herkennen uit de URL', variant: 'destructive' });
       return;
     }
 
     setSaving(true);
     try {
       const displayName = folderName.trim() || `Project - ${projectName}`;
-      
       await oneDriveService.connectProjectToOneDrive(projectId, {
         folder_id: info.folderId,
         folder_name: displayName,
         folder_url: folderUrl.trim(),
-        drive_id: info.driveId
+        drive_id: info.driveId,
       });
-
       await loadConfig();
       setDialogOpen(false);
       setFolderUrl('');
       setFolderName('');
-      
-      toast({
-        title: 'Succes',
-        description: 'OneDrive map succesvol gekoppeld',
-      });
+      toast({ title: 'Succes', description: 'OneDrive map succesvol gekoppeld' });
     } catch (error) {
       console.error('Error connecting OneDrive:', error);
-      toast({
-        title: 'Fout',
-        description: 'Koppelen van OneDrive map mislukt',
-        variant: 'destructive'
-      });
+      toast({ title: 'Fout', description: 'Koppelen van OneDrive map mislukt', variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    if (!employeeId) return;
+    
+    setCreatingFolder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('onedrive-files', {
+        body: {
+          action: 'create-folder',
+          employeeId,
+          folderName: projectName,
+          driveId: config?.drive_id,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.needsReauth) {
+        setIsAuthenticated(false);
+        toast({ title: 'Sessie verlopen', description: 'Log opnieuw in met Microsoft.', variant: 'destructive' });
+        return;
+      }
+
+      if (data?.folder) {
+        // Auto-connect the created folder to this project
+        await oneDriveService.connectProjectToOneDrive(projectId, {
+          folder_id: data.folder.id,
+          folder_name: data.folder.name,
+          folder_url: data.folder.webUrl,
+          drive_id: data.folder.driveId,
+        });
+        await loadConfig();
+        toast({ title: 'Succes', description: `Map "${data.folder.name}" aangemaakt en gekoppeld` });
+      }
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      toast({ title: 'Fout', description: 'Aanmaken van map mislukt', variant: 'destructive' });
+    } finally {
+      setCreatingFolder(false);
     }
   };
 
@@ -381,17 +377,10 @@ const { data, error } = await supabase.functions.invoke(
       setFiles([]);
       setFolderStack([]);
       setCurrentFolderId(null);
-      toast({
-        title: 'Succes',
-        description: 'OneDrive map losgekoppeld',
-      });
+      toast({ title: 'Succes', description: 'OneDrive map losgekoppeld' });
     } catch (error) {
       console.error('Error disconnecting OneDrive:', error);
-      toast({
-        title: 'Fout',
-        description: 'Loskoppelen van OneDrive map mislukt',
-        variant: 'destructive'
-      });
+      toast({ title: 'Fout', description: 'Loskoppelen van OneDrive map mislukt', variant: 'destructive' });
     }
   };
 
@@ -403,7 +392,7 @@ const { data, error } = await supabase.functions.invoke(
     if (file.mimeType?.includes('pdf') || file.mimeType?.includes('document')) {
       return <FileText className="h-5 w-5 text-blue-500" />;
     }
-    return <File className="h-5 w-5 text-gray-500" />;
+    return <File className="h-5 w-5 text-muted-foreground" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -419,7 +408,7 @@ const { data, error } = await supabase.functions.invoke(
         <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
           <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
             <Folder className="h-4 w-4 sm:h-5 sm:w-5" />
-            OneDrive Integratie
+            OneDrive
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
@@ -441,6 +430,11 @@ const { data, error } = await supabase.functions.invoke(
               OneDrive
             </div>
             <div className="flex items-center gap-1">
+              {isAuthenticated && (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-[10px] sm:text-xs">
+                  Verbonden
+                </Badge>
+              )}
               {isAuthenticated && config && (
                 <Button variant="ghost" size="sm" onClick={() => loadFiles()} className="h-7 w-7 sm:h-8 sm:w-8 p-0">
                   <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -471,13 +465,13 @@ const { data, error } = await supabase.functions.invoke(
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-2">
-                   <div className="bg-muted p-3 sm:p-4 rounded-lg text-xs sm:text-sm space-y-2">
+                  <div className="bg-muted p-3 sm:p-4 rounded-lg text-xs sm:text-sm space-y-2">
                     <p className="font-medium">Om OneDrive te gebruiken:</p>
                     <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] sm:text-sm">
                       <li>Registreer een Azure AD app (gratis)</li>
-                      <li>Configureer MICROSOFT_CLIENT_ID en MICROSOFT_CLIENT_SECRET</li>
+                      <li>Configureer MICROSOFT_CLIENT_ID in tenant instellingen</li>
                       <li>Log in met je Microsoft account</li>
-                      <li>Koppel een OneDrive map aan dit project</li>
+                      <li>Koppel of maak een OneDrive map voor dit project</li>
                     </ol>
                   </div>
                 </CollapsibleContent>
@@ -501,16 +495,14 @@ const { data, error } = await supabase.functions.invoke(
                 </div>
                 <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                   <Button 
-                    variant="ghost" 
-                    size="sm"
+                    variant="ghost" size="sm"
                     onClick={() => window.open(config.folder_url, '_blank')}
                     className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                   >
                     <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                   <Button 
-                    variant="ghost" 
-                    size="sm"
+                    variant="ghost" size="sm"
                     onClick={handleDisconnect}
                     className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-destructive hover:text-destructive"
                   >
@@ -553,15 +545,8 @@ const { data, error } = await supabase.functions.invoke(
                         </div>
                         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                           {!file.isFolder && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 sm:h-8 sm:w-8 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(file.webUrl, '_blank');
-                              }}
-                            >
+                            <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              onClick={(e) => { e.stopPropagation(); window.open(file.webUrl, '_blank'); }}>
                               <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           )}
@@ -575,32 +560,53 @@ const { data, error } = await supabase.functions.invoke(
                 )}
               </ScrollArea>
 
-              {/* Status */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-[10px] sm:text-xs">
-                  Verbonden
-                </Badge>
+              {/* Status bar */}
+              <div className="flex items-center justify-end pt-2 border-t">
                 <Button variant="ghost" size="sm" onClick={handleLogout} className="text-[10px] sm:text-xs h-7 sm:h-8">
+                  <LogOut className="h-3 w-3 mr-1" />
                   Uitloggen
                 </Button>
               </div>
             </div>
           ) : (
+            /* Authenticated but no folder connected */
             <div className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">OneDrive Map Koppelen</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Koppel een OneDrive map aan dit project om bestanden te bekijken.
+                <h4 className="font-medium mb-2 text-sm">OneDrive Map Koppelen</h4>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                  Koppel een bestaande OneDrive map of maak een nieuwe map aan voor dit project.
                 </p>
               </div>
               
-              <Button 
-                onClick={() => setDialogOpen(true)} 
-                className="flex items-center gap-2"
-              >
-                <Link2 className="h-4 w-4" />
-                OneDrive Map Koppelen
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  onClick={handleCreateFolder}
+                  disabled={creatingFolder}
+                  className="flex items-center gap-2"
+                >
+                  {creatingFolder ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FolderPlus className="h-4 w-4" />
+                  )}
+                  Map aanmaken
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setDialogOpen(true)} 
+                  className="flex items-center gap-2"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Bestaande map koppelen
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-end pt-2 border-t">
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-[10px] sm:text-xs h-7 sm:h-8">
+                  <LogOut className="h-3 w-3 mr-1" />
+                  Uitloggen
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
