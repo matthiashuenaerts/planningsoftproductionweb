@@ -684,19 +684,22 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
           <DialogHeader>
             <DialogTitle>OneDrive Map Koppelen</DialogTitle>
             <DialogDescription>
-              Plak de OneDrive URL van de map die je wilt koppelen.
+              Plak de OneDrive of SharePoint URL van de map die je wilt koppelen. Deellinks van SharePoint worden automatisch opgelost.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="folderUrl">OneDrive URL *</Label>
+              <Label htmlFor="folderUrl">OneDrive / SharePoint URL *</Label>
               <Input
                 id="folderUrl"
-                placeholder="https://onedrive.live.com/..."
+                placeholder="https://...sharepoint.com/... of https://onedrive.live.com/..."
                 value={folderUrl}
                 onChange={(e) => setFolderUrl(e.target.value)}
               />
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                Ondersteunt OneDrive links, SharePoint mappen en gedeelde links.
+              </p>
             </div>
             
             <div className="space-y-2">
