@@ -595,6 +595,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
       if (error) throw error;
       setClientId("");
       setDirectoryId("");
+      setDefaultFolderPath("");
+      setDefaultDriveId("");
       setNotes("");
       qc.invalidateQueries({ queryKey: ["dev", "onedrive-settings", tenantId] });
       toast({ title: "OneDrive settings removed" });
