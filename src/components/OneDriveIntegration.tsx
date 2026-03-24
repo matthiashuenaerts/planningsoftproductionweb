@@ -275,6 +275,46 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
     loadFiles(parentId);
   };
 
+  const isSharePointOrShareLink = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.includes('sharepoint.com') || 
+             urlObj.pathname.includes('/:f:/') || 
+             urlObj.pathname.includes('/:w:/') ||
+             urlObj.pathname.includes('/personal/') ||
+             urlObj.hostname.includes('.sharepoint.com');
+    } catch {
+      return false;
+    }
+  };
+
+  const resolveShareLink = async (url: string): Promise<{ folderId: string; driveId?: string; name?: string; webUrl?: string } | null> => {
+    if (!employeeId) return null;
+    try {
+      const { data, error } = await supabase.functions.invoke('onedrive-files', {
+        body: { action: 'resolve-share-link', employeeId, shareUrl: url },
+      });
+      if (error) throw error;
+      if (data?.needsReauth) {
+        setIsAuthenticated(false);
+        toast({ title: 'Sessie verlopen', description: 'Log opnieuw in met Microsoft.', variant: 'destructive' });
+        return null;
+      }
+      if (data?.resolved) {
+        return {
+          folderId: data.resolved.id,
+          driveId: data.resolved.driveId,
+          name: data.resolved.name,
+          webUrl: data.resolved.webUrl,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error resolving share link:', error);
+      return null;
+    }
+  };
+
   const extractOneDriveInfo = (url: string): { folderId: string; driveId?: string } | null => {
     try {
       const urlObj = new URL(url);
