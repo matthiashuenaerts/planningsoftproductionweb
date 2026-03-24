@@ -344,7 +344,8 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
           action: 'create-folder',
           employeeId,
           folderName: projectName,
-          driveId: config?.drive_id,
+          parentFolderId: defaultFolderPath || undefined,
+          driveId: defaultDriveId || config?.drive_id,
         },
       });
 
