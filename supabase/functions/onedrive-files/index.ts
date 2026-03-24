@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, folderId, driveId, employeeId, folderName, parentFolderId } = await req.json();
+    const { action, folderId, driveId, employeeId, folderName, parentFolderId, shareUrl } = await req.json();
 
     if (!employeeId) {
       return new Response(
@@ -87,6 +87,61 @@ serve(async (req) => {
         refresh_token: tokens.refresh_token || tokenRow.refresh_token,
         expires_at: Date.now() + (tokens.expires_in * 1000),
       }).eq("employee_id", employeeId);
+    }
+
+    // Handle resolve-share-link action (SharePoint sharing URLs)
+    if (action === "resolve-share-link") {
+      if (!shareUrl) {
+        return new Response(
+          JSON.stringify({ error: "shareUrl is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Encode the share URL for Graph API: base64url encode the URL prefixed with "u!"
+      const base64Url = btoa(shareUrl)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+      const shareToken = `u!${base64Url}`;
+
+      const resolveResponse = await fetch(
+        `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem?$expand=children`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
+
+      if (!resolveResponse.ok) {
+        const err = await resolveResponse.json();
+        console.error("Resolve share link error:", err);
+        if (resolveResponse.status === 401) {
+          await supabase.from("employee_onedrive_tokens").delete().eq("employee_id", employeeId);
+          return new Response(
+            JSON.stringify({ error: "Authentication expired. Please re-authenticate.", needsReauth: true }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: err.error?.message || "Failed to resolve share link" }),
+          { status: resolveResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const item = await resolveResponse.json();
+      return new Response(
+        JSON.stringify({
+          resolved: {
+            id: item.id,
+            name: item.name,
+            webUrl: item.webUrl,
+            driveId: item.parentReference?.driveId,
+            isFolder: !!item.folder,
+            childCount: item.folder?.childCount,
+          },
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Handle create-folder action
