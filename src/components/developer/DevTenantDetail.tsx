@@ -529,6 +529,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
   const [directoryId, setDirectoryId] = useState("");
+  const [defaultFolderPath, setDefaultFolderPath] = useState("");
+  const [defaultDriveId, setDefaultDriveId] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -549,6 +551,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
     if (settings) {
       setClientId(settings.microsoft_client_id || "");
       setDirectoryId(settings.tenant_directory_id || "");
+      setDefaultFolderPath(settings.default_folder_path || "");
+      setDefaultDriveId(settings.default_drive_id || "");
       setNotes(settings.notes || "");
     }
   }, [settings]);
@@ -566,6 +570,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
           tenant_id: tenantId,
           microsoft_client_id: clientId.trim(),
           tenant_directory_id: directoryId.trim() || null,
+          default_folder_path: defaultFolderPath.trim() || '',
+          default_drive_id: defaultDriveId.trim() || null,
           notes: notes.trim() || null,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: "tenant_id" });
@@ -589,6 +595,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
       if (error) throw error;
       setClientId("");
       setDirectoryId("");
+      setDefaultFolderPath("");
+      setDefaultDriveId("");
       setNotes("");
       qc.invalidateQueries({ queryKey: ["dev", "onedrive-settings", tenantId] });
       toast({ title: "OneDrive settings removed" });
@@ -626,6 +634,26 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
               value={directoryId}
               onChange={(e) => setDirectoryId(e.target.value)}
               placeholder="e.g. fdf0d555-953a-444d-915e-..."
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-slate-300 text-xs">Default Folder Path (folder ID for project folders)</Label>
+            <Input
+              value={defaultFolderPath}
+              onChange={(e) => setDefaultFolderPath(e.target.value)}
+              placeholder="e.g. OneDrive folder ID where project folders are created"
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+          <div>
+            <Label className="text-slate-300 text-xs">Default Drive ID (for shared drives)</Label>
+            <Input
+              value={defaultDriveId}
+              onChange={(e) => setDefaultDriveId(e.target.value)}
+              placeholder="Leave empty for personal OneDrive"
               className="bg-white/10 border-white/20 text-white text-xs h-8"
             />
           </div>

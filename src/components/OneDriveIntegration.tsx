@@ -66,25 +66,29 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderStack, setFolderStack] = useState<{ id: string; name: string }[]>([]);
   const [tenantClientId, setTenantClientId] = useState<string | null>(null);
+  const [defaultFolderPath, setDefaultFolderPath] = useState<string | null>(null);
+  const [defaultDriveId, setDefaultDriveId] = useState<string | null>(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const { toast } = useToast();
 
   const employeeId = currentEmployee?.id;
 
-  // Fetch tenant-specific Microsoft Client ID
+  // Fetch tenant-specific OneDrive settings
   useEffect(() => {
     if (!tenant?.id) return;
-    const fetchClientId = async () => {
+    const fetchSettings = async () => {
       const { data } = await supabase
         .from('tenant_onedrive_settings' as any)
-        .select('microsoft_client_id')
+        .select('microsoft_client_id, default_folder_path, default_drive_id')
         .eq('tenant_id', tenant.id)
         .maybeSingle();
       if (data) {
         setTenantClientId((data as any).microsoft_client_id);
+        setDefaultFolderPath((data as any).default_folder_path || null);
+        setDefaultDriveId((data as any).default_drive_id || null);
       }
     };
-    fetchClientId();
+    fetchSettings();
   }, [tenant?.id]);
 
   // Check for stored tokens in DB
@@ -340,7 +344,8 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
           action: 'create-folder',
           employeeId,
           folderName: projectName,
-          driveId: config?.drive_id,
+          parentFolderId: defaultFolderPath || undefined,
+          driveId: defaultDriveId || config?.drive_id,
         },
       });
 

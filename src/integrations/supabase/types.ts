@@ -5654,6 +5654,8 @@ export type Database = {
       tenant_onedrive_settings: {
         Row: {
           created_at: string
+          default_drive_id: string | null
+          default_folder_path: string | null
           id: string
           microsoft_client_id: string
           notes: string | null
@@ -5663,6 +5665,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_drive_id?: string | null
+          default_folder_path?: string | null
           id?: string
           microsoft_client_id: string
           notes?: string | null
@@ -5672,6 +5676,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_drive_id?: string | null
+          default_folder_path?: string | null
           id?: string
           microsoft_client_id?: string
           notes?: string | null
