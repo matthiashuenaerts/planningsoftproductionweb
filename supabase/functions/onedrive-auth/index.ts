@@ -2,11 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Fallback to env var if no client ID provided in request
 const FALLBACK_CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
+const FALLBACK_CLIENT_SECRET = Deno.env.get("MICROSOFT_CLIENT_SECRET");
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,7 +17,6 @@ serve(async (req) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // Generate auth URL for OAuth PKCE flow (public client, no secret needed)
     if (action === "get-auth-url") {
       const { redirectUri, state, codeChallenge, clientId } = await req.json();
       
@@ -45,31 +44,38 @@ serve(async (req) => {
       );
     }
 
-    // Exchange code for tokens (PKCE flow - no client_secret)
     if (action === "exchange-code") {
-      const { code, redirectUri, codeVerifier, clientId } = await req.json();
+      const { code, redirectUri, codeVerifier, clientId, clientSecret } = await req.json();
       
-      console.log("exchange-code called", { redirectUri, hasCode: !!code, hasCodeVerifier: !!codeVerifier, hasClientId: !!clientId, hasFallback: !!FALLBACK_CLIENT_ID });
-
       const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
+      const microsoftClientSecret = clientSecret || FALLBACK_CLIENT_SECRET;
+      
+      console.log("exchange-code called", { redirectUri, hasCode: !!code, hasCodeVerifier: !!codeVerifier, hasClientId: !!microsoftClientId, hasClientSecret: !!microsoftClientSecret });
+
       if (!microsoftClientId) {
-        console.error("No Microsoft Client ID available");
         return new Response(
           JSON.stringify({ error: "Microsoft Client ID not configured" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
+      const body: Record<string, string> = {
+        client_id: microsoftClientId,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+        code_verifier: codeVerifier,
+      };
+
+      // Add client_secret if available (confidential client)
+      if (microsoftClientSecret) {
+        body.client_secret = microsoftClientSecret;
+      }
+
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: microsoftClientId,
-          code,
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code",
-          code_verifier: codeVerifier,
-        }),
+        body: new URLSearchParams(body),
       });
 
       const tokens = await tokenResponse.json();
@@ -93,11 +99,12 @@ serve(async (req) => {
       );
     }
 
-    // Refresh access token (PKCE flow - no client_secret)
     if (action === "refresh-token") {
-      const { refreshToken, clientId } = await req.json();
+      const { refreshToken, clientId, clientSecret } = await req.json();
       
       const microsoftClientId = clientId || FALLBACK_CLIENT_ID;
+      const microsoftClientSecret = clientSecret || FALLBACK_CLIENT_SECRET;
+      
       if (!microsoftClientId) {
         return new Response(
           JSON.stringify({ error: "Microsoft Client ID not configured" }),
@@ -105,19 +112,26 @@ serve(async (req) => {
         );
       }
 
+      const body: Record<string, string> = {
+        client_id: microsoftClientId,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      };
+
+      if (microsoftClientSecret) {
+        body.client_secret = microsoftClientSecret;
+      }
+
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: microsoftClientId,
-          refresh_token: refreshToken,
-          grant_type: "refresh_token",
-        }),
+        body: new URLSearchParams(body),
       });
 
       const tokens = await tokenResponse.json();
 
       if (tokens.error) {
+        console.error("Token refresh error:", tokens.error, tokens.error_description);
         return new Response(
           JSON.stringify({ error: tokens.error_description || tokens.error }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
