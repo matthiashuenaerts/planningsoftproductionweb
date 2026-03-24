@@ -50,18 +50,23 @@ serve(async (req) => {
       .maybeSingle();
 
     const clientId = tenantSettings?.microsoft_client_id || Deno.env.get("MICROSOFT_CLIENT_ID");
+    const clientSecret = Deno.env.get("MICROSOFT_CLIENT_SECRET");
 
     // Auto-refresh if token expired or expiring in 2 minutes
     if (Date.now() > expiresAt - 120000) {
       console.log("Token expired, refreshing...");
+      const refreshBody: Record<string, string> = {
+        client_id: clientId || "",
+        refresh_token: tokenRow.refresh_token,
+        grant_type: "refresh_token",
+      };
+      if (clientSecret) {
+        refreshBody.client_secret = clientSecret;
+      }
       const tokenResponse = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId || "",
-          refresh_token: tokenRow.refresh_token,
-          grant_type: "refresh_token",
-        }),
+        body: new URLSearchParams(refreshBody),
       });
 
       const tokens = await tokenResponse.json();
