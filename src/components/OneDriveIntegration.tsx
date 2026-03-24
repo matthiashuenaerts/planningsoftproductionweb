@@ -68,6 +68,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
   const [tenantClientId, setTenantClientId] = useState<string | null>(null);
   const [defaultFolderPath, setDefaultFolderPath] = useState<string | null>(null);
   const [defaultDriveId, setDefaultDriveId] = useState<string | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const { toast } = useToast();
 
   const employeeId = currentEmployee?.id;
