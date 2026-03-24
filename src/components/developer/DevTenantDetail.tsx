@@ -529,6 +529,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
   const [directoryId, setDirectoryId] = useState("");
+  const [defaultFolderPath, setDefaultFolderPath] = useState("");
+  const [defaultDriveId, setDefaultDriveId] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -549,6 +551,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
     if (settings) {
       setClientId(settings.microsoft_client_id || "");
       setDirectoryId(settings.tenant_directory_id || "");
+      setDefaultFolderPath(settings.default_folder_path || "");
+      setDefaultDriveId(settings.default_drive_id || "");
       setNotes(settings.notes || "");
     }
   }, [settings]);
