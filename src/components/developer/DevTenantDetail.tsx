@@ -570,6 +570,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
           tenant_id: tenantId,
           microsoft_client_id: clientId.trim(),
           tenant_directory_id: directoryId.trim() || null,
+          default_folder_path: defaultFolderPath.trim() || '',
+          default_drive_id: defaultDriveId.trim() || null,
           notes: notes.trim() || null,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: "tenant_id" });
