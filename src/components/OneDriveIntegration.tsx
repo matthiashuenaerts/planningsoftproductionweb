@@ -335,7 +335,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
 
   const handleConnect = async () => {
     if (!folderUrl.trim()) {
-      toast({ title: 'Fout', description: 'Voer een geldige OneDrive URL in', variant: 'destructive' });
+      toast({ title: 'Fout', description: 'Voer een geldige OneDrive of SharePoint URL in', variant: 'destructive' });
       return;
     }
 
@@ -346,29 +346,51 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
       return;
     }
 
-    const info = extractOneDriveInfo(folderUrl);
-    if (!info) {
-      toast({ title: 'Fout', description: 'Kon OneDrive map informatie niet herkennen uit de URL', variant: 'destructive' });
-      return;
-    }
-
     setSaving(true);
     try {
-      const displayName = folderName.trim() || `Project - ${projectName}`;
+      let folderId: string;
+      let driveId: string | undefined;
+      let resolvedName: string | undefined;
+      let resolvedWebUrl: string | undefined;
+
+      // Check if it's a SharePoint or sharing link that needs resolution
+      if (isSharePointOrShareLink(folderUrl)) {
+        const resolved = await resolveShareLink(folderUrl);
+        if (!resolved) {
+          toast({ title: 'Fout', description: 'Kon de SharePoint/deellink niet oplossen. Controleer of je toegang hebt.', variant: 'destructive' });
+          setSaving(false);
+          return;
+        }
+        folderId = resolved.folderId;
+        driveId = resolved.driveId;
+        resolvedName = resolved.name;
+        resolvedWebUrl = resolved.webUrl;
+      } else {
+        const info = extractOneDriveInfo(folderUrl);
+        if (!info) {
+          toast({ title: 'Fout', description: 'Kon OneDrive map informatie niet herkennen uit de URL', variant: 'destructive' });
+          setSaving(false);
+          return;
+        }
+        folderId = info.folderId;
+        driveId = info.driveId;
+      }
+
+      const displayName = folderName.trim() || resolvedName || `Project - ${projectName}`;
       await oneDriveService.connectProjectToOneDrive(projectId, {
-        folder_id: info.folderId,
+        folder_id: folderId,
         folder_name: displayName,
-        folder_url: folderUrl.trim(),
-        drive_id: info.driveId,
+        folder_url: resolvedWebUrl || folderUrl.trim(),
+        drive_id: driveId,
       });
       await loadConfig();
       setDialogOpen(false);
       setFolderUrl('');
       setFolderName('');
-      toast({ title: 'Succes', description: 'OneDrive map succesvol gekoppeld' });
+      toast({ title: 'Succes', description: 'Map succesvol gekoppeld' });
     } catch (error) {
       console.error('Error connecting OneDrive:', error);
-      toast({ title: 'Fout', description: 'Koppelen van OneDrive map mislukt', variant: 'destructive' });
+      toast({ title: 'Fout', description: 'Koppelen van map mislukt', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
