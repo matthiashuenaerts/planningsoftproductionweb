@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action, folderId, driveId, employeeId, folderName, parentFolderId } = await req.json();
+    const { action, folderId, driveId, employeeId, folderName, parentFolderId, shareUrl } = await req.json();
 
     if (!employeeId) {
       return new Response(
