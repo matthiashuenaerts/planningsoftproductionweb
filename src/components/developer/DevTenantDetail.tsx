@@ -533,6 +533,8 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
   const [defaultDriveId, setDefaultDriveId] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [resolving, setResolving] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["dev", "onedrive-settings", tenantId],
@@ -556,6 +558,51 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
       setNotes(settings.notes || "");
     }
   }, [settings]);
+
+  const handleResolveShareLink = async () => {
+    if (!shareLink.trim()) return;
+    
+    // We need an employee with OneDrive tokens to resolve the link
+    // Find any employee in this tenant that has tokens
+    const { data: tokenRow } = await supabase
+      .from("employee_onedrive_tokens" as any)
+      .select("employee_id")
+      .eq("tenant_id", tenantId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!tokenRow) {
+      toast({ title: "No connected user", description: "At least one user in this tenant must be connected to OneDrive first to resolve share links.", variant: "destructive" });
+      return;
+    }
+
+    setResolving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("onedrive-files", {
+        body: {
+          action: "resolve-share-link",
+          employeeId: (tokenRow as any).employee_id,
+          shareUrl: shareLink.trim(),
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const resolved = data?.resolved;
+      if (resolved) {
+        setDefaultFolderPath(resolved.id);
+        if (resolved.driveId) setDefaultDriveId(resolved.driveId);
+        toast({ title: "Link resolved!", description: `Folder: ${resolved.name}` });
+        setShareLink("");
+      } else {
+        throw new Error("Could not resolve the share link");
+      }
+    } catch (e: any) {
+      toast({ title: "Failed to resolve link", description: e?.message, variant: "destructive" });
+    } finally {
+      setResolving(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!clientId.trim()) {
@@ -598,6 +645,7 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
       setDefaultFolderPath("");
       setDefaultDriveId("");
       setNotes("");
+      setShareLink("");
       qc.invalidateQueries({ queryKey: ["dev", "onedrive-settings", tenantId] });
       toast({ title: "OneDrive settings removed" });
     } catch (e: any) {
@@ -638,13 +686,37 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
             />
           </div>
         </div>
+
+        {/* SharePoint / OneDrive share link resolver */}
+        <div className="p-3 rounded-md bg-white/5 border border-white/10 space-y-2">
+          <Label className="text-blue-300 text-xs font-semibold">📎 Resolve SharePoint / OneDrive Share Link</Label>
+          <p className="text-[11px] text-slate-400">Paste a SharePoint sharing link to automatically fill the Folder ID and Drive ID below.</p>
+          <div className="flex gap-2">
+            <Input
+              value={shareLink}
+              onChange={(e) => setShareLink(e.target.value)}
+              placeholder="https://...sharepoint.com/:f:/g/..."
+              className="bg-white/10 border-white/20 text-white text-xs h-8 flex-1"
+            />
+            <Button
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-xs h-8 whitespace-nowrap"
+              disabled={resolving || !shareLink.trim()}
+              onClick={handleResolveShareLink}
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              {resolving ? "Resolving..." : "Resolve"}
+            </Button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label className="text-slate-300 text-xs">Default Folder Path (folder ID for project folders)</Label>
             <Input
               value={defaultFolderPath}
               onChange={(e) => setDefaultFolderPath(e.target.value)}
-              placeholder="e.g. OneDrive folder ID where project folders are created"
+              placeholder="Auto-filled from share link or manual folder ID"
               className="bg-white/10 border-white/20 text-white text-xs h-8"
             />
           </div>
@@ -653,7 +725,7 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
             <Input
               value={defaultDriveId}
               onChange={(e) => setDefaultDriveId(e.target.value)}
-              placeholder="Leave empty for personal OneDrive"
+              placeholder="Auto-filled from share link or leave empty"
               className="bg-white/10 border-white/20 text-white text-xs h-8"
             />
           </div>
@@ -681,5 +753,4 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
     </Card>
   );
 };
-
 export default DevTenantDetail;
