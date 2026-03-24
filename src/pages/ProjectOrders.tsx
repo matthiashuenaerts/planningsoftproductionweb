@@ -527,7 +527,7 @@ const ProjectOrders = () => {
                                       variant="ghost" 
                                       size="sm" 
                                       className="h-6 w-12 text-xs"
-                                      onClick={() => window.open(attachment.file_path, '_blank')}
+                                      onClick={() => window.open(orderService.getAttachmentUrl(attachment.file_path), '_blank')}
                                     >
                                       View
                                     </Button>

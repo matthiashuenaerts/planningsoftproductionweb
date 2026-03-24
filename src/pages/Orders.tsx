@@ -607,7 +607,7 @@ const Orders: React.FC = () => {
                                               <div key={attachment.id} className="flex items-center gap-2 p-2 bg-background rounded border">
                                                 <Paperclip className="h-4 w-4 text-muted-foreground" />
                                                 <span className="flex-1 truncate">{attachment.file_name}</span>
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => window.open(attachment.file_path, '_blank')}>
+                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => window.open(orderService.getAttachmentUrl(attachment.file_path), '_blank')}>
                                                   <FileText className="h-4 w-4" />
                                                 </Button>
                                               </div>

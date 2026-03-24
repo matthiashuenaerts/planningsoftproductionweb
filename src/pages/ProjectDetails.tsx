@@ -1659,7 +1659,7 @@ const ProjectDetails = () => {
                                           {attachment.file_name.includes('DELIVERY_CONFIRMED') && <p className="text-green-600 font-medium">✓ Delivery Confirmed</p>}
                                         </div>
                                       </div>
-                                      <Button size="sm" variant="outline" onClick={() => window.open(attachment.file_path, '_blank')} className="h-6 w-12 text-xs p-0">
+                                      <Button size="sm" variant="outline" onClick={() => window.open(orderService.getAttachmentUrl(attachment.file_path), '_blank')} className="h-6 w-12 text-xs p-0">
                                         View
                                       </Button>
                                     </div>)}
