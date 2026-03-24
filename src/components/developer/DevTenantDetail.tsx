@@ -638,6 +638,26 @@ const OneDriveSettingsCard: React.FC<{ tenantId: string }> = ({ tenantId }) => {
             />
           </div>
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-slate-300 text-xs">Default Folder Path (folder ID for project folders)</Label>
+            <Input
+              value={defaultFolderPath}
+              onChange={(e) => setDefaultFolderPath(e.target.value)}
+              placeholder="e.g. OneDrive folder ID where project folders are created"
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+          <div>
+            <Label className="text-slate-300 text-xs">Default Drive ID (for shared drives)</Label>
+            <Input
+              value={defaultDriveId}
+              onChange={(e) => setDefaultDriveId(e.target.value)}
+              placeholder="Leave empty for personal OneDrive"
+              className="bg-white/10 border-white/20 text-white text-xs h-8"
+            />
+          </div>
+        </div>
         <div>
           <Label className="text-slate-300 text-xs">Notes</Label>
           <Input
