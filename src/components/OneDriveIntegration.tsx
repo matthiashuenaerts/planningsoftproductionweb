@@ -12,8 +12,13 @@ import { useAuth } from '@/context/AuthContext';
 import { 
   ExternalLink, Folder, Link2, Unlink, RefreshCw, HelpCircle, 
   File, FileText, FileImage, FileVideo, FileAudio, ChevronRight,
-  ArrowLeft, LogIn, FolderPlus, LogOut
+  ArrowLeft, LogIn, FolderPlus, LogOut, AppWindow
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
