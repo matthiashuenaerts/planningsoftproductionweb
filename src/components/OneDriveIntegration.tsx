@@ -467,6 +467,45 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
     return <File className="h-5 w-5 text-muted-foreground" />;
   };
 
+  const getOpenInAppUrl = (file: OneDriveFile): string | null => {
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const webUrl = file.webUrl;
+    
+    // Office URI schemes - these open the file in the desktop app with direct OneDrive save-back
+    const officeSchemes: Record<string, string> = {
+      'doc': 'ms-word', 'docx': 'ms-word', 'docm': 'ms-word',
+      'xls': 'ms-excel', 'xlsx': 'ms-excel', 'xlsm': 'ms-excel', 'csv': 'ms-excel',
+      'ppt': 'ms-powerpoint', 'pptx': 'ms-powerpoint', 'pptm': 'ms-powerpoint',
+      'vsd': 'ms-visio', 'vsdx': 'ms-visio',
+    };
+    
+    if (officeSchemes[ext]) {
+      return `${officeSchemes[ext]}:ofe|u|${webUrl}`;
+    }
+    
+    // For PDFs and other files, use the SharePoint/OneDrive "open in app" pattern
+    // This triggers the OS file association (e.g. Adobe for PDF)
+    if (ext === 'pdf' || ext === 'dwg' || ext === 'dxf') {
+      // Use the webUrl with ?web=0 to trigger native app opening via OneDrive
+      if (webUrl.includes('sharepoint.com')) {
+        return webUrl.replace('?', '?action=edit&') || `${webUrl}?action=edit`;
+      }
+      return webUrl;
+    }
+    
+    return null;
+  };
+
+  const handleOpenInApp = (file: OneDriveFile) => {
+    const appUrl = getOpenInAppUrl(file);
+    if (appUrl) {
+      window.open(appUrl, '_blank');
+    } else {
+      // Fallback: open webUrl which may trigger "Open in app" in OneDrive web
+      window.open(file.webUrl, '_blank');
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
