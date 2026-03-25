@@ -657,7 +657,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
                         </div>
                         <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                           {!file.isFolder && (
-                            <>
+                            <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0"
@@ -667,6 +667,8 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
                                 </TooltipTrigger>
                                 <TooltipContent>Open in app (bijv. Adobe, Word)</TooltipContent>
                               </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0"
@@ -676,7 +678,7 @@ const OneDriveIntegration: React.FC<OneDriveIntegrationProps> = ({ projectId, pr
                                 </TooltipTrigger>
                                 <TooltipContent>Open in browser</TooltipContent>
                               </Tooltip>
-                            </>
+                            </TooltipProvider>
                           )}
                           {file.isFolder && (
                             <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
