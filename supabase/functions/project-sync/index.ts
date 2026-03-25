@@ -350,15 +350,21 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authSupabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Allow anon key (cron) or valid user JWT
+    if (token === supabaseAnonKey) {
+      console.log('Authenticated via anon key (cron job)');
+    } else {
+      const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user }, error: userError } = await authSupabase.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Authenticated via user JWT:', user.id);
     }
 
     console.log('Starting project sync process...');
