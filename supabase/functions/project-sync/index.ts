@@ -350,15 +350,21 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await authSupabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Allow anon key (cron) or valid user JWT
+    if (token === supabaseAnonKey) {
+      console.log('Authenticated via anon key (cron job)');
+    } else {
+      const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user }, error: userError } = await authSupabase.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('Authenticated via user JWT:', user.id);
     }
 
     console.log('Starting project sync process...');
@@ -371,29 +377,24 @@ serve(async (req) => {
     // Determine configs to use
     let configsToProcess: Array<{ tenantId: string; config: { baseUrl: string; username: string; password: string } }> = [];
 
-    if (body.config) {
-      // Manual call with explicit config — use it for all projects (legacy behavior)
-      configsToProcess.push({ tenantId: '', config: body.config });
-    } else {
-      // Load ALL tenant configs for 'projects' API type
-      console.log('Loading ALL tenant project API configs from database...');
-      const { data: allConfigs, error: configError } = await supabase
-        .from('external_api_configs')
-        .select('*')
-        .eq('api_type', 'projects');
+    // Always load ALL tenant configs from database — never accept client-supplied credentials
+    console.log('Loading ALL tenant project API configs from database...');
+    const { data: allConfigs, error: configError } = await supabase
+      .from('external_api_configs')
+      .select('*')
+      .eq('api_type', 'projects');
 
-      if (configError || !allConfigs || allConfigs.length === 0) {
-        console.error('No project API configs found:', configError);
-        throw new Error('No Projects API configurations found. Please save the configuration in Settings first.');
-      }
+    if (configError || !allConfigs || allConfigs.length === 0) {
+      console.error('No project API configs found:', configError);
+      throw new Error('No Projects API configurations found. Please save the configuration in Settings first.');
+    }
 
-      console.log(`Found ${allConfigs.length} tenant project API configs`);
-      for (const cfg of allConfigs) {
-        configsToProcess.push({
-          tenantId: cfg.tenant_id,
-          config: { baseUrl: cfg.base_url, username: cfg.username, password: cfg.password }
-        });
-      }
+    console.log(`Found ${allConfigs.length} tenant project API configs`);
+    for (const cfg of allConfigs) {
+      configsToProcess.push({
+        tenantId: cfg.tenant_id,
+        config: { baseUrl: cfg.base_url, username: cfg.username, password: cfg.password }
+      });
     }
 
     // Fetch placement teams once
