@@ -271,7 +271,7 @@ const NewRushOrderForm: React.FC<NewRushOrderFormProps> = ({ onSuccess, initialV
     if (!currentEmployee) return;
     setIsSubmitting(true);
     try {
-      const formattedDeadline = format(data.deadline, "yyyy-MM-dd'T'HH:mm:ss");
+      const formattedDeadline = data.deadline.toISOString();
       const rushOrder = await rushOrderService.createRushOrder(
         data.title, data.description, formattedDeadline,
         currentEmployee.id, data.attachment, data.projectId || undefined
