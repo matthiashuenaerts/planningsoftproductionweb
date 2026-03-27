@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const WALL_CLOCK_LIMIT_MS = 120_000; // 120s — leave 30s buffer before Edge Function hard kill
+const WALL_CLOCK_LIMIT_MS = 120_000;
 
 function convertWeekNumberToDate(weekNumber: string): string {
   if (/^\d{6}$/.test(weekNumber)) {
@@ -51,9 +51,6 @@ function daysBetweenInclusive(startISO: string, endISO: string): number {
   return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
-/**
- * Process a single project using an already-authenticated token.
- */
 async function syncProject(
   supabase: any,
   project: any,
@@ -64,7 +61,6 @@ async function syncProject(
   try {
     console.log(`Processing project ${project.name} (${project.project_link_id})`);
 
-    // Query external API (reuse existing token)
     let rawPlacementDate: string | null = null;
     let planningStartRaw: string | null = null;
     let planningEndRaw: string | null = null;
@@ -73,18 +69,12 @@ async function syncProject(
 
     const queryResponse = await fetch(
       `${baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
+      { method: 'GET', headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' } }
     );
 
     if (queryResponse.ok) {
       const queryData = await queryResponse.json();
-      if (queryData.response && queryData.response.scriptResult) {
+      if (queryData.response?.scriptResult) {
         try {
           const orderData = JSON.parse(queryData.response.scriptResult);
           if (orderData.order) {
@@ -291,26 +281,37 @@ serve(async (req) => {
     }
 
     console.log('Starting project sync process...');
-    const body = await req.json().catch(() => ({ automated: true }));
-    const { automated = false } = body;
+    const body = await req.json().catch(() => ({}));
+    const { automated = false, tenant_id: requestedTenantId = null } = body;
 
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Load ALL tenant project API configs
-    const { data: allConfigs, error: configError } = await supabase
+    // Load tenant config(s) — single tenant if tenant_id provided, else all
+    let configQuery = supabase
       .from('external_api_configs')
       .select('*')
       .eq('api_type', 'projects');
 
-    if (configError || !allConfigs || allConfigs.length === 0) {
-      throw new Error('No Projects API configurations found.');
+    if (requestedTenantId) {
+      configQuery = configQuery.eq('tenant_id', requestedTenantId);
     }
 
-    console.log(`Found ${allConfigs.length} tenant project API configs`);
+    const { data: allConfigs, error: configError } = await configQuery;
 
-    // Fetch placement teams once
-    const { data: placementTeams } = await supabase.from('placement_teams').select('id, name, external_team_names');
+    if (configError || !allConfigs || allConfigs.length === 0) {
+      const msg = requestedTenantId
+        ? `No Projects API config found for tenant ${requestedTenantId}.`
+        : 'No Projects API configurations found.';
+      throw new Error(msg);
+    }
+
+    console.log(`Processing ${allConfigs.length} tenant config(s)${requestedTenantId ? ` (tenant: ${requestedTenantId})` : ''}`);
+
+    // Fetch placement teams (filtered by tenant if single-tenant mode)
+    let teamsQuery = supabase.from('placement_teams').select('id, name, external_team_names');
+    if (requestedTenantId) teamsQuery = teamsQuery.eq('tenant_id', requestedTenantId);
+    const { data: placementTeams } = await teamsQuery;
 
     let totalSynced = 0;
     let totalErrors = 0;
@@ -378,7 +379,6 @@ serve(async (req) => {
 
       try {
         for (const project of projects) {
-          // Wall-clock timeout guard
           if (Date.now() - startTime > WALL_CLOCK_LIMIT_MS) {
             console.warn(`⏱️ Wall-clock limit reached after ${Math.round((Date.now() - startTime) / 1000)}s — stopping gracefully`);
             timedOut = true;
@@ -395,7 +395,6 @@ serve(async (req) => {
           }
         }
       } finally {
-        // Logout the API token for this tenant
         try {
           await fetch(`${baseUrl}/sessions/${apiToken}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
         } catch (_) {}
