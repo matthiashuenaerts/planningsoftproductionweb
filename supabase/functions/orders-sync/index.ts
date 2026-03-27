@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
-const WALL_CLOCK_LIMIT_MS = 120_000; // 120s — leave 30s buffer
+const WALL_CLOCK_LIMIT_MS = 120_000;
 
 function convertWeekNumberToDate(weekString: string): string {
   if (!weekString) return new Date().toISOString();
@@ -32,7 +32,7 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    // Authenticate the caller (user JWT or cron anon key)
+    // Authenticate the caller
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -61,22 +61,31 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json().catch(() => ({ automated: true }));
-    const { automated = true } = body;
+    const body = await req.json().catch(() => ({}));
+    const { automated = true, tenant_id: requestedTenantId = null } = body;
 
-    console.log(`Starting ${automated ? 'automated' : 'manual'} orders sync...`);
+    console.log(`Starting ${automated ? 'automated' : 'manual'} orders sync${requestedTenantId ? ` for tenant ${requestedTenantId}` : ''}...`);
 
-    // Load ALL tenant orders API configs
-    const { data: allConfigs, error: configError } = await supabase
+    // Load tenant config(s) — single tenant if tenant_id provided, else all
+    let configQuery = supabase
       .from('external_api_configs')
       .select('*')
       .eq('api_type', 'orders');
 
-    if (configError || !allConfigs || allConfigs.length === 0) {
-      throw new Error('Orders API configuration not found.');
+    if (requestedTenantId) {
+      configQuery = configQuery.eq('tenant_id', requestedTenantId);
     }
 
-    console.log(`Found ${allConfigs.length} tenant orders API configs`);
+    const { data: allConfigs, error: configError } = await configQuery;
+
+    if (configError || !allConfigs || allConfigs.length === 0) {
+      const msg = requestedTenantId
+        ? `No Orders API config found for tenant ${requestedTenantId}.`
+        : 'Orders API configuration not found.';
+      throw new Error(msg);
+    }
+
+    console.log(`Processing ${allConfigs.length} tenant config(s)`);
 
     let totalSyncedCount = 0;
     let totalErrorCount = 0;
@@ -93,7 +102,6 @@ serve(async (req) => {
       const baseUrl = cfg.base_url;
       console.log(`Processing orders for tenant ${tenantId} with baseUrl: ${baseUrl}`);
 
-      // Get projects for this tenant
       let query = supabase
         .from('projects')
         .select('id, name, project_link_id')
@@ -143,7 +151,6 @@ serve(async (req) => {
 
       try {
         for (const project of projects) {
-          // Wall-clock timeout guard
           if (Date.now() - startTime > WALL_CLOCK_LIMIT_MS) {
             console.warn(`⏱️ Wall-clock limit reached after ${Math.round((Date.now() - startTime) / 1000)}s — stopping gracefully`);
             timedOut = true;
@@ -175,7 +182,6 @@ serve(async (req) => {
 
             const rawQueryData = await queryResponse.json();
 
-            // Parse scriptResult if present
             let queryData = rawQueryData;
             try {
               const scriptResult = rawQueryData?.response?.scriptResult;
@@ -307,7 +313,6 @@ serve(async (req) => {
           }
         }
       } finally {
-        // Logout the API token for this tenant
         try {
           await fetch(`${baseUrl}/sessions/${apiToken}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
         } catch (_) {}
@@ -356,7 +361,6 @@ serve(async (req) => {
       }
     }
 
-    // Send error alert if needed
     if (totalErrorCount > 0) {
       try {
         await supabase.functions.invoke('send-error-alert', {
