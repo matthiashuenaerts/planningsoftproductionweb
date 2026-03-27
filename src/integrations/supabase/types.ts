@@ -6574,7 +6574,9 @@ export type Database = {
       setup_phase_offsets_table: { Args: never; Returns: boolean }
       table_exists: { Args: { table_name: string }; Returns: boolean }
       trigger_auto_generate_schedule: { Args: never; Returns: undefined }
+      trigger_orders_sync_per_tenant: { Args: never; Returns: undefined }
       trigger_project_forecast_email: { Args: never; Returns: undefined }
+      trigger_project_sync_per_tenant: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:
