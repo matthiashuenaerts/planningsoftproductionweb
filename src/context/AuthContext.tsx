@@ -60,15 +60,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const { tenantSlug } = useTenant();
+  const { tenantSlug, tenant } = useTenant();
 
   const isDeveloper = roles.includes("developer");
 
   // Fetch employee data based on auth user
   const fetchEmployeeData = async (userId: string) => {
     try {
-      // Use service-level query - developers may have NULL tenant_id
-      // so RLS tenant filtering must not block them
       const { data: employee, error } = await supabase
         .from("employees")
         .select("*")
@@ -133,6 +131,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ─── Sync developer active tenant with URL-resolved tenant ───
+  useEffect(() => {
+    if (!isDeveloper || !tenant?.id || !user?.id) return;
+
+    // Only sync if the current employee tenant doesn't match the URL tenant
+    if (currentEmployee?.tenant_id === tenant.id) return;
+
+    const syncActiveTenant = async () => {
+      try {
+        console.log(`Developer tenant sync: setting active tenant to ${tenant.id} (${tenantSlug})`);
+        await supabase.rpc("set_developer_active_tenant", {
+          p_tenant_id: tenant.id,
+        });
+        // Refetch employee so the context picks up the new tenant_id
+        await fetchEmployeeData(user.id);
+      } catch (e) {
+        console.error("Failed to sync developer active tenant:", e);
+      }
+    };
+
+    syncActiveTenant();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDeveloper, tenant?.id, user?.id]);
+
   // ─── Midnight auto-logout ───
   useEffect(() => {
     if (!session) return;
@@ -140,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const scheduleMidnightLogout = () => {
       const now = new Date();
       const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0); // next midnight
+      midnight.setHours(24, 0, 0, 0);
       const msUntilMidnight = midnight.getTime() - now.getTime();
 
       console.log(`Session will auto-expire at midnight (in ${Math.round(msUntilMidnight / 60000)} minutes)`);
@@ -152,7 +174,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setRoles([]);
         setUser(null);
         setSession(null);
-        // Navigate handled by auth state change
       }, msUntilMidnight);
     };
 
