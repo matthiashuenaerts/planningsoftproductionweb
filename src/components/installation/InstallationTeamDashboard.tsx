@@ -52,7 +52,7 @@ interface InstallationAssignment {
 const InstallationTeamDashboard: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
-  const { t, language } = useLanguage();
+  const { t, lang } = useLanguage();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -65,7 +65,7 @@ const InstallationTeamDashboard: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
-  const dateFnsLocale = language === 'nl' ? nl : language === 'fr' ? fr : enUS;
+  const dateFnsLocale = lang === 'nl' ? nl : lang === 'fr' ? fr : enUS;
 
   const loadAssignments = useCallback(async () => {
     if (!currentEmployee?.id) return;
@@ -368,7 +368,7 @@ const InstallationTeamDashboard: React.FC = () => {
                       <div className="grid grid-cols-2 gap-2">
                         <Button
                           variant="outline"
-                          onClick={() => window.open(`/${tenant?.slug}/${language}/projects/${currentAssignment.project.id}`, '_blank')}
+                          onClick={() => window.open(`/${tenant?.slug}/${lang}/projects/${currentAssignment.project.id}`, '_blank')}
                         >
                           <ExternalLink className="h-4 w-4 mr-2" /> Projectdetails
                         </Button>

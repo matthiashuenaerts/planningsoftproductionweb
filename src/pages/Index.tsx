@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import UserManagement from '@/components/UserManagement';
 import Navbar from '@/components/Navbar';
 import WorkstationDashboard from '@/components/WorkstationDashboard';
+import InstallationTeamDashboard from '@/components/installation/InstallationTeamDashboard';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/context/LanguageContext';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -15,6 +16,10 @@ const Index = () => {
 
   if (currentEmployee?.role === 'workstation') {
     return <WorkstationDashboard />;
+  }
+
+  if (currentEmployee?.role === 'installation_team') {
+    return <InstallationTeamDashboard />;
   }
 
   const getGreeting = () => {
