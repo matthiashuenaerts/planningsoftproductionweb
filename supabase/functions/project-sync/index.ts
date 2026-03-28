@@ -6,7 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const WALL_CLOCK_LIMIT_MS = 120_000;
+const WALL_CLOCK_LIMIT_MS = 110_000; // 110s to leave margin for cleanup + re-invoke
+const FETCH_TIMEOUT_MS = 15_000; // 15s per external API call
+
+function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 function convertWeekNumberToDate(weekNumber: string): string {
   if (/^\d{6}$/.test(weekNumber)) {
@@ -51,6 +58,26 @@ function daysBetweenInclusive(startISO: string, endISO: string): number {
   return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+function parseAddress(rawAddress: string | null): Record<string, string | null> {
+  const fields: Record<string, string | null> = {};
+  if (!rawAddress) return fields;
+  const adres = rawAddress.trim();
+  const commaIdx = adres.indexOf(',');
+  if (commaIdx > 0) {
+    const streetPart = adres.substring(0, commaIdx).trim();
+    const cityPart = adres.substring(commaIdx + 1).trim();
+    const streetMatch = streetPart.match(/^(.+?)\s+(\d+\S*)$/);
+    if (streetMatch) { fields.address_street = streetMatch[1]; fields.address_number = streetMatch[2]; }
+    else { fields.address_street = streetPart; }
+    const cityMatch = cityPart.match(/^(\d+)\s+(.+)$/);
+    if (cityMatch) { fields.address_postal_code = cityMatch[1]; fields.address_city = cityMatch[2]; }
+    else { fields.address_city = cityPart; }
+  } else {
+    fields.address_street = adres;
+  }
+  return fields;
+}
+
 async function syncProject(
   supabase: any,
   project: any,
@@ -67,7 +94,7 @@ async function syncProject(
     let planningTeams: string[] = [];
     let rawAddress: string | null = null;
 
-    const queryResponse = await fetch(
+    const queryResponse = await fetchWithTimeout(
       `${baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${project.project_link_id}`,
       { method: 'GET', headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' } }
     );
@@ -144,56 +171,45 @@ async function syncProject(
     const newDuration = (startFromPlanning && endFromPlanning) ? daysBetweenInclusive(startFromPlanning, endFromPlanning) : null;
     const newTeamId = matchedTeam?.id || null;
 
-    const dateChanged = normalizedExternal !== normalizedCurrent;
+    // --- Compare ALL fields before deciding to update ---
+    const dateChanged = normalizedExternal && normalizedExternal !== normalizedCurrent;
     const teamChanged = newTeamId && newTeamId !== currentTeamId;
     const startDateChanged = startFromPlanning && startFromPlanning !== currentStartDate;
     const durationChanged = newDuration && newDuration !== currentDuration;
+
+    // Compare address fields against current project data
+    const addressFields = parseAddress(rawAddress);
+    const addressChanged = Object.keys(addressFields).length > 0 && Object.entries(addressFields).some(
+      ([key, val]) => (val || null) !== (project[key] || null)
+    );
 
     const changes: string[] = [];
     if (dateChanged) changes.push('installation_date');
     if (teamChanged) changes.push('team');
     if (startDateChanged) changes.push('start_date');
     if (durationChanged) changes.push('duration');
+    if (addressChanged) changes.push('address');
 
+    // No changes at all → skip entirely
     if (changes.length === 0) {
       return { detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'up_to_date' }, synced: false };
     }
 
     console.log(`Project ${project.name}: changes detected: ${changes.join(', ')}`);
 
-    // Parse address
-    const addressFields: Record<string, string | null> = {};
-    if (rawAddress) {
-      const adres = rawAddress.trim();
-      const commaIdx = adres.indexOf(',');
-      if (commaIdx > 0) {
-        const streetPart = adres.substring(0, commaIdx).trim();
-        const cityPart = adres.substring(commaIdx + 1).trim();
-        const streetMatch = streetPart.match(/^(.+?)\s+(\d+\S*)$/);
-        if (streetMatch) { addressFields.address_street = streetMatch[1]; addressFields.address_number = streetMatch[2]; }
-        else { addressFields.address_street = streetPart; }
-        const cityMatch = cityPart.match(/^(\d+)\s+(.+)$/);
-        if (cityMatch) { addressFields.address_postal_code = cityMatch[1]; addressFields.address_city = cityMatch[2]; }
-        else { addressFields.address_city = cityPart; }
-      } else {
-        addressFields.address_street = adres;
-      }
-    }
+    // --- Only update project table if project-level fields changed ---
+    const projectUpdate: Record<string, any> = {};
+    if (dateChanged) projectUpdate.installation_date = normalizedExternal;
+    if (addressChanged) Object.assign(projectUpdate, addressFields);
 
-    // Update project
-    const projectUpdate: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (dateChanged && normalizedExternal) projectUpdate.installation_date = normalizedExternal;
-    if (Object.keys(addressFields).length > 0) {
-      Object.assign(projectUpdate, addressFields);
-      if (!changes.includes('address')) changes.push('address');
-    }
-    if (Object.keys(projectUpdate).length > 1) {
+    if (Object.keys(projectUpdate).length > 0) {
+      projectUpdate.updated_at = new Date().toISOString();
       const { error: updateProjectError } = await supabase.from('projects').update(projectUpdate).eq('id', project.id);
       if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
     }
 
-    // Upsert team assignment
-    if (startFromPlanning && endFromPlanning) {
+    // --- Only upsert team assignment if team/start/duration actually changed ---
+    if (startFromPlanning && endFromPlanning && (teamChanged || startDateChanged || durationChanged)) {
       const { error: upsertErr } = await supabase
         .from('project_team_assignments')
         .upsert({
@@ -206,23 +222,28 @@ async function syncProject(
         }, { onConflict: 'project_id' });
       if (upsertErr) console.warn(`PTA upsert failed: ${upsertErr.message}`);
 
-      await supabase.from('projects')
-        .update({ installation_date: startFromPlanning, updated_at: new Date().toISOString() })
-        .eq('id', project.id);
+      // Sync installation_date from planning start if it differs
+      if (startFromPlanning !== normalizedCurrent) {
+        await supabase.from('projects')
+          .update({ installation_date: startFromPlanning, updated_at: new Date().toISOString() })
+          .eq('id', project.id);
+      }
     }
 
-    // Recalculate task due dates
-    const { data: phases } = await supabase.from('phases').select('id').eq('project_id', project.id);
-    if (phases && phases.length > 0) {
-      for (const phase of phases) {
-        const { data: tasks } = await supabase.from('tasks').select('id, standard_task_id').eq('phase_id', phase.id);
-        for (const task of tasks || []) {
-          if (task.standard_task_id && normalizedExternal) {
-            const { data: st } = await supabase.from('standard_tasks').select('day_counter').eq('id', task.standard_task_id).single();
-            if (st) {
-              const installDate = new Date(normalizedExternal);
-              installDate.setDate(installDate.getDate() - (st.day_counter || 0));
-              await supabase.from('tasks').update({ due_date: installDate.toISOString().split('T')[0], updated_at: new Date().toISOString() }).eq('id', task.id);
+    // Recalculate task due dates only if installation date actually changed
+    if (dateChanged && normalizedExternal) {
+      const { data: phases } = await supabase.from('phases').select('id').eq('project_id', project.id);
+      if (phases && phases.length > 0) {
+        for (const phase of phases) {
+          const { data: tasks } = await supabase.from('tasks').select('id, standard_task_id').eq('phase_id', phase.id);
+          for (const task of tasks || []) {
+            if (task.standard_task_id) {
+              const { data: st } = await supabase.from('standard_tasks').select('day_counter').eq('id', task.standard_task_id).single();
+              if (st) {
+                const installDate = new Date(normalizedExternal);
+                installDate.setDate(installDate.getDate() - (st.day_counter || 0));
+                await supabase.from('tasks').update({ due_date: installDate.toISOString().split('T')[0], updated_at: new Date().toISOString() }).eq('id', task.id);
+              }
             }
           }
         }
@@ -282,12 +303,12 @@ serve(async (req) => {
 
     console.log('Starting project sync process...');
     const body = await req.json().catch(() => ({}));
-    const { automated = false, tenant_id: requestedTenantId = null } = body;
+    const { automated = false, tenant_id: requestedTenantId = null, project_ids: requestedProjectIds = null } = body;
 
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Load tenant config(s) — single tenant if tenant_id provided, else all
+    // Load tenant config(s)
     let configQuery = supabase
       .from('external_api_configs')
       .select('*')
@@ -308,7 +329,7 @@ serve(async (req) => {
 
     console.log(`Processing ${allConfigs.length} tenant config(s)${requestedTenantId ? ` (tenant: ${requestedTenantId})` : ''}`);
 
-    // Fetch placement teams (filtered by tenant if single-tenant mode)
+    // Fetch placement teams
     let teamsQuery = supabase.from('placement_teams').select('id, name, external_team_names');
     if (requestedTenantId) teamsQuery = teamsQuery.eq('tenant_id', requestedTenantId);
     const { data: placementTeams } = await teamsQuery;
@@ -320,6 +341,8 @@ serve(async (req) => {
     const allDetails: any[] = [];
     const allErrorDetails: string[] = [];
     let timedOut = false;
+    const skippedProjectIds: string[] = [];
+    let skippedTenantId: string | null = null;
 
     for (const cfg of allConfigs) {
       if (timedOut) break;
@@ -328,14 +351,17 @@ serve(async (req) => {
       const baseUrl = cfg.base_url;
       console.log(`Processing tenant ${tenantId} with baseUrl: ${baseUrl}`);
 
-      // Get projects for this tenant
+      // Get projects for this tenant — filter by specific IDs if provided (continuation)
       let query = supabase
         .from('projects')
-        .select('id, name, project_link_id, installation_date')
+        .select('id, name, project_link_id, installation_date, address_street, address_number, address_postal_code, address_city')
         .not('project_link_id', 'is', null)
         .not('project_link_id', 'eq', '');
 
       if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (requestedProjectIds && Array.isArray(requestedProjectIds) && requestedProjectIds.length > 0) {
+        query = query.in('id', requestedProjectIds);
+      }
 
       const { data: projects, error: projectsError } = await query;
 
@@ -353,7 +379,7 @@ serve(async (req) => {
       // Authenticate ONCE per tenant
       let apiToken: string | null = null;
       try {
-        const authResponse = await fetch(`${baseUrl}/sessions`, {
+        const authResponse = await fetchWithTimeout(`${baseUrl}/sessions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -378,11 +404,18 @@ serve(async (req) => {
       }
 
       try {
-        for (const project of projects) {
+        for (let i = 0; i < projects.length; i++) {
+          const project = projects[i];
+
           if (Date.now() - startTime > WALL_CLOCK_LIMIT_MS) {
             console.warn(`⏱️ Wall-clock limit reached after ${Math.round((Date.now() - startTime) / 1000)}s — stopping gracefully`);
             timedOut = true;
-            totalSkipped += projects.length - projects.indexOf(project);
+            // Collect remaining project IDs for continuation
+            for (let j = i; j < projects.length; j++) {
+              skippedProjectIds.push(projects[j].id);
+            }
+            skippedTenantId = tenantId;
+            totalSkipped += projects.length - i;
             break;
           }
 
@@ -396,7 +429,7 @@ serve(async (req) => {
         }
       } finally {
         try {
-          await fetch(`${baseUrl}/sessions/${apiToken}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+          await fetchWithTimeout(`${baseUrl}/sessions/${apiToken}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }, 5000);
         } catch (_) {}
       }
     }
@@ -423,7 +456,7 @@ serve(async (req) => {
         await supabase.from('automation_logs').insert({
           action_type: 'project_sync',
           status: tenantErrorDetails.length > 0 ? 'partial' : (timedOut ? 'partial' : 'success'),
-          summary: `${tenantSynced} synced, ${tenantErrorDetails.length} errors${timedOut ? `, ${totalSkipped} skipped (timeout)` : ''} (${automated ? 'automated' : 'manual'})`,
+          summary: `${tenantSynced} synced, ${tenantErrorDetails.length} errors${timedOut ? `, ${totalSkipped} skipped (timeout → continuation scheduled)` : ''} (${automated ? 'automated' : 'manual'})`,
           error_message: tenantErrorDetails.length > 0 ? tenantErrorDetails.map((d: any) => `${d.project_name}: ${d.error}`).join('; ') : null,
           details: { totalProjects: tenantDetails.length, totalSynced: tenantSynced, totalErrors: tenantErrorDetails.length, timedOut, totalSkipped, automated },
           tenant_id: tenantId || null,
@@ -442,10 +475,27 @@ serve(async (req) => {
       } catch (_) {}
     }
 
+    // --- Re-invoke for skipped projects on timeout ---
+    if (timedOut && skippedProjectIds.length > 0 && skippedTenantId) {
+      console.log(`🔄 Re-invoking project-sync for ${skippedProjectIds.length} remaining projects (tenant: ${skippedTenantId})`);
+      try {
+        await supabase.functions.invoke('project-sync', {
+          body: {
+            automated: true,
+            tenant_id: skippedTenantId,
+            project_ids: skippedProjectIds,
+          }
+        });
+        console.log('✅ Continuation invocation sent successfully');
+      } catch (reInvokeErr) {
+        console.error('Failed to re-invoke project-sync for remaining projects:', reInvokeErr);
+      }
+    }
+
     const elapsedMs = Date.now() - startTime;
     const result = {
       success: true,
-      message: `${automated ? 'Automated' : 'Manual'} sync completed in ${Math.round(elapsedMs / 1000)}s: ${totalSynced} updated, ${totalErrors} errors${timedOut ? `, ${totalSkipped} skipped (timeout)` : ''}`,
+      message: `${automated ? 'Automated' : 'Manual'} sync completed in ${Math.round(elapsedMs / 1000)}s: ${totalSynced} updated, ${totalErrors} errors${timedOut ? `, ${totalSkipped} skipped (continuation scheduled)` : ''}`,
       syncedCount: totalSynced, errorCount: totalErrors, totalProjects, automated, timedOut, skipped: totalSkipped,
       details: allDetails, timestamp: new Date().toISOString(), elapsed_ms: elapsedMs
     };
