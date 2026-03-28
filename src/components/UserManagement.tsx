@@ -194,6 +194,7 @@ const UserManagement = () => {
                   <SelectItem value="teamleader">Team Leader</SelectItem>
                   <SelectItem value="worker">Worker</SelectItem>
                   <SelectItem value="preparater">Preparater</SelectItem>
+                  <SelectItem value="installation_team">Installation Team</SelectItem>
                   <SelectItem value="workstation">Workstation</SelectItem>
                 </SelectContent>
               </Select>
