@@ -208,19 +208,31 @@ async function syncProject(
       if (updateProjectError) throw new Error(`Failed to update project: ${updateProjectError.message}`);
     }
 
-    // --- Only upsert team assignment if team/start/duration actually changed ---
+    // --- Only update/insert team assignment if team/start/duration actually changed ---
     if (startFromPlanning && endFromPlanning && (teamChanged || startDateChanged || durationChanged)) {
-      const { error: upsertErr } = await supabase
-        .from('project_team_assignments')
-        .upsert({
-          project_id: project.id,
-          team_id: newTeamId,
-          team: matchedTeam?.name || externalTeamName,
-          start_date: startFromPlanning,
-          duration: newDuration!,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'project_id' });
-      if (upsertErr) console.warn(`PTA upsert failed: ${upsertErr.message}`);
+      const ptaPayload: Record<string, any> = {
+        team_id: newTeamId,
+        team: matchedTeam?.name || externalTeamName,
+        start_date: startFromPlanning,
+        duration: newDuration!,
+        updated_at: new Date().toISOString()
+      };
+
+      if (currentPTA) {
+        // Update existing assignment
+        const { error: updateErr } = await supabase
+          .from('project_team_assignments')
+          .update(ptaPayload)
+          .eq('project_id', project.id)
+          .eq('is_service_ticket', false);
+        if (updateErr) console.warn(`PTA update failed: ${updateErr.message}`);
+      } else {
+        // Insert new assignment
+        const { error: insertErr } = await supabase
+          .from('project_team_assignments')
+          .insert({ ...ptaPayload, project_id: project.id, is_service_ticket: false });
+        if (insertErr) console.warn(`PTA insert failed: ${insertErr.message}`);
+      }
 
       // Sync installation_date from planning start if it differs
       if (startFromPlanning !== normalizedCurrent) {
