@@ -2107,6 +2107,58 @@ export type Database = {
           },
         ]
       }
+      installation_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          file_path: string
+          id: string
+          project_id: string
+          tenant_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          file_path: string
+          id?: string
+          project_id: string
+          tenant_id?: string
+          uploaded_by: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          file_path?: string
+          id?: string
+          project_id?: string
+          tenant_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installation_photos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installation_photos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installation_photos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number | null
@@ -4967,6 +5019,80 @@ export type Database = {
           },
           {
             foreignKeyName: "service_routes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_ticket_items: {
+        Row: {
+          assigned_to: string | null
+          assignment_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          item_type: string
+          priority: string | null
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          assignment_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_type?: string
+          priority?: string | null
+          status?: string
+          tenant_id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          assignment_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_type?: string
+          priority?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_ticket_items_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_ticket_items_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "project_team_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_ticket_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_ticket_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
