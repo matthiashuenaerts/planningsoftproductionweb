@@ -15,6 +15,7 @@ import UserMenu from './UserMenu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { HelpDialog } from '@/components/help/HelpDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 const NavbarContent = ({
   onItemClick
