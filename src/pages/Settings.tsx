@@ -60,39 +60,6 @@ const Settings: React.FC = () => {
   const defaultTab = searchParams.get('tab') || 'workstations';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
-  const canAccessSettings = useMemo(
-    () => !!currentEmployee && SETTINGS_ALLOWED_ROLES.includes(currentEmployee.role),
-    [currentEmployee]
-  );
-
-  useEffect(() => {
-    if (currentEmployee && !canAccessSettings) {
-      toast({
-        title: t('set_access_denied'),
-        description: t('set_no_permission'),
-        variant: 'destructive'
-      });
-    }
-  }, [canAccessSettings, currentEmployee, toast, t]);
-
-  if (!canAccessSettings) {
-    return (
-      <div className="flex min-h-screen bg-background">
-        <Navbar />
-        <div className={`flex-1 min-w-0 p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
-          <div className="text-center py-12">
-            <SettingsIcon className="mx-auto h-16 w-16 text-muted-foreground" />
-            <h1 className="mt-4 text-2xl font-bold text-foreground">{t('set_access_denied')}</h1>
-            <p className="mt-2 text-muted-foreground">{t('set_no_permission')}</p>
-            <Button className="mt-6" onClick={() => window.history.back()}>
-              {t('set_go_back')}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const renderTabContent = (tab: string) => {
     switch (tab) {
       case 'workstations': return <WorkstationSettings />;
