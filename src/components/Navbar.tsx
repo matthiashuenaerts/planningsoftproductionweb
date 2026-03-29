@@ -37,9 +37,7 @@ const NavbarContent = ({
   const { tenant } = useTenant();
   const location = useLocation();
   const isMobile = useIsMobile();
-
-  const canSeeRushOrders = isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'worker', 'teamleader'].includes(currentEmployee.role));
-  const canSeeTimeRegistrations = isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role));
+  const { canAccess } = useRolePermissions();
   const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
 
   const { data: isServiceMember } = useQuery({
