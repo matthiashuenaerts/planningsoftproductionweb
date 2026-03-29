@@ -66,7 +66,7 @@ const NavbarContent = ({
   } = useQuery({
     queryKey: ['rushOrders', 'navbar', tenant?.id],
     queryFn: () => rushOrderService.getAllRushOrders(tenant?.id),
-    enabled: !!canSeeRushOrders,
+    enabled: !!canAccess('rush-orders'),
     refetchInterval: 30000
   });
 
