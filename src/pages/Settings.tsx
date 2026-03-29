@@ -53,7 +53,6 @@ const Settings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
-  const isMobile = useIsMobile();
   const defaultTab = searchParams.get('tab') || 'workstations';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
