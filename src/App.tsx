@@ -81,10 +81,10 @@ const P = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>{children}</ProtectedRoute>
 );
 
-/** Helper for role-restricted routes */
-const R = ({ children, roles, logistics }: { children: React.ReactNode; roles: string[]; logistics?: boolean }) => (
+/** Helper for role-restricted routes using role_permissions table */
+const R = ({ children, navbarItem, logistics }: { children: React.ReactNode; navbarItem: string; logistics?: boolean }) => (
   <ProtectedRoute>
-    <RoleProtectedRoute allowedRoles={roles} requireLogistics={logistics}>
+    <RoleProtectedRoute navbarItem={navbarItem} requireLogistics={logistics}>
       {children}
     </RoleProtectedRoute>
   </ProtectedRoute>
