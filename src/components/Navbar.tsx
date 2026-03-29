@@ -38,7 +38,7 @@ const NavbarContent = ({
   const location = useLocation();
   const isMobile = useIsMobile();
   const { canAccess } = useRolePermissions();
-  const canSeeInvoices = currentEmployee && ['admin', 'manager'].includes(currentEmployee.role);
+  const canSeeInvoices = canAccess('invoices');
 
   const { data: isServiceMember } = useQuery({
     queryKey: ['isServiceTeamMember', currentEmployee?.id],
