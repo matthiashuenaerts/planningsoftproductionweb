@@ -149,29 +149,29 @@ function App() {
                     <Route path=":lang/broken-parts/new" element={<P><NewBrokenPart /></P>} />
                     <Route path=":lang/personal-tasks" element={<P><PersonalTasks /></P>} />
                     <Route path=":lang/notes-and-tasks" element={<P><NotesAndTasks /></P>} />
-                    <Route path=":lang/daily-tasks" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><DailyTasks /></R>} />
-                    <Route path=":lang/planning" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><Planning /></R>} />
-                    <Route path=":lang/orders" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
-                    <Route path=":lang/orders/new" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
-                    <Route path=":lang/orders/:orderId" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
-                    <Route path=":lang/orders/:orderId/edit" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']}><Orders /></R>} />
-                    <Route path=":lang/logistics" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><Logistics /></R>} />
-                    <Route path=":lang/logistics-out" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader', 'preparater']} logistics><LogisticsOut /></R>} />
-                    <Route path=":lang/rush-orders" element={<R roles={['admin', 'manager', 'installation_team', 'worker', 'teamleader']}><RushOrders /></R>} />
-                    <Route path=":lang/rush-orders/:rushOrderId" element={<R roles={['admin', 'manager', 'installation_team', 'worker', 'teamleader']}><RushOrderDetails /></R>} />
-                    <Route path=":lang/calculation" element={<R roles={['admin']}><Calculation /></R>} />
-                    <Route path=":lang/calculation/new" element={<R roles={['admin']}><NewCabinetProject /></R>} />
-                    <Route path=":lang/calculation/project/:projectId" element={<R roles={['admin']}><CabinetProjectDetails /></R>} />
-                    <Route path=":lang/calculation/project/:projectId/library" element={<R roles={['admin']}><CabinetLibrary /></R>} />
-                    <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<R roles={['admin']}><CabinetEditor /></R>} />
-                    <Route path=":lang/calculation/model-builder/:modelId?" element={<R roles={['admin']}><CabinetModelBuilder /></R>} />
-                    <Route path=":lang/time-registrations" element={<R roles={['admin', 'manager', 'teamleader']}><TimeRegistrations /></R>} />
-                    <Route path=":lang/invoices" element={<R roles={['admin', 'manager']}><Invoices /></R>} />
+                    <Route path=":lang/daily-tasks" element={<R navbarItem="daily-tasks"><DailyTasks /></R>} />
+                    <Route path=":lang/planning" element={<R navbarItem="planning"><Planning /></R>} />
+                    <Route path=":lang/orders" element={<R navbarItem="orders"><Orders /></R>} />
+                    <Route path=":lang/orders/new" element={<R navbarItem="orders"><Orders /></R>} />
+                    <Route path=":lang/orders/:orderId" element={<R navbarItem="orders"><Orders /></R>} />
+                    <Route path=":lang/orders/:orderId/edit" element={<R navbarItem="orders"><Orders /></R>} />
+                    <Route path=":lang/logistics" element={<R navbarItem="logistics" logistics><Logistics /></R>} />
+                    <Route path=":lang/logistics-out" element={<R navbarItem="logistics-out" logistics><LogisticsOut /></R>} />
+                    <Route path=":lang/rush-orders" element={<R navbarItem="rush-orders"><RushOrders /></R>} />
+                    <Route path=":lang/rush-orders/:rushOrderId" element={<R navbarItem="rush-orders"><RushOrderDetails /></R>} />
+                    <Route path=":lang/calculation" element={<R navbarItem="settings"><Calculation /></R>} />
+                    <Route path=":lang/calculation/new" element={<R navbarItem="settings"><NewCabinetProject /></R>} />
+                    <Route path=":lang/calculation/project/:projectId" element={<R navbarItem="settings"><CabinetProjectDetails /></R>} />
+                    <Route path=":lang/calculation/project/:projectId/library" element={<R navbarItem="settings"><CabinetLibrary /></R>} />
+                    <Route path=":lang/calculation/project/:projectId/editor/:modelId" element={<R navbarItem="settings"><CabinetEditor /></R>} />
+                    <Route path=":lang/calculation/model-builder/:modelId?" element={<R navbarItem="settings"><CabinetModelBuilder /></R>} />
+                    <Route path=":lang/time-registrations" element={<R navbarItem="time-registrations"><TimeRegistrations /></R>} />
+                    <Route path=":lang/invoices" element={<R navbarItem="invoices"><Invoices /></R>} />
                     <Route path=":lang/general-schedule" element={<P><GeneralSchedule /></P>} />
-                    <Route path=":lang/settings" element={<R roles={['admin', 'manager', 'teamleader']}><Settings /></R>} />
-                    <Route path=":lang/control-panel" element={<R roles={['admin', 'manager', 'teamleader']}><ControlPanel /></R>} />
-                    <Route path=":lang/control-panel/:workstationId" element={<R roles={['admin', 'manager', 'teamleader']}><WorkstationControl /></R>} />
-                    <Route path=":lang/truck-loading" element={<R roles={['admin', 'manager', 'installation_team', 'teamleader']}><TruckLoadingView /></R>} />
+                    <Route path=":lang/settings" element={<R navbarItem="settings"><Settings /></R>} />
+                    <Route path=":lang/control-panel" element={<R navbarItem="control-panel"><ControlPanel /></R>} />
+                    <Route path=":lang/control-panel/:workstationId" element={<R navbarItem="control-panel"><WorkstationControl /></R>} />
+                    <Route path=":lang/truck-loading" element={<R navbarItem="daily-tasks"><TruckLoadingView /></R>} />
                     <Route path=":lang/service-installation" element={<P><ServiceInstallation /></P>} />
                     <Route path=":lang/scanner/:workstationId" element={<P><ScannerPage /></P>} />
                   </Route>
