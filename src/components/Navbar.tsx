@@ -129,86 +129,98 @@ const NavbarContent = ({
       {/* Scrollable Menu Items */}
       <ScrollArea className="flex-1 px-2.5 py-2">
         <nav className="space-y-0.5 pb-2">
-          <NavLink to={createLocalizedPath("/")} className={navLinkClass("/")} onClick={handleItemClick}>
-            <Home className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('dashboard')}</span>
-          </NavLink>
+          {canAccess('dashboard') && (
+            <NavLink to={createLocalizedPath("/")} className={navLinkClass("/")} onClick={handleItemClick}>
+              <Home className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('dashboard')}</span>
+            </NavLink>
+          )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
+          {canAccess('control-panel') && (
             <NavLink to={createLocalizedPath("/control-panel")} className={navLinkClass("/control-panel")} onClick={handleItemClick}>
               <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('control_panel')}</span>
             </NavLink>
           )}
 
-          <NavLink to={createLocalizedPath("/projects")} className={navLinkClass("/projects")} onClick={handleItemClick}>
-            <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('projects')}</span>
-          </NavLink>
+          {canAccess('projects') && (
+            <NavLink to={createLocalizedPath("/projects")} className={navLinkClass("/projects")} onClick={handleItemClick}>
+              <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('projects')}</span>
+            </NavLink>
+          )}
 
-          <NavLink to={createLocalizedPath("/workstations")} className={navLinkClass("/workstations")} onClick={handleItemClick}>
-            <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('workstations')}</span>
-          </NavLink>
+          {canAccess('workstations') && (
+            <NavLink to={createLocalizedPath("/workstations")} className={navLinkClass("/workstations")} onClick={handleItemClick}>
+              <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('workstations')}</span>
+            </NavLink>
+          )}
 
-          <NavLink to={createLocalizedPath("/broken-parts")} className={navLinkClass("/broken-parts")} onClick={handleItemClick}>
-            <AlertTriangle className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('broken_parts')}</span>
-          </NavLink>
+          {canAccess('broken-parts') && (
+            <NavLink to={createLocalizedPath("/broken-parts")} className={navLinkClass("/broken-parts")} onClick={handleItemClick}>
+              <AlertTriangle className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('broken_parts')}</span>
+            </NavLink>
+          )}
 
-          <NavLink to={createLocalizedPath("/personal-tasks")} className={navLinkClass("/personal-tasks")} onClick={handleItemClick}>
-            <ListChecks className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('personal_tasks')}</span>
-          </NavLink>
+          {canAccess('personal-tasks') && (
+            <NavLink to={createLocalizedPath("/personal-tasks")} className={navLinkClass("/personal-tasks")} onClick={handleItemClick}>
+              <ListChecks className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('personal_tasks')}</span>
+            </NavLink>
+          )}
 
-          <NavLink to={createLocalizedPath("/notes-and-tasks")} className={navLinkClass("/notes-and-tasks")} onClick={handleItemClick}>
-            <FileText className="w-[18px] h-[18px] shrink-0 opacity-80" />
-            <span>{t('Tasks_Notes')}</span>
-          </NavLink>
+          {canAccess('notes-and-tasks') && (
+            <NavLink to={createLocalizedPath("/notes-and-tasks")} className={navLinkClass("/notes-and-tasks")} onClick={handleItemClick}>
+              <FileText className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('Tasks_Notes')}</span>
+            </NavLink>
+          )}
 
-          {(isDeveloper || isServiceMember || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
+          {(canAccess('service-installation') || isServiceMember) && (
             <NavLink to={createLocalizedPath("/service-installation")} className={navLinkClass("/service-installation")} onClick={handleItemClick}>
               <Wrench className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('service_installation')}</span>
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && (
+          {canAccess('daily-tasks') && (
             <NavLink to={createLocalizedPath("/daily-tasks")} className={navLinkClass("/daily-tasks")} onClick={handleItemClick}>
               <ListChecks className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('installation_planning')}</span>
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader'].includes(currentEmployee.role))) && (
+          {canAccess('planning') && (
             <NavLink to={createLocalizedPath("/planning")} className={navLinkClass("/planning")} onClick={handleItemClick}>
               <Users className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('planning')}</span>
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role))) && (
+          {canAccess('orders') && (
             <NavLink to={createLocalizedPath("/orders")} className={navLinkClass("/orders")} onClick={handleItemClick}>
               <PackagePlus className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('orders')}</span>
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)))) && (
+          {(canAccess('logistics') || currentEmployee?.logistics) && (
             <NavLink to={createLocalizedPath("/logistics")} className={navLinkClass("/logistics")} onClick={handleItemClick}>
               <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('logistics')}</span>
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && (currentEmployee.logistics || ['admin', 'manager', 'installation_team', 'teamleader', 'preparater'].includes(currentEmployee.role)))) && (
+          {(canAccess('logistics-out') || currentEmployee?.logistics) && (
             <NavLink to={createLocalizedPath("/logistics-out")} className={navLinkClass("/logistics-out")} onClick={handleItemClick}>
               <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('logistics_out')}</span>
             </NavLink>
           )}
 
-          {canSeeRushOrders && (
+          {canAccess('rush-orders') && (
             <NavLink to={createLocalizedPath("/rush-orders")} className={navLinkClass("/rush-orders")} onClick={handleItemClick}>
               <PackagePlus className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span className="flex-1">{t('rush_orders')}</span>
@@ -227,7 +239,7 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {canSeeTimeRegistrations && (
+          {canAccess('time-registrations') && (
             <NavLink to={createLocalizedPath("/time-registrations")} className={navLinkClass("/time-registrations")} onClick={handleItemClick}>
               <Clock className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('time_registrations')}</span>
@@ -241,7 +253,7 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {(isDeveloper || (currentEmployee && ['admin', 'manager', 'teamleader'].includes(currentEmployee.role))) && (
+          {canAccess('settings') && (
             <NavLink to={createLocalizedPath("/settings")} className={navLinkClass("/settings")} onClick={handleItemClick}>
               <Settings className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('settings')}</span>
