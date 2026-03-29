@@ -48,7 +48,8 @@ const tabConfig = [
   { value: 'order-task-groups', labelKey: 'set_order_task_groups' },
 ];
 
-const SETTINGS_ALLOWED_ROLES = ['admin', 'manager', 'teamleader'];
+// Settings access is now controlled via role_permissions table (navbarItem: 'settings')
+// The RoleProtectedRoute in App.tsx handles access control
 
 const Settings: React.FC = () => {
   const [searchParams] = useSearchParams();
