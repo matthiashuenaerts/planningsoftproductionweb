@@ -51,9 +51,8 @@ const tabConfig = [
 
 const Settings: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const { currentEmployee } = useAuth();
   const { t } = useLanguage();
-  const { toast } = useToast();
+  const isMobile = useIsMobile();
   const isMobile = useIsMobile();
   const defaultTab = searchParams.get('tab') || 'workstations';
   const [activeTab, setActiveTab] = useState(defaultTab);
