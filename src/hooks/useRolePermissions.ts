@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
-import { useTenant } from '@/context/TenantContext';
 
 interface RolePermission {
   navbar_item: string;
@@ -10,28 +9,25 @@ interface RolePermission {
 
 export function useRolePermissions() {
   const { currentEmployee, isDeveloper } = useAuth();
-  const { tenant } = useTenant();
 
   const role = currentEmployee?.role;
-  const tenantId = currentEmployee?.tenant_id || tenant?.id;
 
   const { data: permissions, isLoading } = useQuery({
-    queryKey: ['role_permissions', role, tenantId],
+    queryKey: ['role_permissions', role],
     queryFn: async () => {
-      if (!role || !tenantId) return [];
+      if (!role) return [];
       const { data, error } = await supabase
         .from('role_permissions')
         .select('navbar_item, can_access')
-        .eq('role', role)
-        .eq('tenant_id', tenantId);
+        .eq('role', role);
       if (error) {
         console.error('Failed to fetch role permissions:', error);
         return [];
       }
       return (data as RolePermission[]) ?? [];
     },
-    enabled: !!role && !!tenantId && !isDeveloper,
-    staleTime: 5 * 60 * 1000, // cache 5 min
+    enabled: !!role && !isDeveloper,
+    staleTime: 5 * 60 * 1000,
   });
 
   /**

@@ -4626,7 +4626,6 @@ export type Database = {
           id: string
           navbar_item: string
           role: Database["public"]["Enums"]["app_role"]
-          tenant_id: string
           updated_at: string
         }
         Insert: {
@@ -4635,7 +4634,6 @@ export type Database = {
           id?: string
           navbar_item: string
           role: Database["public"]["Enums"]["app_role"]
-          tenant_id?: string
           updated_at?: string
         }
         Update: {
@@ -4644,18 +4642,9 @@ export type Database = {
           id?: string
           navbar_item?: string
           role?: Database["public"]["Enums"]["app_role"]
-          tenant_id?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "role_permissions_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       rush_order_assignments: {
         Row: {
