@@ -44,12 +44,33 @@ interface ServiceAssignment {
   created_at: string;
 }
 
+interface TicketItem {
+  id: string;
+  assignment_id: string;
+  item_type: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  order_article_code?: string | null;
+  order_supplier?: string | null;
+  order_quantity?: number | null;
+}
+
+const ITEM_TYPE_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string }> = {
+  todo: { label: 'To-do', icon: ClipboardList, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+  order_request: { label: 'Bestelling', icon: Package, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  production_task: { label: 'Productie', icon: Wrench, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  office_task: { label: 'Kantoor', icon: Building2, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+};
+
 const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName }) => {
   const { tenant } = useTenant();
   const { toast } = useToast();
   const { t } = useLanguage();
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([]);
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
+  const [ticketItems, setTicketItems] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
