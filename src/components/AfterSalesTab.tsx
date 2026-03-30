@@ -136,7 +136,7 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
           .select('*')
           .in('assignment_id', assignmentIds)
           .order('created_at', { ascending: true });
-        setTicketItems((itemsData as TicketItem[]) || []);
+        setTicketItems((itemsData as any as TicketItem[]) || []);
       } else {
         setTicketItems([]);
       }
