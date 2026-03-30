@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -13,12 +14,26 @@ import { format, addDays, parseISO, isToday } from 'date-fns';
 import { nl, fr, enUS } from 'date-fns/locale';
 import {
   MapPin, Camera, ChevronLeft, ChevronRight, ExternalLink, CalendarDays,
-  Phone, Clock, Wrench, Package, ClipboardList, Building2, Navigation, Image
+  Phone, Clock, Wrench, Package, ClipboardList, Building2, Navigation, Image, Zap, AlertTriangle
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import InstallationPhotoCapture from './InstallationPhotoCapture';
 import ServiceTicketItemsPanel from './ServiceTicketItemsPanel';
+import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
+
+// Fix Leaflet default marker icons
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 interface InstallationAssignment {
   id: string;
@@ -61,6 +76,7 @@ const InstallationTeamDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [serviceTicketOpen, setServiceTicketOpen] = useState(false);
+  const [rushOrderOpen, setRushOrderOpen] = useState(false);
   const [selectedAssignmentForTicket, setSelectedAssignmentForTicket] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -71,7 +87,6 @@ const InstallationTeamDashboard: React.FC = () => {
     if (!currentEmployee?.id) return;
     setLoading(true);
     try {
-      // 1. Find teams this employee belongs to
       const { data: memberships } = await (supabase
         .from('placement_team_members' as any)
         .select('team_id')
@@ -84,7 +99,6 @@ const InstallationTeamDashboard: React.FC = () => {
         return;
       }
 
-      // 2. Get all assignments for those teams (today and future, non-service)
       const today = format(new Date(), 'yyyy-MM-dd');
       const { data: assignmentsData } = await supabase
         .from('project_team_assignments')
@@ -103,14 +117,12 @@ const InstallationTeamDashboard: React.FC = () => {
         return;
       }
 
-      // 3. Fetch project details
       const projectIds = [...new Set(assignmentsData.map(a => a.project_id))];
       const { data: projects } = await supabase
         .from('projects')
         .select('id, name, client, description, address_street, address_number, address_postal_code, address_city, installation_date, progress, status')
         .in('id', projectIds);
 
-      // 4. Fetch team info
       const { data: teams } = await (supabase
         .from('placement_teams')
         .select('id, name, color') as any)
@@ -128,7 +140,6 @@ const InstallationTeamDashboard: React.FC = () => {
         }));
 
       setAssignments(enriched);
-      // Set index to today's assignment if exists
       const todayIdx = enriched.findIndex(a => a.start_date && isToday(parseISO(a.start_date)));
       setCurrentIndex(todayIdx >= 0 ? todayIdx : 0);
     } catch (err: any) {
@@ -142,7 +153,6 @@ const InstallationTeamDashboard: React.FC = () => {
     loadAssignments();
   }, [loadAssignments]);
 
-  // Map rendering
   const currentAssignment = assignments[currentIndex];
   const address = currentAssignment?.project
     ? [
@@ -156,7 +166,6 @@ const InstallationTeamDashboard: React.FC = () => {
   useEffect(() => {
     if (!address || !mapContainerRef.current) return;
 
-    // Geocode the address using Nominatim
     const geocode = async () => {
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
@@ -181,7 +190,6 @@ const InstallationTeamDashboard: React.FC = () => {
         ).openPopup();
 
         mapRef.current = map;
-
         setTimeout(() => map.invalidateSize(), 200);
       } catch (err) {
         console.error('Geocoding error:', err);
@@ -211,9 +219,9 @@ const InstallationTeamDashboard: React.FC = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return t('good_morning');
-    if (hour < 18) return t('good_afternoon');
-    return t('good_evening');
+    if (hour < 12) return '☀️ ' + t('good_morning');
+    if (hour < 18) return '🌤️ ' + t('good_afternoon');
+    return '🌙 ' + t('good_evening');
   };
 
   if (loading) {
@@ -233,14 +241,14 @@ const InstallationTeamDashboard: React.FC = () => {
       {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
       {isMobile && <Navbar />}
       <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
-        <div className="max-w-4xl mx-auto space-y-4">
+        <div className="w-full max-w-7xl mx-auto space-y-4">
           {/* Header */}
           <div className="mb-4">
             <p className="text-sm text-muted-foreground">
               {getGreeting()}, {currentEmployee?.name?.split(' ')[0]}
             </p>
             <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-2xl'}`}>
-              Installatie Dashboard
+              {t('installation_dashboard') || 'Installatie Dashboard'}
             </h1>
           </div>
 
@@ -262,10 +270,10 @@ const InstallationTeamDashboard: React.FC = () => {
                   disabled={currentIndex === 0}
                   onClick={() => setCurrentIndex(i => i - 1)}
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Vorige
+                  <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous') || 'Vorige'}
                 </Button>
                 <span className="text-sm text-muted-foreground font-medium">
-                  {currentIndex + 1} / {assignments.length} installaties
+                  {currentIndex + 1} / {assignments.length} {t('installations') || 'installaties'}
                 </span>
                 <Button
                   variant="outline"
@@ -273,193 +281,233 @@ const InstallationTeamDashboard: React.FC = () => {
                   disabled={currentIndex === assignments.length - 1}
                   onClick={() => setCurrentIndex(i => i + 1)}
                 >
-                  Volgende <ChevronRight className="h-4 w-4 ml-1" />
+                  {t('next') || 'Volgende'} <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
 
               {currentAssignment && (
                 <>
-                  {/* Project Info Card */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate">{currentAssignment.project.name}</CardTitle>
-                          <CardDescription className="truncate">{currentAssignment.project.client}</CardDescription>
-                        </div>
-                        <div className="flex gap-2 flex-shrink-0">
-                          {currentAssignment.team_info && (
-                            <Badge
-                              style={{ backgroundColor: currentAssignment.team_info.color, color: '#fff' }}
-                            >
-                              {currentAssignment.team_info.name}
-                            </Badge>
-                          )}
-                          {currentAssignment.start_date && isToday(parseISO(currentAssignment.start_date)) && (
-                            <Badge variant="default">Vandaag</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Dates */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <CalendarDays className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-muted-foreground text-xs">Startdatum</p>
-                            <p className="font-medium">
-                              {currentAssignment.start_date
-                                ? format(parseISO(currentAssignment.start_date), 'EEEE d MMMM', { locale: dateFnsLocale })
-                                : 'Niet gepland'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-muted-foreground text-xs">Duur</p>
-                            <p className="font-medium">
-                              {currentAssignment.duration} {currentAssignment.duration === 1 ? 'dag' : 'dagen'}
-                              {getEndDate(currentAssignment) && (
-                                <span className="text-muted-foreground ml-1">
-                                  (t/m {format(getEndDate(currentAssignment)!, 'd MMM', { locale: dateFnsLocale })})
-                                </span>
+                  {/* Desktop: two-column layout / Mobile: single column */}
+                  <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
+                    {/* Left column: Project info */}
+                    <div className="space-y-4">
+                      {/* Project Info Card */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className={`${isMobile ? 'text-base' : 'text-lg'} truncate`}>{currentAssignment.project.name}</CardTitle>
+                              <CardDescription className="truncate">{currentAssignment.project.client}</CardDescription>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+                              {currentAssignment.team_info && (
+                                <Badge style={{ backgroundColor: currentAssignment.team_info.color, color: '#fff' }}>
+                                  {currentAssignment.team_info.name}
+                                </Badge>
                               )}
-                            </p>
+                              {currentAssignment.start_date && isToday(parseISO(currentAssignment.start_date)) && (
+                                <Badge variant="default">{t('today') || 'Vandaag'}</Badge>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Address */}
-                      {address && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-primary mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-muted-foreground text-xs">Adres</p>
-                            <p className="font-medium">{address}</p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={openNavigation}>
-                            <Navigation className="h-4 w-4 mr-1" /> Route
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Progress */}
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">Voortgang</span>
-                        <div className="flex-1 bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{ width: `${currentAssignment.project.progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium">{currentAssignment.project.progress || 0}%</span>
-                      </div>
-
-                      {/* Description */}
-                      {currentAssignment.project.description && (
-                        <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
-                          {currentAssignment.project.description}
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => window.open(`/${tenant?.slug}/${lang}/projects/${currentAssignment.project.id}`, '_blank')}
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" /> Projectdetails
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setPhotoDialogOpen(true)}
-                        >
-                          <Camera className="h-4 w-4 mr-2" /> Werf Foto's
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Map */}
-                  {address && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <MapPin className="h-4 w-4" /> Locatie
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div
-                          ref={mapContainerRef}
-                          className="w-full h-64 rounded-lg overflow-hidden border border-border"
-                        />
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Service Ticket Creation */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Wrench className="h-4 w-4" /> Naservice
-                      </CardTitle>
-                      <CardDescription>
-                        Maak een naservice ticket aan voor dit project
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Button
-                        className="w-full"
-                        onClick={() => {
-                          setSelectedAssignmentForTicket(currentAssignment.id);
-                          setServiceTicketOpen(true);
-                        }}
-                      >
-                        <ClipboardList className="h-4 w-4 mr-2" /> Nieuw Service Ticket
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  {/* Upcoming installations overview */}
-                  {assignments.length > 1 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <CalendarDays className="h-4 w-4" /> Komende Installaties
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {assignments.map((a, idx) => (
-                          <button
-                            key={a.id}
-                            onClick={() => setCurrentIndex(idx)}
-                            className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                              idx === currentIndex
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:bg-muted/50'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {/* Dates */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center gap-2 text-sm">
+                              <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
                               <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">{a.project.name}</p>
-                                <p className="text-xs text-muted-foreground">{a.project.client}</p>
-                              </div>
-                              <div className="text-right flex-shrink-0 ml-2">
-                                {a.start_date && (
-                                  <p className="text-xs font-medium">
-                                    {format(parseISO(a.start_date), 'd MMM', { locale: dateFnsLocale })}
-                                  </p>
-                                )}
-                                <p className="text-xs text-muted-foreground">{a.duration}d</p>
+                                <p className="text-muted-foreground text-xs">{t('start_date') || 'Startdatum'}</p>
+                                <p className="font-medium truncate">
+                                  {currentAssignment.start_date
+                                    ? format(parseISO(currentAssignment.start_date), 'EEEE d MMMM', { locale: dateFnsLocale })
+                                    : t('not_planned') || 'Niet gepland'}
+                                </p>
                               </div>
                             </div>
-                          </button>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  )}
+                            <div className="flex items-center gap-2 text-sm">
+                              <Clock className="h-4 w-4 text-primary flex-shrink-0" />
+                              <div>
+                                <p className="text-muted-foreground text-xs">{t('duration') || 'Duur'}</p>
+                                <p className="font-medium">
+                                  {currentAssignment.duration} {currentAssignment.duration === 1 ? (t('day') || 'dag') : (t('days') || 'dagen')}
+                                  {getEndDate(currentAssignment) && (
+                                    <span className="text-muted-foreground ml-1">
+                                      (t/m {format(getEndDate(currentAssignment)!, 'd MMM', { locale: dateFnsLocale })})
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Address */}
+                          {address && (
+                            <div className="flex items-start gap-2 text-sm">
+                              <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-muted-foreground text-xs">{t('address') || 'Adres'}</p>
+                                <p className="font-medium break-words">{address}</p>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={openNavigation} className="flex-shrink-0">
+                                <Navigation className="h-4 w-4 mr-1" /> Route
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Progress */}
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground">{t('progress') || 'Voortgang'}</span>
+                            <div className="flex-1 bg-muted rounded-full h-2.5">
+                              <div
+                                className="bg-primary h-2.5 rounded-full transition-all"
+                                style={{ width: `${currentAssignment.project.progress || 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium">{currentAssignment.project.progress || 0}%</span>
+                          </div>
+
+                          {/* Description */}
+                          {currentAssignment.project.description && (
+                            <div className="text-sm text-muted-foreground bg-muted/50 rounded-md p-3">
+                              {currentAssignment.project.description}
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                            <Button
+                              variant="outline"
+                              size={isMobile ? 'sm' : 'default'}
+                              onClick={() => window.open(`/${tenant?.slug}/${lang}/projects/${currentAssignment.project.id}`, '_blank')}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1.5" />
+                              <span className="truncate">{t('project_details') || 'Projectdetails'}</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size={isMobile ? 'sm' : 'default'}
+                              onClick={() => setPhotoDialogOpen(true)}
+                            >
+                              <Camera className="h-4 w-4 mr-1.5" />
+                              <span className="truncate">{t('yard_photos') || 'Werf Foto\'s'}</span>
+                            </Button>
+                            {!isMobile && (
+                              <Button
+                                variant="outline"
+                                onClick={openNavigation}
+                              >
+                                <Navigation className="h-4 w-4 mr-1.5" />
+                                <span className="truncate">Google Maps</span>
+                              </Button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Service + Rush Order cards */}
+                      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                        {/* Service Ticket */}
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Wrench className="h-4 w-4" /> {t('after_sales') || 'Naservice'}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedAssignmentForTicket(currentAssignment.id);
+                                setServiceTicketOpen(true);
+                              }}
+                            >
+                              <ClipboardList className="h-4 w-4 mr-2" /> {t('new_service_ticket') || 'Nieuw Service Ticket'}
+                            </Button>
+                          </CardContent>
+                        </Card>
+
+                        {/* Rush Order */}
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-amber-500" /> {t('rush_order') || 'Spoedorder'}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => setRushOrderOpen(true)}
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-2" /> {t('create_rush_order') || 'Spoedorder Aanmaken'}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+
+                    {/* Right column: Map + Upcoming */}
+                    <div className="space-y-4">
+                      {/* Map */}
+                      {address && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <MapPin className="h-4 w-4" /> {t('location') || 'Locatie'}
+                            </CardTitle>
+                            <CardDescription className="text-xs truncate">{address}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div
+                              ref={mapContainerRef}
+                              className={`w-full ${isMobile ? 'h-48' : 'h-72'} rounded-lg overflow-hidden border border-border`}
+                            />
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Upcoming installations */}
+                      {assignments.length > 1 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <CalendarDays className="h-4 w-4" /> {t('upcoming_installations') || 'Komende Installaties'}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 max-h-80 overflow-y-auto">
+                            {assignments.map((a, idx) => (
+                              <button
+                                key={a.id}
+                                onClick={() => setCurrentIndex(idx)}
+                                className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                                  idx === currentIndex
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-border hover:bg-muted/50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm truncate">{a.project.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{a.project.client}</p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0 ml-2">
+                                    {a.start_date && (
+                                      <p className="text-xs font-medium">
+                                        {format(parseISO(a.start_date), 'd MMM', { locale: dateFnsLocale })}
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">{a.duration}d</p>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Photo capture dialog */}
                   <InstallationPhotoCapture
@@ -477,6 +525,28 @@ const InstallationTeamDashboard: React.FC = () => {
                     projectName={currentAssignment.project.name}
                     assignmentId={selectedAssignmentForTicket}
                   />
+
+                  {/* Rush Order Dialog */}
+                  <Dialog open={rushOrderOpen} onOpenChange={setRushOrderOpen}>
+                    <DialogContent className={isMobile ? 'max-w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto' : 'max-w-2xl max-h-[85vh] overflow-y-auto'}>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Zap className="h-5 w-5 text-amber-500" /> {t('create_rush_order') || 'Spoedorder Aanmaken'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <NewRushOrderForm
+                        initialValues={{
+                          title: `Spoed - ${currentAssignment.project.name}`,
+                          description: `Project: ${currentAssignment.project.name}\nKlant: ${currentAssignment.project.client}\nAdres: ${address || '-'}`,
+                          projectId: currentAssignment.project.id,
+                        }}
+                        onSuccess={() => {
+                          setRushOrderOpen(false);
+                          toast({ title: t('rush_order_created') || 'Spoedorder aangemaakt' });
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </>
               )}
             </>
