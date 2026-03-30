@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useTenant } from '@/context/TenantContext';
@@ -15,8 +17,9 @@ import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Plus, CheckCircle, Clock, Package, Wrench, Building2, ClipboardList,
-  Trash2, Loader2, AlertCircle
+  Trash2, Loader2, AlertCircle, ChevronsUpDown, Search
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ServiceTicketItemsPanelProps {
   open: boolean;
@@ -35,6 +38,9 @@ interface TicketItem {
   status: string;
   priority: string;
   created_at: string;
+  order_article_code?: string | null;
+  order_supplier?: string | null;
+  order_quantity?: number | null;
 }
 
 interface ServiceAssignment {
@@ -43,6 +49,13 @@ interface ServiceAssignment {
   start_date: string | null;
   service_notes: string | null;
   service_hours: number | null;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
+  article_code?: string;
+  supplier?: string;
 }
 
 const ITEM_TYPE_CONFIG = {
@@ -74,10 +87,17 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
   const [showForm, setShowForm] = useState(false);
   const [targetAssignmentId, setTargetAssignmentId] = useState<string>('');
 
+  // Order-specific fields
+  const [orderArticleCode, setOrderArticleCode] = useState('');
+  const [orderSupplier, setOrderSupplier] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState<number>(1);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Load service ticket assignments for this project
       const { data: ticketAssignments } = await supabase
         .from('project_team_assignments')
         .select('id, team, start_date, service_notes, service_hours')
@@ -87,7 +107,6 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
 
       setAssignments((ticketAssignments || []) as ServiceAssignment[]);
 
-      // Load all items for these assignments
       if (ticketAssignments && ticketAssignments.length > 0) {
         const ids = ticketAssignments.map(a => a.id);
         const { data: itemsData } = await supabase
@@ -100,7 +119,6 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
         setItems([]);
       }
 
-      // Default target assignment
       if (ticketAssignments && ticketAssignments.length > 0) {
         setTargetAssignmentId(ticketAssignments[0].id);
       }
@@ -111,11 +129,25 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
     }
   }, [projectId]);
 
-  useEffect(() => {
-    if (open) loadData();
-  }, [open, loadData]);
+  // Load products/accessories for order selection
+  const loadProducts = useCallback(async () => {
+    try {
+      let query = supabase.from('products' as any).select('id, name, article_code, supplier').limit(200);
+      if (tenant?.id) {
+        query = applyTenantFilter(query, tenant.id);
+      }
+      const { data } = await query;
+      setProducts((data as any) || []);
+    } catch { /* ignore */ }
+  }, [tenant?.id]);
 
-  // Create a new service ticket (assignment) if none exist
+  useEffect(() => {
+    if (open) {
+      loadData();
+      loadProducts();
+    }
+  }, [open, loadData, loadProducts]);
+
   const createServiceTicket = async () => {
     try {
       const { data, error } = await supabase
@@ -152,26 +184,42 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
         aId = created;
       }
 
-      const { error } = await supabase.from('service_ticket_items' as any).insert({
+      const insertData: any = {
         assignment_id: aId,
         item_type: newType,
         title: newTitle.trim(),
         description: newDescription.trim() || null,
         priority: newPriority,
         created_by: currentEmployee.id,
-      });
+      };
 
+      // Add order-specific fields
+      if (newType === 'order_request') {
+        insertData.order_article_code = orderArticleCode.trim() || null;
+        insertData.order_supplier = orderSupplier.trim() || null;
+        insertData.order_quantity = orderQuantity || 1;
+      }
+
+      const { error } = await supabase.from('service_ticket_items' as any).insert(insertData);
       if (error) throw error;
+
       toast({ title: 'Item toegevoegd' });
-      setNewTitle('');
-      setNewDescription('');
-      setShowForm(false);
+      resetForm();
       loadData();
     } catch (err: any) {
       toast({ title: 'Fout', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setNewTitle('');
+    setNewDescription('');
+    setOrderArticleCode('');
+    setOrderSupplier('');
+    setOrderQuantity(1);
+    setShowForm(false);
   };
 
   const toggleItemStatus = async (item: TicketItem) => {
@@ -184,6 +232,18 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
     await supabase.from('service_ticket_items' as any).delete().eq('id', id);
     loadData();
   };
+
+  const selectProduct = (product: ProductOption) => {
+    setNewTitle(product.name);
+    setOrderArticleCode(product.article_code || '');
+    setOrderSupplier(product.supplier || '');
+    setProductPopoverOpen(false);
+  };
+
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.article_code && p.article_code.toLowerCase().includes(productSearch.toLowerCase()))
+  );
 
   const filteredItems = activeTab === 'all'
     ? items
@@ -201,13 +261,26 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
         <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
           {/* Tabs for filtering */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className={`w-full ${isMobile ? 'grid grid-cols-3' : 'grid grid-cols-5'}`}>
               <TabsTrigger value="all" className="text-xs">Alles</TabsTrigger>
               <TabsTrigger value="todo" className="text-xs">To-do</TabsTrigger>
-              <TabsTrigger value="order_request" className="text-xs">Bestellingen</TabsTrigger>
-              <TabsTrigger value="production_task" className="text-xs">Productie</TabsTrigger>
-              <TabsTrigger value="office_task" className="text-xs">Kantoor</TabsTrigger>
+              <TabsTrigger value="order_request" className="text-xs">
+                <Package className="h-3 w-3 mr-1" />
+                {isMobile ? 'Best.' : 'Bestellingen'}
+              </TabsTrigger>
+              {!isMobile && (
+                <>
+                  <TabsTrigger value="production_task" className="text-xs">Productie</TabsTrigger>
+                  <TabsTrigger value="office_task" className="text-xs">Kantoor</TabsTrigger>
+                </>
+              )}
             </TabsList>
+            {isMobile && (
+              <TabsList className="w-full grid grid-cols-2 mt-1">
+                <TabsTrigger value="production_task" className="text-xs">Productie</TabsTrigger>
+                <TabsTrigger value="office_task" className="text-xs">Kantoor</TabsTrigger>
+              </TabsList>
+            )}
           </Tabs>
 
           {/* Add button */}
@@ -250,8 +323,86 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
                   </Select>
                 </div>
               </div>
+
+              {/* Product selection for order_request */}
+              {newType === 'order_request' && (
+                <div className="space-y-3 border border-border rounded-md p-3 bg-background">
+                  <Label className="text-xs font-semibold flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5" /> Bestelling details
+                  </Label>
+                  
+                  {/* Product selector */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Product selecteren (optioneel)</Label>
+                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between h-9 text-sm font-normal">
+                          <span className="truncate">{newTitle || 'Zoek een product...'}</span>
+                          <ChevronsUpDown className="h-3.5 w-3.5 ml-2 flex-shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Zoek product of artikelcode..."
+                            value={productSearch}
+                            onValueChange={setProductSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Geen producten gevonden</CommandEmpty>
+                            <CommandGroup className="max-h-48 overflow-y-auto">
+                              {filteredProducts.slice(0, 30).map(p => (
+                                <CommandItem key={p.id} onSelect={() => selectProduct(p)} className="text-sm">
+                                  <div className="flex flex-col">
+                                    <span>{p.name}</span>
+                                    {p.article_code && (
+                                      <span className="text-xs text-muted-foreground">{p.article_code}</span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Artikelcode</Label>
+                      <Input
+                        value={orderArticleCode}
+                        onChange={e => setOrderArticleCode(e.target.value)}
+                        placeholder="Artikelcode"
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Leverancier</Label>
+                      <Input
+                        value={orderSupplier}
+                        onChange={e => setOrderSupplier(e.target.value)}
+                        placeholder="Leverancier"
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Aantal</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={orderQuantity}
+                      onChange={e => setOrderQuantity(parseInt(e.target.value) || 1)}
+                      className="h-9 text-sm w-24"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
-                <Label className="text-xs">Titel</Label>
+                <Label className="text-xs">{newType === 'order_request' ? 'Product / Omschrijving' : 'Titel'}</Label>
                 <Input
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
@@ -293,7 +444,7 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
                   {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                   Toevoegen
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Annuleren</Button>
+                <Button size="sm" variant="ghost" onClick={resetForm}>Annuleren</Button>
               </div>
             </div>
           )}
@@ -349,6 +500,20 @@ const ServiceTicketItemsPanel: React.FC<ServiceTicketItemsPanelProps> = ({
                           </Badge>
                         )}
                       </div>
+                      {/* Order details */}
+                      {item.item_type === 'order_request' && (item.order_article_code || item.order_supplier || item.order_quantity) && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {item.order_article_code && (
+                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">Code: {item.order_article_code}</span>
+                          )}
+                          {item.order_supplier && (
+                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">Lev: {item.order_supplier}</span>
+                          )}
+                          {item.order_quantity && (
+                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">Qty: {item.order_quantity}</span>
+                          )}
+                        </div>
+                      )}
                       {item.description && (
                         <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
                       )}
