@@ -9,7 +9,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Plus, X, Edit3, Trash2, Loader2, HeadphonesIcon, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarIcon, Plus, X, Edit3, Trash2, Loader2, HeadphonesIcon, Clock, CheckCircle, AlertCircle, Package, Wrench, Building2, ClipboardList } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,12 +44,33 @@ interface ServiceAssignment {
   created_at: string;
 }
 
+interface TicketItem {
+  id: string;
+  assignment_id: string;
+  item_type: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  order_article_code?: string | null;
+  order_supplier?: string | null;
+  order_quantity?: number | null;
+}
+
+const ITEM_TYPE_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string }> = {
+  todo: { label: 'To-do', icon: ClipboardList, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+  order_request: { label: 'Bestelling', icon: Package, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+  production_task: { label: 'Productie', icon: Wrench, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+  office_task: { label: 'Kantoor', icon: Building2, color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+};
+
 const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName }) => {
   const { tenant } = useTenant();
   const { toast } = useToast();
   const { t } = useLanguage();
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([]);
   const [serviceTeams, setServiceTeams] = useState<ServiceTeam[]>([]);
+  const [ticketItems, setTicketItems] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -105,6 +127,19 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
         return a.is_service_ticket === true;
       });
       setAssignments(filtered as ServiceAssignment[]);
+
+      // Load service ticket items for these assignments
+      if (filtered.length > 0) {
+        const assignmentIds = filtered.map((a: any) => a.id);
+        const { data: itemsData } = await supabase
+          .from('service_ticket_items' as any)
+          .select('*')
+          .in('assignment_id', assignmentIds)
+          .order('created_at', { ascending: true });
+        setTicketItems((itemsData as any as TicketItem[]) || []);
+      } else {
+        setTicketItems([]);
+      }
     } catch (error) {
       console.error('Error loading after sales data:', error);
     } finally {
@@ -337,6 +372,57 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
                       ))}
                     </div>
                   )}
+
+                  {/* Service Ticket Items grouped by type */}
+                  {(() => {
+                    const assignmentItems = ticketItems.filter(i => i.assignment_id === assignment.id);
+                    if (assignmentItems.length === 0) return null;
+                    
+                    const orderItems = assignmentItems.filter(i => i.item_type === 'order_request');
+                    const productionItems = assignmentItems.filter(i => i.item_type === 'production_task');
+                    const officeItems = assignmentItems.filter(i => i.item_type === 'office_task');
+                    const todoItems = assignmentItems.filter(i => i.item_type === 'todo');
+
+                    const renderItemGroup = (items: TicketItem[], label: string, Icon: React.FC<any>, colorClass: string) => {
+                      if (items.length === 0) return null;
+                      return (
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold flex items-center gap-1">
+                            <Icon className="h-3 w-3" /> {label}
+                          </p>
+                          {items.map(item => (
+                            <div key={item.id} className={`flex items-start gap-2 text-xs p-1.5 rounded ${item.status === 'completed' ? 'opacity-50' : ''}`}>
+                              {item.status === 'completed' ? (
+                                <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0 text-green-500" />
+                              ) : (
+                                <div className="h-3 w-3 mt-0.5 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className={item.status === 'completed' ? 'line-through text-muted-foreground' : ''}>{item.title}</span>
+                                {item.item_type === 'order_request' && (item.order_article_code || item.order_supplier) && (
+                                  <div className="flex gap-1 mt-0.5 flex-wrap">
+                                    {item.order_article_code && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{item.order_article_code}</Badge>}
+                                    {item.order_supplier && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{item.order_supplier}</Badge>}
+                                    {item.order_quantity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">x{item.order_quantity}</Badge>}
+                                  </div>
+                                )}
+                                {item.priority === 'critical' && <Badge variant="destructive" className="text-[9px] px-1 py-0 ml-1">!</Badge>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="border-t border-border pt-2 space-y-2">
+                        {renderItemGroup(orderItems, 'Bestellingen', Package, 'text-amber-600')}
+                        {renderItemGroup(productionItems, 'Productie', Wrench, 'text-purple-600')}
+                        {renderItemGroup(officeItems, 'Kantoor', Building2, 'text-green-600')}
+                        {renderItemGroup(todoItems, 'To-do', ClipboardList, 'text-blue-600')}
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             );

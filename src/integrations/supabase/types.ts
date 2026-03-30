@@ -5024,6 +5024,9 @@ export type Database = {
           description: string | null
           id: string
           item_type: string
+          order_article_code: string | null
+          order_quantity: number | null
+          order_supplier: string | null
           priority: string | null
           status: string
           tenant_id: string
@@ -5038,6 +5041,9 @@ export type Database = {
           description?: string | null
           id?: string
           item_type?: string
+          order_article_code?: string | null
+          order_quantity?: number | null
+          order_supplier?: string | null
           priority?: string | null
           status?: string
           tenant_id?: string
@@ -5052,6 +5058,9 @@ export type Database = {
           description?: string | null
           id?: string
           item_type?: string
+          order_article_code?: string | null
+          order_quantity?: number | null
+          order_supplier?: string | null
           priority?: string | null
           status?: string
           tenant_id?: string
