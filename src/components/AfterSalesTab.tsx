@@ -127,6 +127,19 @@ const AfterSalesTab: React.FC<AfterSalesTabProps> = ({ projectId, projectName })
         return a.is_service_ticket === true;
       });
       setAssignments(filtered as ServiceAssignment[]);
+
+      // Load service ticket items for these assignments
+      if (filtered.length > 0) {
+        const assignmentIds = filtered.map((a: any) => a.id);
+        const { data: itemsData } = await supabase
+          .from('service_ticket_items' as any)
+          .select('*')
+          .in('assignment_id', assignmentIds)
+          .order('created_at', { ascending: true });
+        setTicketItems((itemsData as TicketItem[]) || []);
+      } else {
+        setTicketItems([]);
+      }
     } catch (error) {
       console.error('Error loading after sales data:', error);
     } finally {
