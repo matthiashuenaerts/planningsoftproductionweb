@@ -134,15 +134,17 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
       });
 
       // Also create a project file reference in the yard-photos folder
-      await supabase.from('project_files' as any).insert({
-        project_id: projectId,
-        file_name: fileName,
-        file_path: path,
-        file_type: 'image/jpeg',
-        file_size: blob.size,
-        folder: 'Werf Foto\'s',
-        uploaded_by: currentEmployee.id,
-      }).then(() => {}).catch(() => {}); // Silently fail if table doesn't have folder column
+      try {
+        await supabase.from('project_files' as any).insert({
+          project_id: projectId,
+          file_name: fileName,
+          file_path: path,
+          file_type: 'image/jpeg',
+          file_size: blob.size,
+          folder: 'Werf Foto\'s',
+          uploaded_by: currentEmployee.id,
+        });
+      } catch { /* ignore */ }
 
       toast({ title: 'Foto opgeslagen', description: 'De foto is opgeslagen in de werf map.' });
       setCaption('');
@@ -182,15 +184,17 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
         });
 
         // Also register in project files
-        await supabase.from('project_files' as any).insert({
-          project_id: projectId,
-          file_name: file.name,
-          file_path: path,
-          file_type: file.type,
-          file_size: file.size,
-          folder: 'Werf Foto\'s',
-          uploaded_by: currentEmployee.id,
-        }).then(() => {}).catch(() => {});
+        try {
+          await supabase.from('project_files' as any).insert({
+            project_id: projectId,
+            file_name: file.name,
+            file_path: path,
+            file_type: file.type,
+            file_size: file.size,
+            folder: 'Werf Foto\'s',
+            uploaded_by: currentEmployee.id,
+          });
+        } catch { /* ignore */ }
       }
       toast({ title: 'Foto\'s geüpload', description: `${files.length} foto(\'s) opgeslagen.` });
       setCaption('');
