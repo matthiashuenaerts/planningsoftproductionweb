@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { Camera, Upload, Trash2, Loader2, RotateCcw, X, Check, SwitchCamera } from 'lucide-react';
+import { Camera, Upload, Trash2, Loader2, X, SwitchCamera } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { format } from 'date-fns';
 
 interface InstallationPhotoCaptureProps {
   open: boolean;
@@ -27,6 +30,7 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
   open, onOpenChange, projectId, projectName
 }) => {
   const { currentEmployee } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,10 +40,11 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [caption, setCaption] = useState('');
-  const [cameraMode, setCameraMode] = useState<'none' | 'camera' | 'preview'>('none');
+  const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [photoToDelete, setPhotoToDelete] = useState<Photo | null>(null);
+  const [captureCount, setCaptureCount] = useState(0);
 
   const YARD_FOLDER = `yard-photos/${projectId}`;
 
@@ -70,7 +75,8 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
         video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       setStream(mediaStream);
-      setCameraMode('camera');
+      setCameraActive(true);
+      setCaptureCount(0);
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
@@ -78,7 +84,7 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
       }, 100);
     } catch (err) {
       console.error('Camera access error:', err);
-      toast({ title: 'Camera niet beschikbaar', description: 'Gebruik de bestandsselectie.', variant: 'destructive' });
+      toast({ title: t('inst_camera_not_available'), description: t('inst_camera_not_available_desc'), variant: 'destructive' });
     }
   };
 
@@ -87,8 +93,8 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
       stream.getTracks().forEach(t => t.stop());
       setStream(null);
     }
-    setCameraMode('none');
-    setCapturedImage(null);
+    setCameraActive(false);
+    setCaptureCount(0);
   };
 
   const switchCamera = async () => {
@@ -98,32 +104,48 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
     setTimeout(() => startCamera(), 200);
   };
 
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  const drawTimestamp = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const now = new Date();
+    const timestamp = format(now, 'dd/MM/yyyy HH:mm');
+    const fontSize = Math.max(20, Math.floor(height / 30));
+    ctx.font = `bold ${fontSize}px Arial`;
+    const textWidth = ctx.measureText(timestamp).width;
+    const padding = 12;
+    const x = width - textWidth - padding * 2;
+    const y = height - padding * 2;
+
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x - padding, y - fontSize - padding / 2, textWidth + padding * 2, fontSize + padding);
+
+    // White text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(timestamp, x, y);
+  };
+
+  const captureAndSave = async () => {
+    if (!videoRef.current || !canvasRef.current || !currentEmployee) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setCapturedImage(dataUrl);
-    setCameraMode('preview');
-  };
 
-  const uploadCapturedPhoto = async () => {
-    if (!capturedImage || !currentEmployee) return;
+    ctx.drawImage(video, 0, 0);
+    drawTimestamp(ctx, canvas.width, canvas.height);
+
     setUploading(true);
     try {
-      const blob = await (await fetch(capturedImage)).blob();
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.85);
+      });
       const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
       const path = `${YARD_FOLDER}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('project_files')
         .upload(path, blob, { contentType: 'image/jpeg' });
-
       if (uploadError) throw uploadError;
 
       await supabase.from('installation_photos' as any).insert({
@@ -133,7 +155,6 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
         caption: caption || null,
       });
 
-      // Also create a project file reference in the yard-photos folder
       try {
         await supabase.from('project_files' as any).insert({
           project_id: projectId,
@@ -146,14 +167,10 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
         });
       } catch { /* ignore */ }
 
-      toast({ title: 'Foto opgeslagen', description: 'De foto is opgeslagen in de werf map.' });
-      setCaption('');
-      setCapturedImage(null);
-      setCameraMode('none');
-      stopCamera();
-      loadPhotos();
+      setCaptureCount(c => c + 1);
+      toast({ title: t('inst_photo_saved'), description: t('inst_photo_saved_desc') });
     } catch (err: any) {
-      toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+      toast({ title: t('inst_error'), description: err.message, variant: 'destructive' });
     } finally {
       setUploading(false);
     }
@@ -173,7 +190,6 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
         const { error: uploadError } = await supabase.storage
           .from('project_files')
           .upload(path, file);
-
         if (uploadError) throw uploadError;
 
         await supabase.from('installation_photos' as any).insert({
@@ -183,7 +199,6 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
           caption: caption || null,
         });
 
-        // Also register in project files
         try {
           await supabase.from('project_files' as any).insert({
             project_id: projectId,
@@ -196,141 +211,153 @@ const InstallationPhotoCapture: React.FC<InstallationPhotoCaptureProps> = ({
           });
         } catch { /* ignore */ }
       }
-      toast({ title: 'Foto\'s geüpload', description: `${files.length} foto(\'s) opgeslagen.` });
+      toast({ title: t('inst_photos_uploaded'), description: `${files.length} foto(s)` });
       setCaption('');
       loadPhotos();
     } catch (err: any) {
-      toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+      toast({ title: t('inst_error'), description: err.message, variant: 'destructive' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleDelete = async (photo: Photo) => {
+  const confirmDelete = async () => {
+    if (!photoToDelete) return;
     try {
-      await supabase.storage.from('project_files').remove([photo.file_path]);
-      await supabase.from('installation_photos' as any).delete().eq('id', photo.id);
+      await supabase.storage.from('project_files').remove([photoToDelete.file_path]);
+      await supabase.from('installation_photos' as any).delete().eq('id', photoToDelete.id);
+      // Also remove from project_files table
+      try {
+        await supabase.from('project_files' as any).delete().eq('file_path', photoToDelete.file_path);
+      } catch { /* ignore */ }
+      toast({ title: t('inst_photo_deleted') });
+      setPhotoToDelete(null);
       loadPhotos();
     } catch (err: any) {
-      toast({ title: 'Fout', description: err.message, variant: 'destructive' });
+      toast({ title: t('inst_error'), description: err.message, variant: 'destructive' });
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) stopCamera(); onOpenChange(o); }}>
-      <DialogContent className={isMobile ? 'max-w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto p-4' : 'max-w-lg max-h-[85vh] overflow-y-auto'}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" /> Werf Foto's
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) stopCamera(); onOpenChange(o); }}>
+        <DialogContent className={isMobile ? 'max-w-[100vw] h-[100dvh] p-0 m-0 rounded-none' : 'max-w-2xl max-h-[90vh] overflow-y-auto'}>
+          <DialogHeader className={isMobile ? 'p-4 pb-2' : ''}>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" /> {t('inst_yard_photos')}
+            </DialogTitle>
+          </DialogHeader>
 
-        <canvas ref={canvasRef} className="hidden" />
+          <canvas ref={canvasRef} className="hidden" />
 
-        <div className="space-y-4">
-          {/* Camera view */}
-          {cameraMode === 'camera' && (
-            <div className="relative rounded-lg overflow-hidden bg-black">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full aspect-[4/3] object-cover"
-              />
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-3">
-                <Button size="icon" variant="secondary" className="h-10 w-10 rounded-full" onClick={switchCamera}>
-                  <SwitchCamera className="h-5 w-5" />
-                </Button>
-                <Button size="icon" className="h-14 w-14 rounded-full bg-white text-black hover:bg-gray-200" onClick={capturePhoto}>
-                  <Camera className="h-6 w-6" />
-                </Button>
-                <Button size="icon" variant="destructive" className="h-10 w-10 rounded-full" onClick={stopCamera}>
-                  <X className="h-5 w-5" />
-                </Button>
+          <div className={`space-y-4 ${isMobile ? 'px-4 pb-4 overflow-y-auto' : ''}`}>
+            {/* Camera view - large and prominent */}
+            {cameraActive && (
+              <div className="relative rounded-lg overflow-hidden bg-black">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full ${isMobile ? 'h-[60dvh]' : 'h-[50vh]'} object-cover`}
+                />
+                {captureCount > 0 && (
+                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground rounded-full h-8 w-8 flex items-center justify-center text-sm font-bold">
+                    {captureCount}
+                  </div>
+                )}
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
+                  <Button size="icon" variant="secondary" className="h-12 w-12 rounded-full" onClick={switchCamera}>
+                    <SwitchCamera className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    className="h-16 w-16 rounded-full bg-white text-black hover:bg-gray-200 border-4 border-white/50"
+                    onClick={captureAndSave}
+                    disabled={uploading}
+                  >
+                    {uploading ? <Loader2 className="h-7 w-7 animate-spin" /> : <Camera className="h-7 w-7" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-12 w-12 rounded-full"
+                    onClick={() => { stopCamera(); loadPhotos(); }}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Preview captured image */}
-          {cameraMode === 'preview' && capturedImage && (
-            <div className="relative rounded-lg overflow-hidden">
-              <img src={capturedImage} alt="Preview" className="w-full aspect-[4/3] object-cover" />
-              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-3">
-                <Button size="icon" variant="secondary" className="h-10 w-10 rounded-full" onClick={() => { setCapturedImage(null); setCameraMode('camera'); }}>
-                  <RotateCcw className="h-5 w-5" />
-                </Button>
-                <Button
-                  size="icon"
-                  className="h-14 w-14 rounded-full bg-green-500 hover:bg-green-600 text-white"
-                  onClick={uploadCapturedPhoto}
-                  disabled={uploading}
-                >
-                  {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <Check className="h-6 w-6" />}
-                </Button>
+            {/* Upload section */}
+            {!cameraActive && (
+              <div className="space-y-2">
+                <Input
+                  placeholder={t('inst_caption_optional')}
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="default" onClick={startCamera} disabled={uploading}>
+                    <Camera className="h-4 w-4 mr-2" /> {t('inst_camera')}
+                  </Button>
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    {uploading ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t('inst_uploading')}</>
+                    ) : (
+                      <><Upload className="h-4 w-4 mr-2" /> {t('inst_select_files')}</>
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Upload section (when camera not active) */}
-          {cameraMode === 'none' && (
-            <div className="space-y-2">
-              <Input
-                placeholder="Bijschrift (optioneel)"
-                value={caption}
-                onChange={e => setCaption(e.target.value)}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="default"
-                  onClick={startCamera}
-                  disabled={uploading}
-                >
-                  <Camera className="h-4 w-4 mr-2" /> Camera
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploaden...</>
-                  ) : (
-                    <><Upload className="h-4 w-4 mr-2" /> Selecteren</>
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
+            {/* Photo grid */}
+            {!cameraActive && (
+              loading ? (
+                <div className="py-8 text-center text-muted-foreground">{t('inst_loading')}</div>
+              ) : photos.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  {t('inst_no_photos')}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {photos.map(photo => (
+                    <PhotoThumbnail key={photo.id} photo={photo} onDelete={setPhotoToDelete} />
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Photo grid */}
-          {cameraMode === 'none' && (
-            loading ? (
-              <div className="py-8 text-center text-muted-foreground">Laden...</div>
-            ) : photos.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground text-sm">
-                Nog geen foto's voor dit project
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {photos.map(photo => (
-                  <PhotoThumbnail key={photo.id} photo={photo} onDelete={handleDelete} />
-                ))}
-              </div>
-            )
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Delete confirmation */}
+      <AlertDialog open={!!photoToDelete} onOpenChange={(o) => { if (!o) setPhotoToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('inst_delete_photo')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('inst_delete_confirm')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {t('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
@@ -349,10 +376,13 @@ const PhotoThumbnail: React.FC<{ photo: Photo; onDelete: (p: Photo) => void }> =
       {photo.caption && (
         <p className="text-xs p-1.5 truncate text-muted-foreground">{photo.caption}</p>
       )}
+      <p className="text-[10px] px-1.5 pb-1 text-muted-foreground/60">
+        {format(new Date(photo.created_at), 'dd/MM/yyyy HH:mm')}
+      </p>
       <Button
         variant="destructive"
         size="icon"
-        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={() => onDelete(photo)}
       >
         <Trash2 className="h-3 w-3" />
