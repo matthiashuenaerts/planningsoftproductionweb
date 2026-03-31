@@ -861,6 +861,10 @@ const InstallationTeamsSettings: React.FC = () => {
           </AlertDialogContent>
         </AlertDialog>
       </TabsContent>
+
+      <TabsContent value="task-config">
+        <InstallationTaskConfig />
+      </TabsContent>
     </Tabs>
   );
 };
