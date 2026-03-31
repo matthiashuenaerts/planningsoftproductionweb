@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import InstallationTaskConfig from '@/components/installation/InstallationTaskConfig';
 import {
   Card,
   CardContent,
@@ -423,6 +424,7 @@ const InstallationTeamsSettings: React.FC = () => {
       <TabsList>
         <TabsTrigger value="teams"><Users className="h-4 w-4 mr-2" />Teams</TabsTrigger>
         <TabsTrigger value="trucks"><Truck className="h-4 w-4 mr-2" />Trucks</TabsTrigger>
+        <TabsTrigger value="task-config">⚙️ Installation Task</TabsTrigger>
       </TabsList>
       <TabsContent value="teams">
     <div className="space-y-6">
@@ -860,6 +862,10 @@ const InstallationTeamsSettings: React.FC = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </TabsContent>
+
+      <TabsContent value="task-config">
+        <InstallationTaskConfig />
       </TabsContent>
     </Tabs>
   );
