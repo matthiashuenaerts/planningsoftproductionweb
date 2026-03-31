@@ -424,6 +424,7 @@ const InstallationTeamsSettings: React.FC = () => {
       <TabsList>
         <TabsTrigger value="teams"><Users className="h-4 w-4 mr-2" />Teams</TabsTrigger>
         <TabsTrigger value="trucks"><Truck className="h-4 w-4 mr-2" />Trucks</TabsTrigger>
+        <TabsTrigger value="task-config">⚙️ Installation Task</TabsTrigger>
       </TabsList>
       <TabsContent value="teams">
     <div className="space-y-6">
