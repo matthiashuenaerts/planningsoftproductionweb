@@ -71,9 +71,9 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
       if (standardTaskIds.length > 0) {
         const { data: stData } = await supabase
           .from('standard_tasks')
-          .select('id, name')
+          .select('id, task_name')
           .in('id', standardTaskIds);
-        stMap = Object.fromEntries((stData || []).map(s => [s.id, s.name]));
+        stMap = Object.fromEntries((stData || []).map(s => [s.id, s.task_name]));
       }
 
       setTasks(tasksData.map(t => ({

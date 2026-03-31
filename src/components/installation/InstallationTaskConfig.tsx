@@ -35,9 +35,9 @@ const InstallationTaskConfig: React.FC = () => {
     setLoading(true);
     try {
       // Load standard tasks
-      const query = supabase.from('standard_tasks').select('id, name').order('name');
+      const query = supabase.from('standard_tasks').select('id, task_name').order('task_name');
       const { data: tasks } = await applyTenantFilter(query, tenant.id);
-      setStandardTasks(tasks || []);
+      setStandardTasks((tasks || []).map(t => ({ id: t.id, name: t.task_name })));
 
       // Load current setting from tenant settings
       const { data: tenantData } = await supabase
