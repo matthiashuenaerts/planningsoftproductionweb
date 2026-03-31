@@ -14,7 +14,7 @@ import { format, addDays, parseISO, isToday } from 'date-fns';
 import { nl, fr, enUS } from 'date-fns/locale';
 import {
   MapPin, Camera, ChevronLeft, ChevronRight, ExternalLink, CalendarDays,
-  Phone, Clock, Wrench, Package, ClipboardList, Building2, Navigation, Image, Zap, AlertTriangle
+  Clock, Wrench, ClipboardList, Navigation, Zap, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import L from 'leaflet';
@@ -22,6 +22,8 @@ import 'leaflet/dist/leaflet.css';
 import InstallationPhotoCapture from './InstallationPhotoCapture';
 import ServiceTicketItemsPanel from './ServiceTicketItemsPanel';
 import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
+import InstallationTaskList from './InstallationTaskList';
+import InstallationCompletionDialog from './InstallationCompletionDialog';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -78,10 +80,30 @@ const InstallationTeamDashboard: React.FC = () => {
   const [serviceTicketOpen, setServiceTicketOpen] = useState(false);
   const [rushOrderOpen, setRushOrderOpen] = useState(false);
   const [selectedAssignmentForTicket, setSelectedAssignmentForTicket] = useState<string | null>(null);
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+  const [completionTaskId, setCompletionTaskId] = useState<string>('');
+  const [installationStandardTaskId, setInstallationStandardTaskId] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
   const dateFnsLocale = lang === 'nl' ? nl : lang === 'fr' ? fr : enUS;
+
+  // Load installation task setting from tenant
+  useEffect(() => {
+    const loadSetting = async () => {
+      if (!tenant?.id) return;
+      try {
+        const { data } = await supabase
+          .from('tenants')
+          .select('settings')
+          .eq('id', tenant.id)
+          .single();
+        const settings = (data?.settings as any) || {};
+        setInstallationStandardTaskId(settings.installation_standard_task_id || null);
+      } catch { /* ignore */ }
+    };
+    loadSetting();
+  }, [tenant?.id]);
 
   const loadAssignments = useCallback(async () => {
     if (!currentEmployee?.id) return;
@@ -219,9 +241,14 @@ const InstallationTeamDashboard: React.FC = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return '☀️ ' + t('good_morning');
-    if (hour < 18) return '🌤️ ' + t('good_afternoon');
-    return '🌙 ' + t('good_evening');
+    if (hour < 12) return t('good_morning');
+    if (hour < 18) return t('good_afternoon');
+    return t('good_evening');
+  };
+
+  const handleInstallationTaskComplete = (taskId: string) => {
+    setCompletionTaskId(taskId);
+    setCompletionDialogOpen(true);
   };
 
   if (loading) {
@@ -230,7 +257,7 @@ const InstallationTeamDashboard: React.FC = () => {
         {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
         {isMobile && <Navbar />}
         <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'} flex items-center justify-center`}>
-          <div className="animate-pulse text-muted-foreground">Laden...</div>
+          <div className="animate-pulse text-muted-foreground">{t('inst_loading')}</div>
         </div>
       </div>
     );
@@ -248,7 +275,7 @@ const InstallationTeamDashboard: React.FC = () => {
               {getGreeting()}, {currentEmployee?.name?.split(' ')[0]}
             </p>
             <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-2xl'}`}>
-              {t('installation_dashboard') || 'Installatie Dashboard'}
+              {t('inst_dashboard')}
             </h1>
           </div>
 
@@ -256,8 +283,8 @@ const InstallationTeamDashboard: React.FC = () => {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <CalendarDays className="h-12 w-12 mx-auto mb-4 opacity-40" />
-                <p className="text-lg font-medium">Geen installaties gepland</p>
-                <p className="text-sm">Er zijn momenteel geen installaties aan uw team toegewezen.</p>
+                <p className="text-lg font-medium">{t('inst_no_installations_planned')}</p>
+                <p className="text-sm">{t('inst_no_installations_assigned')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -270,10 +297,10 @@ const InstallationTeamDashboard: React.FC = () => {
                   disabled={currentIndex === 0}
                   onClick={() => setCurrentIndex(i => i - 1)}
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" /> {t('previous') || 'Vorige'}
+                  <ChevronLeft className="h-4 w-4 mr-1" /> {t('inst_previous')}
                 </Button>
                 <span className="text-sm text-muted-foreground font-medium">
-                  {currentIndex + 1} / {assignments.length} {t('installations') || 'installaties'}
+                  {currentIndex + 1} / {assignments.length} {t('inst_installations')}
                 </span>
                 <Button
                   variant="outline"
@@ -281,15 +308,14 @@ const InstallationTeamDashboard: React.FC = () => {
                   disabled={currentIndex === assignments.length - 1}
                   onClick={() => setCurrentIndex(i => i + 1)}
                 >
-                  {t('next') || 'Volgende'} <ChevronRight className="h-4 w-4 ml-1" />
+                  {t('inst_next')} <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
 
               {currentAssignment && (
                 <>
-                  {/* Desktop: two-column layout / Mobile: single column */}
                   <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
-                    {/* Left column: Project info */}
+                    {/* Left column: Project info + Tasks */}
                     <div className="space-y-4">
                       {/* Project Info Card */}
                       <Card>
@@ -306,7 +332,7 @@ const InstallationTeamDashboard: React.FC = () => {
                                 </Badge>
                               )}
                               {currentAssignment.start_date && isToday(parseISO(currentAssignment.start_date)) && (
-                                <Badge variant="default">{t('today') || 'Vandaag'}</Badge>
+                                <Badge variant="default">{t('inst_today')}</Badge>
                               )}
                             </div>
                           </div>
@@ -317,23 +343,23 @@ const InstallationTeamDashboard: React.FC = () => {
                             <div className="flex items-center gap-2 text-sm">
                               <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
                               <div className="min-w-0">
-                                <p className="text-muted-foreground text-xs">{t('start_date') || 'Startdatum'}</p>
+                                <p className="text-muted-foreground text-xs">{t('start_date')}</p>
                                 <p className="font-medium truncate">
                                   {currentAssignment.start_date
                                     ? format(parseISO(currentAssignment.start_date), 'EEEE d MMMM', { locale: dateFnsLocale })
-                                    : t('not_planned') || 'Niet gepland'}
+                                    : t('inst_not_planned')}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                               <Clock className="h-4 w-4 text-primary flex-shrink-0" />
                               <div>
-                                <p className="text-muted-foreground text-xs">{t('duration') || 'Duur'}</p>
+                                <p className="text-muted-foreground text-xs">{t('duration')}</p>
                                 <p className="font-medium">
-                                  {currentAssignment.duration} {currentAssignment.duration === 1 ? (t('day') || 'dag') : (t('days') || 'dagen')}
+                                  {currentAssignment.duration} {currentAssignment.duration === 1 ? t('inst_day') : t('inst_days')}
                                   {getEndDate(currentAssignment) && (
                                     <span className="text-muted-foreground ml-1">
-                                      (t/m {format(getEndDate(currentAssignment)!, 'd MMM', { locale: dateFnsLocale })})
+                                      ({t('inst_until')} {format(getEndDate(currentAssignment)!, 'd MMM', { locale: dateFnsLocale })})
                                     </span>
                                   )}
                                 </p>
@@ -346,18 +372,18 @@ const InstallationTeamDashboard: React.FC = () => {
                             <div className="flex items-start gap-2 text-sm">
                               <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-muted-foreground text-xs">{t('address') || 'Adres'}</p>
+                                <p className="text-muted-foreground text-xs">{t('inst_address')}</p>
                                 <p className="font-medium break-words">{address}</p>
                               </div>
                               <Button variant="outline" size="sm" onClick={openNavigation} className="flex-shrink-0">
-                                <Navigation className="h-4 w-4 mr-1" /> Route
+                                <Navigation className="h-4 w-4 mr-1" /> {t('inst_route')}
                               </Button>
                             </div>
                           )}
 
                           {/* Progress */}
                           <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">{t('progress') || 'Voortgang'}</span>
+                            <span className="text-xs text-muted-foreground">{t('progress')}</span>
                             <div className="flex-1 bg-muted rounded-full h-2.5">
                               <div
                                 className="bg-primary h-2.5 rounded-full transition-all"
@@ -382,7 +408,7 @@ const InstallationTeamDashboard: React.FC = () => {
                               onClick={() => window.open(`/${tenant?.slug}/${lang}/projects/${currentAssignment.project.id}`, '_blank')}
                             >
                               <ExternalLink className="h-4 w-4 mr-1.5" />
-                              <span className="truncate">{t('project_details') || 'Projectdetails'}</span>
+                              <span className="truncate">{t('inst_project_details')}</span>
                             </Button>
                             <Button
                               variant="outline"
@@ -390,7 +416,7 @@ const InstallationTeamDashboard: React.FC = () => {
                               onClick={() => setPhotoDialogOpen(true)}
                             >
                               <Camera className="h-4 w-4 mr-1.5" />
-                              <span className="truncate">{t('yard_photos') || 'Werf Foto\'s'}</span>
+                              <span className="truncate">{t('inst_yard_photos')}</span>
                             </Button>
                             {!isMobile && (
                               <Button
@@ -398,20 +424,40 @@ const InstallationTeamDashboard: React.FC = () => {
                                 onClick={openNavigation}
                               >
                                 <Navigation className="h-4 w-4 mr-1.5" />
-                                <span className="truncate">Google Maps</span>
+                                <span className="truncate">{t('inst_google_maps')}</span>
                               </Button>
                             )}
                           </div>
                         </CardContent>
                       </Card>
 
+                      {/* Task List */}
+                      <InstallationTaskList
+                        projectId={currentAssignment.project.id}
+                        installationStandardTaskId={installationStandardTaskId}
+                        onInstallationTaskComplete={handleInstallationTaskComplete}
+                      />
+
+                      {/* Large Complete Installation Button */}
+                      {installationStandardTaskId && (
+                        <Button
+                          className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => {
+                            // Find the installation task and trigger completion
+                            handleInstallationTaskComplete('');
+                          }}
+                        >
+                          <CheckCircle2 className="h-6 w-6 mr-2" />
+                          {t('inst_complete_installation')}
+                        </Button>
+                      )}
+
                       {/* Service + Rush Order cards */}
                       <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-                        {/* Service Ticket */}
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <Wrench className="h-4 w-4" /> {t('after_sales') || 'Naservice'}
+                              <Wrench className="h-4 w-4" /> {t('inst_after_sales')}
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
@@ -423,16 +469,15 @@ const InstallationTeamDashboard: React.FC = () => {
                                 setServiceTicketOpen(true);
                               }}
                             >
-                              <ClipboardList className="h-4 w-4 mr-2" /> {t('new_service_ticket') || 'Nieuw Service Ticket'}
+                              <ClipboardList className="h-4 w-4 mr-2" /> {t('inst_new_service_ticket')}
                             </Button>
                           </CardContent>
                         </Card>
 
-                        {/* Rush Order */}
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <Zap className="h-4 w-4 text-amber-500" /> {t('rush_order') || 'Spoedorder'}
+                              <Zap className="h-4 w-4 text-amber-500" /> {t('inst_rush_order')}
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
@@ -441,7 +486,7 @@ const InstallationTeamDashboard: React.FC = () => {
                               variant="outline"
                               onClick={() => setRushOrderOpen(true)}
                             >
-                              <AlertTriangle className="h-4 w-4 mr-2" /> {t('create_rush_order') || 'Spoedorder Aanmaken'}
+                              <AlertTriangle className="h-4 w-4 mr-2" /> {t('inst_create_rush_order')}
                             </Button>
                           </CardContent>
                         </Card>
@@ -450,12 +495,11 @@ const InstallationTeamDashboard: React.FC = () => {
 
                     {/* Right column: Map + Upcoming */}
                     <div className="space-y-4">
-                      {/* Map */}
                       {address && (
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <MapPin className="h-4 w-4" /> {t('location') || 'Locatie'}
+                              <MapPin className="h-4 w-4" /> {t('inst_location')}
                             </CardTitle>
                             <CardDescription className="text-xs truncate">{address}</CardDescription>
                           </CardHeader>
@@ -468,12 +512,11 @@ const InstallationTeamDashboard: React.FC = () => {
                         </Card>
                       )}
 
-                      {/* Upcoming installations */}
                       {assignments.length > 1 && (
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                              <CalendarDays className="h-4 w-4" /> {t('upcoming_installations') || 'Komende Installaties'}
+                              <CalendarDays className="h-4 w-4" /> {t('inst_upcoming')}
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-2 max-h-80 overflow-y-auto">
@@ -509,7 +552,7 @@ const InstallationTeamDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Photo capture dialog */}
+                  {/* Dialogs */}
                   <InstallationPhotoCapture
                     open={photoDialogOpen}
                     onOpenChange={setPhotoDialogOpen}
@@ -517,7 +560,6 @@ const InstallationTeamDashboard: React.FC = () => {
                     projectName={currentAssignment.project.name}
                   />
 
-                  {/* Service Ticket Items */}
                   <ServiceTicketItemsPanel
                     open={serviceTicketOpen}
                     onOpenChange={setServiceTicketOpen}
@@ -526,12 +568,11 @@ const InstallationTeamDashboard: React.FC = () => {
                     assignmentId={selectedAssignmentForTicket}
                   />
 
-                  {/* Rush Order Dialog */}
                   <Dialog open={rushOrderOpen} onOpenChange={setRushOrderOpen}>
                     <DialogContent className={isMobile ? 'max-w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto' : 'max-w-2xl max-h-[85vh] overflow-y-auto'}>
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                          <Zap className="h-5 w-5 text-amber-500" /> {t('create_rush_order') || 'Spoedorder Aanmaken'}
+                          <Zap className="h-5 w-5 text-amber-500" /> {t('inst_create_rush_order')}
                         </DialogTitle>
                       </DialogHeader>
                       <NewRushOrderForm
@@ -542,11 +583,29 @@ const InstallationTeamDashboard: React.FC = () => {
                         }}
                         onSuccess={() => {
                           setRushOrderOpen(false);
-                          toast({ title: t('rush_order_created') || 'Spoedorder aangemaakt' });
+                          toast({ title: t('inst_create_rush_order') });
                         }}
                       />
                     </DialogContent>
                   </Dialog>
+
+                  {completionDialogOpen && (
+                    <InstallationCompletionDialog
+                      open={completionDialogOpen}
+                      onOpenChange={setCompletionDialogOpen}
+                      taskId={completionTaskId}
+                      projectId={currentAssignment.project.id}
+                      projectName={currentAssignment.project.name}
+                      assignmentId={currentAssignment.id}
+                      onCompleted={() => {
+                        loadAssignments();
+                      }}
+                      onServiceTicketNeeded={() => {
+                        setSelectedAssignmentForTicket(currentAssignment.id);
+                        setServiceTicketOpen(true);
+                      }}
+                    />
+                  )}
                 </>
               )}
             </>
