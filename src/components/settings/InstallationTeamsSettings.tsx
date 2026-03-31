@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import InstallationTaskConfig from '@/components/installation/InstallationTaskConfig';
 import {
   Card,
   CardContent,
