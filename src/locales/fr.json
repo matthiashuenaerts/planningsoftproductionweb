@@ -1826,5 +1826,11 @@
   "inst_email_placeholder": "email@entreprise.fr",
   "inst_add_email": "Ajouter un e-mail",
   "inst_email_saved": "Adresse e-mail enregistrée",
-  "inst_google_maps": "Google Maps"
+  "inst_google_maps": "Google Maps",
+  "inst_documents": "Documents",
+  "inst_project_files": "Fichiers du projet",
+  "inst_no_documents": "Aucun document trouvé",
+  "inst_tasks_same_day": "tâches le même jour",
+  "inst_service_hours": "Heures de service",
+  "inst_start_service": "Démarrer le service"
 }
