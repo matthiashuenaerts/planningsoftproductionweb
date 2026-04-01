@@ -655,6 +655,48 @@ const StandardTasksSettings: React.FC = () => {
                             <TooltipTrigger asChild>
                               <div className="flex items-center justify-center">
                                 <Checkbox
+                                  id={`installation-${task.id}`}
+                                  checked={task.is_installation_task || false}
+                                  onCheckedChange={async (checked) => {
+                                    try {
+                                      await standardTasksService.update(task.id, { is_installation_task: checked as boolean });
+                                      await fetchData();
+                                      toast({
+                                        title: 'Success',
+                                        description: checked 
+                                          ? `"${task.task_number}" marked as installation task`
+                                          : 'Installation task flag removed',
+                                      });
+                                    } catch (error) {
+                                      console.error('Error updating is_installation_task:', error);
+                                      toast({
+                                        title: 'Error',
+                                        description: 'Failed to update installation task setting',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  }}
+                                  className={task.is_installation_task ? 'border-primary' : ''}
+                                />
+                                {task.is_installation_task && (
+                                  <MapPin className="h-4 w-4 ml-1 text-primary" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">
+                                Mark as installation/placement task. Tasks with this flag appear on the Installation Dashboard.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center">
+                                <Checkbox
                                   id={`multi-user-${task.id}`}
                                   checked={task.multi_user_task || false}
                                   onCheckedChange={async (checked) => {
