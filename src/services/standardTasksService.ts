@@ -12,6 +12,7 @@ export interface StandardTask {
   hourly_cost: number;
   is_last_production_step?: boolean;
   multi_user_task?: boolean;
+  is_installation_task?: boolean;
   created_at: string;
   updated_at: string;
 }
