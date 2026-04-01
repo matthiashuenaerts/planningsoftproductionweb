@@ -397,7 +397,7 @@ export const standardTasksService = {
     return data as StandardTask;
   },
 
-  async update(id: string, updates: Partial<{ task_number: string; task_name: string; time_coefficient: number; day_counter: number; color: string; hourly_cost: number; multi_user_task: boolean }>): Promise<StandardTask> {
+  async update(id: string, updates: Partial<{ task_number: string; task_name: string; time_coefficient: number; day_counter: number; color: string; hourly_cost: number; multi_user_task: boolean; is_installation_task: boolean }>): Promise<StandardTask> {
     const { data, error } = await supabase
       .from('standard_tasks')
       .update(updates)

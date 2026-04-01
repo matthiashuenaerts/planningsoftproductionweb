@@ -579,6 +579,7 @@ const StandardTasksSettings: React.FC = () => {
                   <TableHead className="w-20 sticky top-0 bg-background">Task #</TableHead>
                   <TableHead className="sticky top-0 bg-background">Task Name</TableHead>
                   <TableHead className="w-24 sticky top-0 bg-background">Last Step</TableHead>
+                  <TableHead className="w-24 sticky top-0 bg-background">Installation</TableHead>
                   <TableHead className="w-24 sticky top-0 bg-background">Multi-User</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Time Coefficient</TableHead>
                   <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
