@@ -5241,6 +5241,7 @@ export type Database = {
           day_counter: number
           hourly_cost: number
           id: string
+          is_installation_task: boolean | null
           is_last_production_step: boolean | null
           multi_user_task: boolean | null
           task_name: string
@@ -5255,6 +5256,7 @@ export type Database = {
           day_counter?: number
           hourly_cost?: number
           id?: string
+          is_installation_task?: boolean | null
           is_last_production_step?: boolean | null
           multi_user_task?: boolean | null
           task_name: string
@@ -5269,6 +5271,7 @@ export type Database = {
           day_counter?: number
           hourly_cost?: number
           id?: string
+          is_installation_task?: boolean | null
           is_last_production_step?: boolean | null
           multi_user_task?: boolean | null
           task_name?: string

@@ -1348,5 +1348,11 @@
   "inst_email_placeholder": "email@company.com",
   "inst_add_email": "Add email",
   "inst_email_saved": "Email address saved",
-  "inst_google_maps": "Google Maps"
+  "inst_google_maps": "Google Maps",
+  "inst_documents": "Documents",
+  "inst_project_files": "Project Files",
+  "inst_no_documents": "No documents found",
+  "inst_tasks_same_day": "tasks on the same day",
+  "inst_service_hours": "Service hours",
+  "inst_start_service": "Start Service"
 }

@@ -101,11 +101,19 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
     try {
       await supabase.from('tasks').update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() }).eq('id', taskId);
       
-      // Create time registration
+      // Create time registration (activates the task timer)
       const task = tasks.find(t => t.id === taskId);
       if (task) {
         const { data: phase } = await supabase.from('phases').select('project_id').eq('id', task.phase_id).single();
         if (phase) {
+          // Stop any existing active time registrations for this employee
+          await supabase
+            .from('time_registrations')
+            .update({ end_time: new Date().toISOString(), is_active: false })
+            .eq('employee_id', currentEmployee.id)
+            .eq('is_active', true);
+
+          // Start new time registration
           await supabase.from('time_registrations').insert({
             employee_id: currentEmployee.id,
             task_id: taskId,

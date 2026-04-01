@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle, Flag, Users } from 'lucide-react';
+import { Save, X, Plus, Trash2, CheckSquare, Edit, AlertTriangle, Flag, Users, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -579,6 +579,7 @@ const StandardTasksSettings: React.FC = () => {
                   <TableHead className="w-20 sticky top-0 bg-background">Task #</TableHead>
                   <TableHead className="sticky top-0 bg-background">Task Name</TableHead>
                   <TableHead className="w-24 sticky top-0 bg-background">Last Step</TableHead>
+                  <TableHead className="w-24 sticky top-0 bg-background">Installation</TableHead>
                   <TableHead className="w-24 sticky top-0 bg-background">Multi-User</TableHead>
                   <TableHead className="w-32 sticky top-0 bg-background">Time Coefficient</TableHead>
                   <TableHead className="w-20 sticky top-0 bg-background">Actions</TableHead>
@@ -643,6 +644,48 @@ const StandardTasksSettings: React.FC = () => {
                               <p className="max-w-xs">
                                 Mark this as the last production step. This defines the production completion date 
                                 and is used for capacity calculations. Only one task can be marked.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center">
+                                <Checkbox
+                                  id={`installation-${task.id}`}
+                                  checked={task.is_installation_task || false}
+                                  onCheckedChange={async (checked) => {
+                                    try {
+                                      await standardTasksService.update(task.id, { is_installation_task: checked as boolean });
+                                      await fetchData();
+                                      toast({
+                                        title: 'Success',
+                                        description: checked 
+                                          ? `"${task.task_number}" marked as installation task`
+                                          : 'Installation task flag removed',
+                                      });
+                                    } catch (error) {
+                                      console.error('Error updating is_installation_task:', error);
+                                      toast({
+                                        title: 'Error',
+                                        description: 'Failed to update installation task setting',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  }}
+                                  className={task.is_installation_task ? 'border-primary' : ''}
+                                />
+                                {task.is_installation_task && (
+                                  <MapPin className="h-4 w-4 ml-1 text-primary" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">
+                                Mark as installation/placement task. Tasks with this flag appear on the Installation Dashboard.
                               </p>
                             </TooltipContent>
                           </Tooltip>
