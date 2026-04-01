@@ -1826,5 +1826,11 @@
   "inst_email_placeholder": "email@bedrijf.nl",
   "inst_add_email": "E-mail toevoegen",
   "inst_email_saved": "E-mailadres opgeslagen",
-  "inst_google_maps": "Google Maps"
+  "inst_google_maps": "Google Maps",
+  "inst_documents": "Documenten",
+  "inst_project_files": "Projectbestanden",
+  "inst_no_documents": "Geen documenten gevonden",
+  "inst_tasks_same_day": "taken op dezelfde dag",
+  "inst_service_hours": "Service uren",
+  "inst_start_service": "Start Service"
 }
