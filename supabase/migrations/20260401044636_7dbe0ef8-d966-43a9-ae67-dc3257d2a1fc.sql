@@ -1,0 +1,1 @@
+ALTER TABLE public.standard_tasks ADD COLUMN IF NOT EXISTS is_installation_task boolean DEFAULT false;
