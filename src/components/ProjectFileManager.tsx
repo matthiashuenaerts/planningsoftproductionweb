@@ -505,7 +505,10 @@ const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) =>
   }
 
   return (
-    <div>
+    <div className="space-y-4">
+      {/* Yard Photos Folder */}
+      <YardPhotosFolder projectId={projectId} />
+
       <Card className="w-full">
         <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
           <CardTitle className="text-sm sm:text-lg">Project Files</CardTitle>
