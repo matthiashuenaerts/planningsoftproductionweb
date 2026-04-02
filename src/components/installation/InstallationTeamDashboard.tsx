@@ -267,6 +267,7 @@ const InstallationTeamDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!address || !mapContainerRef.current) return;
+    setDrivingTime(null);
 
     const geocode = async () => {
       try {
@@ -274,25 +275,59 @@ const InstallationTeamDashboard: React.FC = () => {
         const data = await res.json();
         if (data.length === 0) return;
 
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
+        const destLat = parseFloat(data[0].lat);
+        const destLng = parseFloat(data[0].lon);
 
         if (mapRef.current) {
           mapRef.current.remove();
           mapRef.current = null;
         }
 
-        const map = L.map(mapContainerRef.current!, { zoomControl: !isMobile }).setView([lat, lng], 14);
+        const map = L.map(mapContainerRef.current!, { zoomControl: !isMobile }).setView([destLat, destLng], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap',
         }).addTo(map);
 
-        L.marker([lat, lng]).addTo(map).bindPopup(
+        L.marker([destLat, destLng]).addTo(map).bindPopup(
           `<strong>${currentAssignment?.project.name}</strong><br/>${address}`
         ).openPopup();
 
         mapRef.current = map;
         setTimeout(() => map.invalidateSize(), 200);
+
+        // Calculate driving time from team's base address
+        if (currentAssignment?.team_id) {
+          try {
+            const { data: teamData } = await supabase
+              .from('placement_teams' as any)
+              .select('address')
+              .eq('id', currentAssignment.team_id)
+              .maybeSingle();
+
+            const teamAddress = (teamData as any)?.address;
+            if (teamAddress) {
+              const teamRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(teamAddress)}&limit=1`);
+              const teamGeo = await teamRes.json();
+              if (teamGeo.length > 0) {
+                const teamLat = parseFloat(teamGeo[0].lat);
+                const teamLng = parseFloat(teamGeo[0].lon);
+
+                // Use OSRM for driving time
+                const routeRes = await fetch(
+                  `https://router.project-osrm.org/route/v1/driving/${teamLng},${teamLat};${destLng},${destLat}?overview=false`
+                );
+                const routeData = await routeRes.json();
+                if (routeData.routes && routeData.routes.length > 0) {
+                  const durationMin = Math.round(routeData.routes[0].duration / 60);
+                  const distKm = (routeData.routes[0].distance / 1000).toFixed(1);
+                  setDrivingTime(`~${durationMin} min (${distKm} km)`);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Driving time calculation error:', err);
+          }
+        }
       } catch (err) {
         console.error('Geocoding error:', err);
       }
