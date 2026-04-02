@@ -16,18 +16,21 @@ interface ProjectTask {
   standard_task_id: string | null;
   standard_task_name: string;
   phase_name: string;
+  is_installation_task: boolean;
 }
 
 interface InstallationTaskListProps {
   projectId: string;
   onInstallationTaskComplete?: (taskId: string) => void;
   installationStandardTaskId?: string | null;
+  installationStandardTaskIds?: string[];
 }
 
 const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
   projectId,
   onInstallationTaskComplete,
   installationStandardTaskId,
+  installationStandardTaskIds = [],
 }) => {
   const { currentEmployee } = useAuth();
   const { t } = useLanguage();
@@ -35,6 +38,12 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Combine both props for backwards compat
+  const allInstallationIds = new Set([
+    ...(installationStandardTaskId ? [installationStandardTaskId] : []),
+    ...installationStandardTaskIds,
+  ]);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -53,11 +62,12 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
       const phaseIds = phases.map(p => p.id);
       const phaseMap = Object.fromEntries(phases.map(p => [p.id, p.name]));
 
+      // Include HOLD status tasks too - installation tasks should be visible even on HOLD
       const { data: tasksData } = await supabase
         .from('tasks')
         .select('id, status, phase_id, standard_task_id')
         .in('phase_id', phaseIds)
-        .in('status', ['TODO', 'IN_PROGRESS'])
+        .in('status', ['TODO', 'IN_PROGRESS', 'HOLD'])
         .order('created_at', { ascending: true });
 
       if (!tasksData || tasksData.length === 0) {
@@ -67,29 +77,44 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
       }
 
       const standardTaskIds = [...new Set(tasksData.filter(t => t.standard_task_id).map(t => t.standard_task_id!))];
-      let stMap: Record<string, string> = {};
+      let stMap: Record<string, { name: string; isInstallation: boolean }> = {};
       if (standardTaskIds.length > 0) {
         const { data: stData } = await supabase
           .from('standard_tasks')
-          .select('id, task_name')
+          .select('id, task_name, is_installation_task')
           .in('id', standardTaskIds);
-        stMap = Object.fromEntries((stData || []).map(s => [s.id, s.task_name]));
+        stMap = Object.fromEntries((stData || []).map(s => [s.id, { 
+          name: s.task_name, 
+          isInstallation: s.is_installation_task || false 
+        }]));
       }
 
-      setTasks(tasksData.map(t => ({
-        id: t.id,
-        status: t.status,
-        phase_id: t.phase_id,
-        standard_task_id: t.standard_task_id,
-        standard_task_name: t.standard_task_id ? (stMap[t.standard_task_id] || 'Taak') : 'Taak',
-        phase_name: phaseMap[t.phase_id] || '',
-      })));
+      // Filter: only show tasks that are installation tasks OR are TODO/IN_PROGRESS
+      const mapped: ProjectTask[] = tasksData.map(t => {
+        const stInfo = t.standard_task_id ? stMap[t.standard_task_id] : null;
+        return {
+          id: t.id,
+          status: t.status,
+          phase_id: t.phase_id,
+          standard_task_id: t.standard_task_id,
+          standard_task_name: stInfo?.name || 'Taak',
+          phase_name: phaseMap[t.phase_id] || '',
+          is_installation_task: stInfo?.isInstallation || allInstallationIds.has(t.standard_task_id || ''),
+        };
+      });
+
+      // Show: installation tasks (any status), or TODO/IN_PROGRESS tasks
+      const filtered = mapped.filter(t => 
+        t.is_installation_task || t.status === 'TODO' || t.status === 'IN_PROGRESS'
+      );
+
+      setTasks(filtered);
     } catch (err) {
       console.error('Error loading tasks:', err);
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, allInstallationIds.size]);
 
   useEffect(() => {
     loadTasks();
@@ -99,7 +124,11 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
     if (!currentEmployee?.id) return;
     setActionLoading(taskId);
     try {
-      await supabase.from('tasks').update({ status: 'IN_PROGRESS', updated_at: new Date().toISOString() }).eq('id', taskId);
+      // Update task status (change HOLD to IN_PROGRESS too)
+      await supabase.from('tasks').update({ 
+        status: 'IN_PROGRESS', 
+        updated_at: new Date().toISOString() 
+      }).eq('id', taskId);
       
       // Create time registration (activates the task timer)
       const task = tasks.find(t => t.id === taskId);
@@ -137,8 +166,8 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
     if (!currentEmployee?.id) return;
     
     const task = tasks.find(t => t.id === taskId);
-    // If this is the installation task, trigger the special completion flow
-    if (task?.standard_task_id && task.standard_task_id === installationStandardTaskId) {
+    // If this is an installation task, trigger the special completion flow
+    if (task?.is_installation_task) {
       onInstallationTaskComplete?.(taskId);
       return;
     }
@@ -179,9 +208,6 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
     );
   }
 
-  const isInstallationTask = (task: ProjectTask) =>
-    installationStandardTaskId && task.standard_task_id === installationStandardTaskId;
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -198,20 +224,26 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
               <div
                 key={task.id}
                 className={`flex items-center justify-between gap-2 p-3 rounded-lg border ${
-                  isInstallationTask(task)
+                  task.is_installation_task
                     ? 'border-primary/30 bg-primary/5'
                     : 'border-border'
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{task.standard_task_name}</p>
+                  <p className="text-sm font-medium truncate">
+                    {task.is_installation_task && '⭐ '}
+                    {task.standard_task_name}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">{task.phase_name}</p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <Badge variant={task.status === 'IN_PROGRESS' ? 'default' : 'secondary'} className="text-[10px]">
-                    {task.status === 'IN_PROGRESS' ? t('in_progress') : 'TODO'}
+                  <Badge 
+                    variant={task.status === 'IN_PROGRESS' ? 'default' : task.status === 'HOLD' ? 'outline' : 'secondary'} 
+                    className="text-[10px]"
+                  >
+                    {task.status === 'IN_PROGRESS' ? t('in_progress') : task.status === 'HOLD' ? 'HOLD' : 'TODO'}
                   </Badge>
-                  {task.status === 'TODO' && (
+                  {(task.status === 'TODO' || task.status === 'HOLD') && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -228,7 +260,7 @@ const InstallationTaskList: React.FC<InstallationTaskListProps> = ({
                       size="sm"
                       onClick={() => completeTask(task.id)}
                       disabled={actionLoading === task.id}
-                      className={`h-8 ${isInstallationTask(task) ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                      className={`h-8 ${task.is_installation_task ? 'bg-green-600 hover:bg-green-700' : ''}`}
                     >
                       {actionLoading === task.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
                       {t('inst_complete_task')}
