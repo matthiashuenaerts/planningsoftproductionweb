@@ -135,7 +135,7 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
   );
 };
 
-
+const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) => {
   const { toast } = useToast();
   const { currentEmployee, isAuthenticated } = useAuth();
   const navigate = useNavigate();
