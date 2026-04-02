@@ -86,6 +86,7 @@ const InstallationTeamDashboard: React.FC = () => {
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [completionTaskId, setCompletionTaskId] = useState<string>('');
   const [installationStandardTaskIds, setInstallationStandardTaskIds] = useState<string[]>([]);
+  const [drivingTime, setDrivingTime] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
