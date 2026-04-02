@@ -728,9 +728,9 @@ const InstallationTeamDashboard: React.FC = () => {
                     projectName={currentAssignment.project.name}
                   />
 
-                  <ProjectDocumentsDialog
-                    open={documentsOpen}
-                    onOpenChange={setDocumentsOpen}
+                  <ProjectFilesPopup
+                    isOpen={documentsOpen}
+                    onClose={() => setDocumentsOpen(false)}
                     projectId={currentAssignment.project.id}
                     projectName={currentAssignment.project.name}
                   />
