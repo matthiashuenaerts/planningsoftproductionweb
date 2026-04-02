@@ -583,7 +583,7 @@ const InstallationTeamDashboard: React.FC = () => {
                       {/* Task List */}
                       <InstallationTaskList
                         projectId={currentAssignment.project.id}
-                        installationStandardTaskId={installationStandardTaskIds[0] || null}
+                        installationStandardTaskIds={installationStandardTaskIds}
                         onInstallationTaskComplete={handleInstallationTaskComplete}
                       />
 
