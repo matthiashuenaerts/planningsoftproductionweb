@@ -25,7 +25,7 @@ import ServiceTicketItemsPanel from './ServiceTicketItemsPanel';
 import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
 import InstallationTaskList from './InstallationTaskList';
 import InstallationCompletionDialog from './InstallationCompletionDialog';
-import ProjectDocumentsDialog from './ProjectDocumentsDialog';
+import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
