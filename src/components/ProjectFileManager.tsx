@@ -48,7 +48,94 @@ interface FileObject {
   };
 }
 
-const ProjectFileManager: React.FC<ProjectFileManagerProps> = ({ projectId }) => {
+// Yard Photos Folder component - shows yard photos in a virtual folder UI
+const YardPhotoThumbnail: React.FC<{ filePath: string; onClick: () => void }> = ({ filePath, onClick }) => {
+  const signedUrl = useSignedUrl('project_files', filePath);
+  return (
+    <button onClick={onClick} className="rounded-md overflow-hidden border border-border hover:ring-2 hover:ring-primary/30 transition-all">
+      {signedUrl ? (
+        <img src={signedUrl} alt="" className="w-full h-24 object-cover" />
+      ) : (
+        <div className="w-full h-24 bg-muted flex items-center justify-center">
+          <Loader2Icon className="h-3 w-3 animate-spin" />
+        </div>
+      )}
+    </button>
+  );
+};
+
+const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
+  const { t } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  const [photos, setPhotos] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const loadPhotos = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.storage
+        .from('project_files')
+        .list(`yard-photos/${projectId}`, { sortBy: { column: 'name', order: 'desc' } });
+      setPhotos((data || []).filter(f => !f.name.endsWith('/') && f.name !== '.folder').map(f => ({ id: f.id, name: f.name })));
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (expanded) loadPhotos();
+  }, [expanded, loadPhotos]);
+
+  const openPhoto = async (name: string) => {
+    const { data } = await supabase.storage
+      .from('project_files')
+      .createSignedUrl(`yard-photos/${projectId}/${name}`, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  return (
+    <Card className="w-full">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-3 px-3 sm:px-6 py-3 sm:py-4 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
+          <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-xs sm:text-sm">📸 {t('inst_yard_photos')}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
+            {photos.length > 0 ? `${photos.length} foto's` : t('inst_no_documents')}
+          </p>
+        </div>
+        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+      </button>
+      {expanded && (
+        <CardContent className="pt-0 px-3 sm:px-6 pb-4">
+          {loading ? (
+            <div className="py-4 text-center"><Loader2Icon className="h-5 w-5 animate-spin mx-auto" /></div>
+          ) : photos.length > 0 ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {photos.map(photo => (
+                <YardPhotoThumbnail
+                  key={photo.id}
+                  filePath={`yard-photos/${projectId}/${photo.name}`}
+                  onClick={() => openPhoto(photo.name)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">{t('inst_no_documents')}</p>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+
   const { toast } = useToast();
   const { currentEmployee, isAuthenticated } = useAuth();
   const navigate = useNavigate();
