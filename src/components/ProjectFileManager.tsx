@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, FileUp, File, Download, AlertCircle, Upload, Eye, ExternalLink } from 'lucide-react';
+import { Trash2, FileUp, File, Download, AlertCircle, Upload, Eye, ExternalLink, FolderOpen, Image, Loader2 as Loader2Icon, Camera } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
