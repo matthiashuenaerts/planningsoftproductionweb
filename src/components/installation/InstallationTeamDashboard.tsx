@@ -25,7 +25,7 @@ import ServiceTicketItemsPanel from './ServiceTicketItemsPanel';
 import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
 import InstallationTaskList from './InstallationTaskList';
 import InstallationCompletionDialog from './InstallationCompletionDialog';
-import ProjectDocumentsDialog from './ProjectDocumentsDialog';
+import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -86,6 +86,7 @@ const InstallationTeamDashboard: React.FC = () => {
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [completionTaskId, setCompletionTaskId] = useState<string>('');
   const [installationStandardTaskIds, setInstallationStandardTaskIds] = useState<string[]>([]);
+  const [drivingTime, setDrivingTime] = useState<string | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -266,6 +267,7 @@ const InstallationTeamDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!address || !mapContainerRef.current) return;
+    setDrivingTime(null);
 
     const geocode = async () => {
       try {
@@ -273,25 +275,59 @@ const InstallationTeamDashboard: React.FC = () => {
         const data = await res.json();
         if (data.length === 0) return;
 
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
+        const destLat = parseFloat(data[0].lat);
+        const destLng = parseFloat(data[0].lon);
 
         if (mapRef.current) {
           mapRef.current.remove();
           mapRef.current = null;
         }
 
-        const map = L.map(mapContainerRef.current!, { zoomControl: !isMobile }).setView([lat, lng], 14);
+        const map = L.map(mapContainerRef.current!, { zoomControl: !isMobile }).setView([destLat, destLng], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap',
         }).addTo(map);
 
-        L.marker([lat, lng]).addTo(map).bindPopup(
+        L.marker([destLat, destLng]).addTo(map).bindPopup(
           `<strong>${currentAssignment?.project.name}</strong><br/>${address}`
         ).openPopup();
 
         mapRef.current = map;
         setTimeout(() => map.invalidateSize(), 200);
+
+        // Calculate driving time from team's base address
+        if (currentAssignment?.team_id) {
+          try {
+            const { data: teamData } = await supabase
+              .from('placement_teams' as any)
+              .select('address')
+              .eq('id', currentAssignment.team_id)
+              .maybeSingle();
+
+            const teamAddress = (teamData as any)?.address;
+            if (teamAddress) {
+              const teamRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(teamAddress)}&limit=1`);
+              const teamGeo = await teamRes.json();
+              if (teamGeo.length > 0) {
+                const teamLat = parseFloat(teamGeo[0].lat);
+                const teamLng = parseFloat(teamGeo[0].lon);
+
+                // Use OSRM for driving time
+                const routeRes = await fetch(
+                  `https://router.project-osrm.org/route/v1/driving/${teamLng},${teamLat};${destLng},${destLat}?overview=false`
+                );
+                const routeData = await routeRes.json();
+                if (routeData.routes && routeData.routes.length > 0) {
+                  const durationMin = Math.round(routeData.routes[0].duration / 60);
+                  const distKm = (routeData.routes[0].distance / 1000).toFixed(1);
+                  setDrivingTime(`~${durationMin} min (${distKm} km)`);
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Driving time calculation error:', err);
+          }
+        }
       } catch (err) {
         console.error('Geocoding error:', err);
       }
@@ -583,7 +619,7 @@ const InstallationTeamDashboard: React.FC = () => {
                       {/* Task List */}
                       <InstallationTaskList
                         projectId={currentAssignment.project.id}
-                        installationStandardTaskId={installationStandardTaskIds[0] || null}
+                        installationStandardTaskIds={installationStandardTaskIds}
                         onInstallationTaskComplete={handleInstallationTaskComplete}
                       />
 
@@ -665,6 +701,12 @@ const InstallationTeamDashboard: React.FC = () => {
                               <MapPin className="h-4 w-4" /> {t('inst_location')}
                             </CardTitle>
                             <CardDescription className="text-xs truncate">{address}</CardDescription>
+                            {drivingTime && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <Navigation className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-xs font-medium text-primary">{t('inst_driving_time')}: {drivingTime}</span>
+                              </div>
+                            )}
                           </CardHeader>
                           <CardContent>
                             <div
@@ -728,9 +770,9 @@ const InstallationTeamDashboard: React.FC = () => {
                     projectName={currentAssignment.project.name}
                   />
 
-                  <ProjectDocumentsDialog
-                    open={documentsOpen}
-                    onOpenChange={setDocumentsOpen}
+                  <ProjectFilesPopup
+                    isOpen={documentsOpen}
+                    onClose={() => setDocumentsOpen(false)}
                     projectId={currentAssignment.project.id}
                     projectName={currentAssignment.project.name}
                   />

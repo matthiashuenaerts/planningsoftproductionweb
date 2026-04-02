@@ -1354,5 +1354,9 @@
   "inst_no_documents": "No documents found",
   "inst_tasks_same_day": "tasks on the same day",
   "inst_service_hours": "Service hours",
-  "inst_start_service": "Start Service"
+  "inst_start_service": "Start Service",
+  "inst_driving_time": "Driving time",
+  "inst_no_recipients": "No recipients",
+  "inst_no_recipients_desc": "No email addresses configured for this notification. Configure in settings.",
+  "inst_email_error": "Email error"
 }

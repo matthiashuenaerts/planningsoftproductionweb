@@ -1832,5 +1832,9 @@
   "inst_no_documents": "Aucun document trouvé",
   "inst_tasks_same_day": "tâches le même jour",
   "inst_service_hours": "Heures de service",
-  "inst_start_service": "Démarrer le service"
+  "inst_start_service": "Démarrer le service",
+  "inst_driving_time": "Temps de trajet",
+  "inst_no_recipients": "Aucun destinataire",
+  "inst_no_recipients_desc": "Aucune adresse e-mail configurée pour cette notification. Configurez dans les paramètres.",
+  "inst_email_error": "Erreur e-mail"
 }

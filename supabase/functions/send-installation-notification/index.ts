@@ -1,4 +1,7 @@
-import { corsHeaders } from '../_shared/cors.ts';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
@@ -10,7 +13,10 @@ Deno.serve(async (req) => {
   try {
     const { type, projectName, projectId, employeeName, recipients, tenantId } = await req.json();
 
+    console.log('Received request:', { type, projectName, projectId, employeeName, recipientCount: recipients?.length, tenantId });
+
     if (!recipients || recipients.length === 0) {
+      console.log('No recipients configured, skipping email');
       return new Response(JSON.stringify({ message: 'No recipients configured' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -42,6 +48,8 @@ Deno.serve(async (req) => {
          <p><strong>Datum:</strong> ${new Date().toLocaleDateString('nl-BE')}</p>
          <p>De installatie is afgerond maar er zijn nog openstaande punten die een service ticket vereisen. Gelieve dit in te plannen.</p>`;
 
+    console.log('Sending email to:', recipients, 'Subject:', subject);
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -57,7 +65,15 @@ Deno.serve(async (req) => {
     });
 
     const result = await res.json();
-    console.log('Email sent:', result);
+    console.log('Resend API response:', JSON.stringify(result), 'Status:', res.status);
+
+    if (!res.ok) {
+      console.error('Resend API error:', result);
+      return new Response(JSON.stringify({ error: 'Failed to send email', details: result }), {
+        status: res.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({ success: true, result }), {
       status: 200,
