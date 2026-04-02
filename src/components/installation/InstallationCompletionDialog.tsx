@@ -6,7 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, AlertTriangle, Loader2, PartyPopper, Wrench } from 'lucide-react';
+import { CheckCircle2, Loader2, PartyPopper, Wrench } from 'lucide-react';
 
 interface InstallationCompletionDialogProps {
   open: boolean;
@@ -29,25 +29,24 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
   const [processing, setProcessing] = useState(false);
 
   const completeTask = async () => {
-    if (!currentEmployee?.id) return;
-    setProcessing(true);
+    if (!currentEmployee?.id) return false;
     try {
-      // Complete the task
-      await supabase.from('tasks').update({
-        status: 'COMPLETED',
-        completed_by: currentEmployee.id,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }).eq('id', taskId);
+      if (taskId) {
+        await supabase.from('tasks').update({
+          status: 'COMPLETED',
+          completed_by: currentEmployee.id,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }).eq('id', taskId);
 
-      // Close active time registration
-      await supabase
-        .from('time_registrations')
-        .update({ end_time: new Date().toISOString(), is_active: false })
-        .eq('task_id', taskId)
-        .eq('employee_id', currentEmployee.id)
-        .eq('is_active', true);
-
+        // Close active time registration
+        await supabase
+          .from('time_registrations')
+          .update({ end_time: new Date().toISOString(), is_active: false })
+          .eq('task_id', taskId)
+          .eq('employee_id', currentEmployee.id)
+          .eq('is_active', true);
+      }
       return true;
     } catch (err) {
       console.error('Error completing task:', err);
@@ -57,31 +56,64 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
 
   const sendNotification = async (type: 'installation_completed' | 'installation_service_needed') => {
     try {
+      console.log('Fetching email configs for type:', type, 'tenant:', tenant?.id);
+      
       // Get email config for this notification type
-      const { data: emailConfigs } = await supabase
+      const { data: emailConfigs, error: configError } = await supabase
         .from('email_configurations')
         .select('recipient_emails')
         .eq('function_name', type)
         .eq('tenant_id', tenant?.id || '');
 
-      const recipients = emailConfigs?.flatMap(c => c.recipient_emails) || [];
+      if (configError) {
+        console.error('Error fetching email configs:', configError);
+      }
       
-      if (recipients.length > 0) {
-        // Invoke edge function
-        await supabase.functions.invoke('send-installation-notification', {
-          body: {
-            type,
-            projectName,
-            projectId,
-            employeeName: currentEmployee?.name || '',
-            recipients,
-            tenantId: tenant?.id,
-          }
+      console.log('Email configs found:', emailConfigs);
+
+      const recipients = emailConfigs?.flatMap(c => c.recipient_emails) || [];
+      console.log('Recipients:', recipients);
+      
+      if (recipients.length === 0) {
+        console.warn('No recipients found for', type);
+        toast({ 
+          title: t('inst_no_recipients'), 
+          description: t('inst_no_recipients_desc'),
+          variant: 'destructive' 
         });
+        return;
+      }
+
+      // Invoke edge function
+      console.log('Invoking send-installation-notification edge function...');
+      const { data, error } = await supabase.functions.invoke('send-installation-notification', {
+        body: {
+          type,
+          projectName,
+          projectId,
+          employeeName: currentEmployee?.name || '',
+          recipients,
+          tenantId: tenant?.id,
+        }
+      });
+
+      if (error) {
+        console.error('Edge function invocation error:', error);
+        toast({ 
+          title: t('inst_email_error'), 
+          description: error.message,
+          variant: 'destructive' 
+        });
+      } else {
+        console.log('Edge function response:', data);
       }
     } catch (err) {
       console.error('Failed to send notification:', err);
-      // Don't block the completion flow
+      toast({ 
+        title: t('inst_email_error'), 
+        description: String(err),
+        variant: 'destructive' 
+      });
     }
   };
 
