@@ -701,6 +701,12 @@ const InstallationTeamDashboard: React.FC = () => {
                               <MapPin className="h-4 w-4" /> {t('inst_location')}
                             </CardTitle>
                             <CardDescription className="text-xs truncate">{address}</CardDescription>
+                            {drivingTime && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <Navigation className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-xs font-medium text-primary">{t('inst_driving_time')}: {drivingTime}</span>
+                              </div>
+                            )}
                           </CardHeader>
                           <CardContent>
                             <div
