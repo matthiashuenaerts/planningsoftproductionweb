@@ -1836,5 +1836,14 @@
   "inst_driving_time": "Temps de trajet",
   "inst_no_recipients": "Aucun destinataire",
   "inst_no_recipients_desc": "Aucune adresse e-mail configurée pour cette notification. Configurez dans les paramètres.",
-  "inst_email_error": "Erreur e-mail"
+  "inst_email_error": "Erreur e-mail",
+  "inst_watermark_completed": "Installé",
+  "inst_watermark_service": "Service nécessaire",
+  "inst_truck": "Camion",
+  "inst_add_broken_part": "Signaler une pièce cassée",
+  "inst_broken_part_added": "Pièce cassée signalée",
+  "inst_service_description": "Décrivez ce qui reste à faire",
+  "inst_service_description_placeholder": "Décrivez les points ouverts pour que la planification sache ce qui doit être fait...",
+  "inst_send_service_ticket": "Envoyer le ticket de service",
+  "inst_service_desc_required": "Veuillez décrire les points ouverts"
 }

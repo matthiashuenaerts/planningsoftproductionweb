@@ -1358,5 +1358,14 @@
   "inst_driving_time": "Driving time",
   "inst_no_recipients": "No recipients",
   "inst_no_recipients_desc": "No email addresses configured for this notification. Configure in settings.",
-  "inst_email_error": "Email error"
+  "inst_email_error": "Email error",
+  "inst_watermark_completed": "Installed",
+  "inst_watermark_service": "Service needed",
+  "inst_truck": "Truck",
+  "inst_add_broken_part": "Report broken part",
+  "inst_broken_part_added": "Broken part reported",
+  "inst_service_description": "Describe what still needs to be done",
+  "inst_service_description_placeholder": "Describe the open items so planning knows what needs to happen...",
+  "inst_send_service_ticket": "Send service ticket",
+  "inst_service_desc_required": "Please describe the open items"
 }
