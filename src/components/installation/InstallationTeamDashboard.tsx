@@ -15,7 +15,7 @@ import { nl, fr, enUS } from 'date-fns/locale';
 import {
   MapPin, Camera, ChevronLeft, ChevronRight, ExternalLink, CalendarDays,
   Clock, Wrench, ClipboardList, Navigation, Zap, AlertTriangle, CheckCircle2,
-  FileText, Play
+  FileText, Play, Truck, AlertCircle
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import L from 'leaflet';
@@ -26,6 +26,7 @@ import NewRushOrderForm from '@/components/rush-orders/NewRushOrderForm';
 import InstallationTaskList from './InstallationTaskList';
 import InstallationCompletionDialog from './InstallationCompletionDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
+import BrokenPartForm from '@/components/broken-parts/BrokenPartForm';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -49,6 +50,7 @@ interface InstallationAssignment {
   is_service_ticket: boolean;
   service_hours: number | null;
   service_notes: string | null;
+  order_index?: number;
   project: {
     id: string;
     name: string;
@@ -61,11 +63,14 @@ interface InstallationAssignment {
     installation_date: string | null;
     progress: number | null;
     status: string;
+    installation_status: string | null;
   };
   team_info?: {
     name: string;
     color: string;
   };
+  truck_number?: string | null;
+  driving_time_text?: string | null;
 }
 
 const InstallationTeamDashboard: React.FC = () => {
@@ -82,6 +87,7 @@ const InstallationTeamDashboard: React.FC = () => {
   const [serviceTicketOpen, setServiceTicketOpen] = useState(false);
   const [rushOrderOpen, setRushOrderOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [brokenPartOpen, setBrokenPartOpen] = useState(false);
   const [selectedAssignmentForTicket, setSelectedAssignmentForTicket] = useState<string | null>(null);
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
   const [completionTaskId, setCompletionTaskId] = useState<string>('');
@@ -134,7 +140,7 @@ const InstallationTeamDashboard: React.FC = () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
 
-      // 1. Get daily_team_assignments for this employee from today onwards
+      // 1. Get daily_team_assignments for this employee from today onwards (ONLY personal assignments)
       const { data: dailyAssignments } = await supabase
         .from('daily_team_assignments' as any)
         .select('team_id, date')
@@ -142,24 +148,17 @@ const InstallationTeamDashboard: React.FC = () => {
         .gte('date', today)
         .eq('is_available', true);
 
-      // 2. Also get team memberships as fallback
-      const { data: memberships } = await supabase
-        .from('placement_team_members' as any)
-        .select('team_id')
-        .eq('employee_id', currentEmployee.id);
-
-      // Combine: daily assignments take priority, but include memberships for dates without daily assignments
-      const dailyTeamDates = new Map<string, Set<string>>(); // date -> set of team_ids
+      // Build date->team_ids map
+      const dailyTeamDates = new Map<string, Set<string>>();
       for (const da of (dailyAssignments as any[] || [])) {
         if (!dailyTeamDates.has(da.date)) dailyTeamDates.set(da.date, new Set());
         dailyTeamDates.get(da.date)!.add(da.team_id);
       }
 
-      const memberTeamIds = new Set((memberships || []).map((m: any) => m.team_id));
-      const allTeamIds = new Set([
-        ...(dailyAssignments as any[] || []).map((da: any) => da.team_id),
-        ...(memberships || []).map((m: any) => m.team_id),
-      ]);
+      const allTeamIds = new Set<string>();
+      for (const teams of dailyTeamDates.values()) {
+        for (const tid of teams) allTeamIds.add(tid);
+      }
 
       if (allTeamIds.size === 0) {
         setAssignments([]);
@@ -167,7 +166,7 @@ const InstallationTeamDashboard: React.FC = () => {
         return;
       }
 
-      // 3. Get project_team_assignments for these teams (both regular and service tickets)
+      // 2. Get project_team_assignments for these teams
       const { data: assignmentsData } = await supabase
         .from('project_team_assignments')
         .select(`
@@ -184,42 +183,56 @@ const InstallationTeamDashboard: React.FC = () => {
         return;
       }
 
-      // 4. Filter assignments: only include if employee is assigned for that date
+      // 3. Filter: only include if employee has daily assignment for this date + team
       const filteredAssignments = assignmentsData.filter(a => {
         if (!a.start_date || !a.team_id) return false;
         const assignDate = a.start_date;
         
-        // Check if there's a daily assignment for this date + team
         const dailyTeams = dailyTeamDates.get(assignDate);
         if (dailyTeams && dailyTeams.has(a.team_id)) return true;
         
-        // If no daily assignments exist for this date, fall back to membership
-        if (!dailyTeamDates.has(assignDate) && memberTeamIds.has(a.team_id)) return true;
-
         // For multi-day assignments, check each day
         const startDate = parseISO(assignDate);
-        for (let d = 0; d < a.duration; d++) {
+        for (let d = 1; d < a.duration; d++) {
           const checkDate = format(addDays(startDate, d), 'yyyy-MM-dd');
           const checkTeams = dailyTeamDates.get(checkDate);
           if (checkTeams && checkTeams.has(a.team_id)) return true;
-          if (!dailyTeamDates.has(checkDate) && memberTeamIds.has(a.team_id)) return true;
         }
         
         return false;
       });
 
-      // 5. Enrich with project + team data
+      // 4. Enrich with project + team + truck data
       const projectIds = [...new Set(filteredAssignments.map(a => a.project_id))];
       const { data: projects } = await supabase
         .from('projects')
-        .select('id, name, client, description, address_street, address_number, address_postal_code, address_city, installation_date, progress, status')
+        .select('id, name, client, description, address_street, address_number, address_postal_code, address_city, installation_date, progress, status, installation_status')
         .in('id', projectIds);
 
       const teamIdsArr = [...allTeamIds];
       const { data: teams } = await (supabase
         .from('placement_teams')
-        .select('id, name, color') as any)
+        .select('id, name, color, start_street, start_number, start_postal_code, start_city') as any)
         .in('id', teamIdsArr);
+
+      // Load truck assignments
+      const { data: truckAssignments } = await supabase
+        .from('project_truck_assignments')
+        .select('project_id, truck_id')
+        .in('project_id', projectIds);
+
+      let truckMap: Record<string, string> = {};
+      if (truckAssignments && truckAssignments.length > 0) {
+        const truckIds = [...new Set(truckAssignments.map(ta => ta.truck_id))];
+        const { data: trucksData } = await supabase
+          .from('trucks')
+          .select('id, truck_number')
+          .in('id', truckIds);
+        const truckNameMap = Object.fromEntries((trucksData || []).map((t: any) => [t.id, t.truck_number]));
+        for (const ta of truckAssignments) {
+          truckMap[ta.project_id] = truckNameMap[ta.truck_id] || null;
+        }
+      }
 
       const projectMap = Object.fromEntries((projects || []).map(p => [p.id, p]));
       const teamMap = Object.fromEntries((teams || []).map((t: any) => [t.id, t]));
@@ -228,9 +241,19 @@ const InstallationTeamDashboard: React.FC = () => {
         .filter(a => projectMap[a.project_id])
         .map(a => ({
           ...a,
+          order_index: (a as any).order_index ?? 999,
           project: projectMap[a.project_id],
           team_info: a.team_id ? teamMap[a.team_id] : undefined,
+          truck_number: truckMap[a.project_id] || null,
         }));
+
+      // Sort: by date, then by order_index for same-day items
+      enriched.sort((a, b) => {
+        const dateA = a.start_date || '9999';
+        const dateB = b.start_date || '9999';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return (a.order_index || 999) - (b.order_index || 999);
+      });
 
       setAssignments(enriched);
       const todayIdx = enriched.findIndex(a => a.start_date && isToday(parseISO(a.start_date)));
@@ -265,6 +288,13 @@ const InstallationTeamDashboard: React.FC = () => {
       )
     : [];
 
+  // All same-day items (including current) sorted by order_index
+  const allSameDayItems = currentAssignment?.start_date
+    ? assignments
+        .filter(a => a.start_date && isSameDay(parseISO(a.start_date), parseISO(currentAssignment.start_date!)))
+        .sort((a, b) => (a.order_index || 999) - (b.order_index || 999))
+    : [];
+
   useEffect(() => {
     if (!address || !mapContainerRef.current) return;
     setDrivingTime(null);
@@ -297,22 +327,19 @@ const InstallationTeamDashboard: React.FC = () => {
 
         // Calculate driving time from team's base address
         if (currentAssignment?.team_id) {
-          try {
-            const { data: teamData } = await supabase
-              .from('placement_teams' as any)
-              .select('address')
-              .eq('id', currentAssignment.team_id)
-              .maybeSingle();
+          const teamInfo = (currentAssignment as any).team_info;
+          const teamAddress = teamInfo?.start_street
+            ? [teamInfo.start_street, teamInfo.start_number, teamInfo.start_postal_code, teamInfo.start_city].filter(Boolean).join(' ')
+            : null;
 
-            const teamAddress = (teamData as any)?.address;
-            if (teamAddress) {
+          if (teamAddress) {
+            try {
               const teamRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(teamAddress)}&limit=1`);
               const teamGeo = await teamRes.json();
               if (teamGeo.length > 0) {
                 const teamLat = parseFloat(teamGeo[0].lat);
                 const teamLng = parseFloat(teamGeo[0].lon);
 
-                // Use OSRM for driving time
                 const routeRes = await fetch(
                   `https://router.project-osrm.org/route/v1/driving/${teamLng},${teamLat};${destLng},${destLat}?overview=false`
                 );
@@ -323,9 +350,9 @@ const InstallationTeamDashboard: React.FC = () => {
                   setDrivingTime(`~${durationMin} min (${distKm} km)`);
                 }
               }
+            } catch (err) {
+              console.error('Driving time calculation error:', err);
             }
-          } catch (err) {
-            console.error('Driving time calculation error:', err);
           }
         }
       } catch (err) {
@@ -366,12 +393,15 @@ const InstallationTeamDashboard: React.FC = () => {
     setCompletionDialogOpen(true);
   };
 
+  const isCompleted = currentAssignment?.project?.installation_status === 'completed';
+  const isCompletedWithService = currentAssignment?.project?.installation_status === 'completed_with_service';
+  const hasCompletionStatus = isCompleted || isCompletedWithService;
+
   if (loading) {
     return (
       <div className="flex min-h-screen bg-muted/30">
-        {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
-        {isMobile && <Navbar />}
-        <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'} flex items-center justify-center`}>
+        <Navbar />
+        <div className="w-full px-3 pt-16 pb-4 flex items-center justify-center">
           <div className="animate-pulse text-muted-foreground">{t('inst_loading')}</div>
         </div>
       </div>
@@ -380,10 +410,9 @@ const InstallationTeamDashboard: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
-        <div className="w-full max-w-7xl mx-auto space-y-4">
+      <Navbar />
+      <div className="w-full px-3 pt-16 pb-4">
+        <div className="w-full mx-auto space-y-4">
           {/* Header */}
           <div className="mb-4">
             <p className="text-sm text-muted-foreground">
@@ -429,38 +458,37 @@ const InstallationTeamDashboard: React.FC = () => {
 
               {currentAssignment && (
                 <>
-                  {/* Multi-task day indicator */}
+                  {/* Multi-task day indicator with timeline */}
                   {sameDayAssignments.length > 0 && (
                     <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
                       <CardContent className="py-3 px-4">
                         <div className="flex items-center gap-2 mb-2">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
                           <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                            {sameDayAssignments.length + 1} {t('inst_tasks_same_day')}
+                            {allSameDayItems.length} {t('inst_tasks_same_day')}
                           </span>
                         </div>
                         <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Badge variant="default" className="text-[10px]">
-                              {currentAssignment.is_service_ticket ? '🔧' : '📦'}
-                            </Badge>
-                            <span className="font-medium truncate">{currentAssignment.project.name}</span>
-                            {currentAssignment.is_service_ticket && currentAssignment.service_hours && (
-                              <span className="text-xs text-muted-foreground">{currentAssignment.service_hours}h</span>
-                            )}
-                          </div>
-                          {sameDayAssignments.map(a => (
+                          {allSameDayItems.map((a, idx) => (
                             <button
                               key={a.id}
                               onClick={() => setCurrentIndex(assignments.indexOf(a))}
-                              className="flex items-center gap-2 text-sm w-full text-left hover:bg-amber-100 dark:hover:bg-amber-900/20 rounded px-1 py-0.5"
+                              className={`flex items-center gap-2 text-sm w-full text-left rounded px-2 py-1.5 ${
+                                a.id === currentAssignment.id
+                                  ? 'bg-amber-200/60 dark:bg-amber-800/30 font-semibold'
+                                  : 'hover:bg-amber-100 dark:hover:bg-amber-900/20'
+                              }`}
                             >
-                              <Badge variant="secondary" className="text-[10px]">
+                              <span className="text-xs font-bold text-amber-600 w-5">{idx + 1}.</span>
+                              <Badge variant={a.id === currentAssignment.id ? 'default' : 'secondary'} className="text-[10px]">
                                 {a.is_service_ticket ? '🔧' : '📦'}
                               </Badge>
-                              <span className="truncate">{a.project.name}</span>
-                              {a.is_service_ticket && a.service_hours && (
-                                <span className="text-xs text-muted-foreground">{a.service_hours}h</span>
+                              <span className="truncate flex-1">{a.project.name}</span>
+                              <span className="text-xs text-muted-foreground flex-shrink-0">
+                                {a.is_service_ticket ? `${a.service_hours || 0}h` : `${a.duration}d`}
+                              </span>
+                              {a.driving_time_text && (
+                                <span className="text-[10px] text-primary flex-shrink-0">🚗 {a.driving_time_text}</span>
                               )}
                             </button>
                           ))}
@@ -473,7 +501,17 @@ const InstallationTeamDashboard: React.FC = () => {
                     {/* Left column: Project info + Tasks */}
                     <div className="space-y-4">
                       {/* Project Info Card */}
-                      <Card>
+                      <Card className={`relative overflow-hidden ${hasCompletionStatus ? 'opacity-90' : ''}`}>
+                        {/* Completion watermark */}
+                        {hasCompletionStatus && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                            <div className={`text-4xl font-black uppercase tracking-widest rotate-[-20deg] ${
+                              isCompleted ? 'text-green-500/20' : 'text-amber-500/20'
+                            }`}>
+                              {isCompleted ? t('inst_watermark_completed') : t('inst_watermark_service')}
+                            </div>
+                          </div>
+                        )}
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
@@ -496,6 +534,14 @@ const InstallationTeamDashboard: React.FC = () => {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                          {/* Truck indicator */}
+                          {currentAssignment.truck_number && (
+                            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
+                              <Truck className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="font-medium">{t('inst_truck')}: {currentAssignment.truck_number}</span>
+                            </div>
+                          )}
+
                           {/* Service ticket details */}
                           {currentAssignment.is_service_ticket && (
                             <div className="bg-amber-50 dark:bg-amber-950/20 rounded-md p-3 space-y-1">
@@ -624,7 +670,7 @@ const InstallationTeamDashboard: React.FC = () => {
                       />
 
                       {/* Large Complete Installation Button */}
-                      {installationStandardTaskIds.length > 0 && !currentAssignment.is_service_ticket && (
+                      {installationStandardTaskIds.length > 0 && !currentAssignment.is_service_ticket && !hasCompletionStatus && (
                         <Button
                           className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => {
@@ -642,7 +688,6 @@ const InstallationTeamDashboard: React.FC = () => {
                           className="w-full h-14 text-lg font-semibold"
                           variant="default"
                           onClick={() => {
-                            // Start service - navigate to service installation page
                             window.open(`/${tenant?.slug}/${lang}/service-installation`, '_blank');
                           }}
                         >
@@ -651,8 +696,8 @@ const InstallationTeamDashboard: React.FC = () => {
                         </Button>
                       )}
 
-                      {/* Service + Rush Order cards */}
-                      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                      {/* Service + Rush Order + Broken Part cards */}
+                      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
@@ -686,6 +731,23 @@ const InstallationTeamDashboard: React.FC = () => {
                               onClick={() => setRushOrderOpen(true)}
                             >
                               <AlertTriangle className="h-4 w-4 mr-2" /> {t('inst_create_rush_order')}
+                            </Button>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-destructive" /> {t('broken_parts')}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              className="w-full"
+                              variant="outline"
+                              onClick={() => setBrokenPartOpen(true)}
+                            >
+                              <AlertCircle className="h-4 w-4 mr-2" /> {t('inst_add_broken_part')}
                             </Button>
                           </CardContent>
                         </Card>
@@ -725,37 +787,57 @@ const InstallationTeamDashboard: React.FC = () => {
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-2 max-h-80 overflow-y-auto">
-                            {assignments.map((a, idx) => (
-                              <button
-                                key={a.id}
-                                onClick={() => setCurrentIndex(idx)}
-                                className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                                  idx === currentIndex
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-border hover:bg-muted/50'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="min-w-0 flex items-center gap-1.5">
-                                    {a.is_service_ticket && <span className="text-xs">🔧</span>}
-                                    <div className="min-w-0">
-                                      <p className="font-medium text-sm truncate">{a.project.name}</p>
-                                      <p className="text-xs text-muted-foreground truncate">{a.project.client}</p>
+                            {assignments.map((a, idx) => {
+                              const aCompleted = a.project?.installation_status === 'completed';
+                              const aService = a.project?.installation_status === 'completed_with_service';
+                              return (
+                                <button
+                                  key={a.id}
+                                  onClick={() => setCurrentIndex(idx)}
+                                  className={`w-full text-left p-3 rounded-lg border transition-colors relative overflow-hidden ${
+                                    idx === currentIndex
+                                      ? 'border-primary bg-primary/5'
+                                      : 'border-border hover:bg-muted/50'
+                                  }`}
+                                >
+                                  {(aCompleted || aService) && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <span className={`text-lg font-black uppercase rotate-[-15deg] ${
+                                        aCompleted ? 'text-green-500/15' : 'text-amber-500/15'
+                                      }`}>
+                                        {aCompleted ? '✓' : '🔧'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center justify-between">
+                                    <div className="min-w-0 flex items-center gap-1.5">
+                                      {a.is_service_ticket && <span className="text-xs">🔧</span>}
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-sm truncate">{a.project.name}</p>
+                                        <div className="flex items-center gap-1">
+                                          <p className="text-xs text-muted-foreground truncate">{a.project.client}</p>
+                                          {a.truck_number && (
+                                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                                              <Truck className="h-2.5 w-2.5 mr-0.5" />{a.truck_number}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right flex-shrink-0 ml-2">
+                                      {a.start_date && (
+                                        <p className="text-xs font-medium">
+                                          {format(parseISO(a.start_date), 'd MMM', { locale: dateFnsLocale })}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-muted-foreground">
+                                        {a.is_service_ticket ? `${a.service_hours || 0}h` : `${a.duration}d`}
+                                      </p>
                                     </div>
                                   </div>
-                                  <div className="text-right flex-shrink-0 ml-2">
-                                    {a.start_date && (
-                                      <p className="text-xs font-medium">
-                                        {format(parseISO(a.start_date), 'd MMM', { locale: dateFnsLocale })}
-                                      </p>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                      {a.is_service_ticket ? `${a.service_hours || 0}h` : `${a.duration}d`}
-                                    </p>
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
+                                </button>
+                              );
+                            })}
                           </CardContent>
                         </Card>
                       )}
@@ -802,6 +884,25 @@ const InstallationTeamDashboard: React.FC = () => {
                           setRushOrderOpen(false);
                           toast({ title: t('inst_create_rush_order') });
                         }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Broken Part Dialog */}
+                  <Dialog open={brokenPartOpen} onOpenChange={setBrokenPartOpen}>
+                    <DialogContent className={isMobile ? 'max-w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto' : 'max-w-2xl max-h-[85vh] overflow-y-auto'}>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <AlertCircle className="h-5 w-5 text-destructive" /> {t('inst_add_broken_part')}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <BrokenPartForm
+                        prefilledProjectId={currentAssignment.project.id}
+                        onSuccess={() => {
+                          setBrokenPartOpen(false);
+                          toast({ title: t('inst_broken_part_added') });
+                        }}
+                        embedded
                       />
                     </DialogContent>
                   </Dialog>

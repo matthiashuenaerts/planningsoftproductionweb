@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type, projectName, projectId, employeeName, recipients, tenantId } = await req.json();
+    const { type, projectName, projectId, employeeName, recipients, tenantId, serviceDescription } = await req.json();
 
     console.log('Received request:', { type, projectName, projectId, employeeName, recipientCount: recipients?.length, tenantId });
 
@@ -36,6 +36,10 @@ Deno.serve(async (req) => {
       ? `✅ Installatie voltooid: ${projectName}`
       : `🔧 Service ticket nodig: ${projectName}`;
 
+    const serviceBlock = serviceDescription
+      ? `<p><strong>Beschrijving openstaande punten:</strong></p><p style="background:#fff3cd;padding:12px;border-radius:6px;border-left:4px solid #ffc107;">${serviceDescription.replace(/\n/g, '<br/>')}</p>`
+      : '';
+
     const body = isCompleted
       ? `<h2>Installatie Voltooid</h2>
          <p><strong>Project:</strong> ${projectName}</p>
@@ -46,6 +50,7 @@ Deno.serve(async (req) => {
          <p><strong>Project:</strong> ${projectName}</p>
          <p><strong>Gemeld door:</strong> ${employeeName}</p>
          <p><strong>Datum:</strong> ${new Date().toLocaleDateString('nl-BE')}</p>
+         ${serviceBlock}
          <p>De installatie is afgerond maar er zijn nog openstaande punten die een service ticket vereisen. Gelieve dit in te plannen.</p>`;
 
     console.log('Sending email to:', recipients, 'Subject:', subject);

@@ -434,9 +434,19 @@ const Projects = () => {
               {filteredProjects.map(project => (
                 <Card 
                   key={project.id} 
-                  className="group overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer active:scale-[0.98]"
+                  className="group overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-lg hover:border-primary/20 transition-all duration-300 cursor-pointer active:scale-[0.98] relative"
                   onClick={() => handleProjectClick(project.id)}
                 >
+                  {/* Installation status watermark */}
+                  {(project as any).installation_status && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                      <div className={`text-2xl font-black uppercase tracking-widest rotate-[-20deg] ${
+                        (project as any).installation_status === 'completed' ? 'text-green-500/15' : 'text-amber-500/15'
+                      }`}>
+                        {(project as any).installation_status === 'completed' ? '✓ Installed' : '🔧 Service'}
+                      </div>
+                    </div>
+                  )}
                   <CardHeader className="pb-2 px-4 sm:px-5 pt-4 sm:pt-5">
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">

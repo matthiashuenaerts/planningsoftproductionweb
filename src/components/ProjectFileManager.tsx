@@ -49,23 +49,34 @@ interface FileObject {
 }
 
 // Yard Photos Folder component - shows yard photos in a virtual folder UI
-const YardPhotoThumbnail: React.FC<{ filePath: string; onClick: () => void }> = ({ filePath, onClick }) => {
+const YardPhotoThumbnail: React.FC<{ filePath: string; onClick: () => void; onDelete?: () => void }> = ({ filePath, onClick, onDelete }) => {
   const signedUrl = useSignedUrl('project_files', filePath);
   return (
-    <button onClick={onClick} className="rounded-md overflow-hidden border border-border hover:ring-2 hover:ring-primary/30 transition-all">
-      {signedUrl ? (
-        <img src={signedUrl} alt="" className="w-full h-24 object-cover" />
-      ) : (
-        <div className="w-full h-24 bg-muted flex items-center justify-center">
-          <Loader2Icon className="h-3 w-3 animate-spin" />
-        </div>
+    <div className="relative group rounded-md overflow-hidden border border-border">
+      <button onClick={onClick} className="w-full hover:ring-2 hover:ring-primary/30 transition-all">
+        {signedUrl ? (
+          <img src={signedUrl} alt="" className="w-full h-24 object-cover" />
+        ) : (
+          <div className="w-full h-24 bg-muted flex items-center justify-center">
+            <Loader2Icon className="h-3 w-3 animate-spin" />
+          </div>
+        )}
+      </button>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-1 right-1 h-6 w-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
       )}
-    </button>
+    </div>
   );
 };
 
 const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +104,20 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
       .from('project_files')
       .createSignedUrl(`yard-photos/${projectId}/${name}`, 3600);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const deletePhoto = async (name: string) => {
+    const path = `yard-photos/${projectId}/${name}`;
+    try {
+      await supabase.storage.from('project_files').remove([path]);
+      // Also remove from installation_photos and project_files tables
+      await supabase.from('installation_photos' as any).delete().eq('file_path', path);
+      await supabase.from('project_files' as any).delete().eq('file_path', path);
+      toast({ title: t('inst_photo_deleted') || 'Photo deleted' });
+      loadPhotos();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -123,6 +148,7 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
                   key={photo.id}
                   filePath={`yard-photos/${projectId}/${photo.name}`}
                   onClick={() => openPhoto(photo.name)}
+                  onDelete={() => deletePhoto(photo.name)}
                 />
               ))}
             </div>

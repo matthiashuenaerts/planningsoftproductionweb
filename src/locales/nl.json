@@ -1836,5 +1836,14 @@
   "inst_driving_time": "Rijtijd",
   "inst_no_recipients": "Geen ontvangers",
   "inst_no_recipients_desc": "Er zijn geen e-mailadressen geconfigureerd voor deze notificatie. Configureer dit in de instellingen.",
-  "inst_email_error": "E-mail fout"
+  "inst_email_error": "E-mail fout",
+  "inst_watermark_completed": "Geïnstalleerd",
+  "inst_watermark_service": "Naservice nodig",
+  "inst_truck": "Vrachtwagen",
+  "inst_add_broken_part": "Defect onderdeel melden",
+  "inst_broken_part_added": "Defect onderdeel gemeld",
+  "inst_service_description": "Beschrijf wat er nog moet gebeuren",
+  "inst_service_description_placeholder": "Beschrijf de openstaande punten zodat de planning weet wat er nog moet gebeuren...",
+  "inst_send_service_ticket": "Service ticket versturen",
+  "inst_service_desc_required": "Vul een beschrijving in van de openstaande punten"
 }

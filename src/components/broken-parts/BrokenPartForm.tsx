@@ -17,7 +17,13 @@ import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 
-const BrokenPartForm = () => {
+interface BrokenPartFormProps {
+  prefilledProjectId?: string;
+  onSuccess?: () => void;
+  embedded?: boolean;
+}
+
+const BrokenPartForm: React.FC<BrokenPartFormProps> = ({ prefilledProjectId, onSuccess, embedded }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { tenant } = useTenant();
@@ -35,7 +41,7 @@ const BrokenPartForm = () => {
   const [workstationOpen, setWorkstationOpen] = useState(false);
   
   const [formData, setFormData] = useState({
-    project_id: '',
+    project_id: prefilledProjectId || '',
     workstation_id: '',
     description: ''
   });
@@ -232,7 +238,11 @@ const BrokenPartForm = () => {
         description: t('bp_success_msg'),
       });
       
-      navigate(createLocalizedPath('/broken-parts'));
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate(createLocalizedPath('/broken-parts'));
+      }
     } catch (error) {
       console.error('Error reporting broken part:', error);
       toast({
