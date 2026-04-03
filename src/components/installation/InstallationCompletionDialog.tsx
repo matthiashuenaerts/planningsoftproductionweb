@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTenant } from '@/context/TenantContext';
@@ -27,6 +29,8 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
   const { tenant } = useTenant();
   const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [serviceDescription, setServiceDescription] = useState('');
 
   const completeTask = async () => {
     if (!currentEmployee?.id) return false;
@@ -54,11 +58,19 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
     }
   };
 
-  const sendNotification = async (type: 'installation_completed' | 'installation_service_needed') => {
+  const updateProjectStatus = async (status: 'completed' | 'completed_with_service') => {
     try {
-      console.log('Fetching email configs for type:', type, 'tenant:', tenant?.id);
-      
-      // Get email config for this notification type
+      await supabase
+        .from('projects')
+        .update({ installation_status: status, updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+    } catch (err) {
+      console.error('Error updating project status:', err);
+    }
+  };
+
+  const sendNotification = async (type: 'installation_completed' | 'installation_service_needed', extraBody?: string) => {
+    try {
       const { data: emailConfigs, error: configError } = await supabase
         .from('email_configurations')
         .select('recipient_emails')
@@ -68,11 +80,8 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
       if (configError) {
         console.error('Error fetching email configs:', configError);
       }
-      
-      console.log('Email configs found:', emailConfigs);
 
       const recipients = emailConfigs?.flatMap(c => c.recipient_emails) || [];
-      console.log('Recipients:', recipients);
       
       if (recipients.length === 0) {
         console.warn('No recipients found for', type);
@@ -84,8 +93,6 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
         return;
       }
 
-      // Invoke edge function
-      console.log('Invoking send-installation-notification edge function...');
       const { data, error } = await supabase.functions.invoke('send-installation-notification', {
         body: {
           type,
@@ -94,6 +101,7 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
           employeeName: currentEmployee?.name || '',
           recipients,
           tenantId: tenant?.id,
+          serviceDescription: extraBody || undefined,
         }
       });
 
@@ -104,8 +112,6 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
           description: error.message,
           variant: 'destructive' 
         });
-      } else {
-        console.log('Edge function response:', data);
       }
     } catch (err) {
       console.error('Failed to send notification:', err);
@@ -121,6 +127,7 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
     setProcessing(true);
     const success = await completeTask();
     if (success) {
+      await updateProjectStatus('completed');
       await sendNotification('installation_completed');
       toast({ title: t('inst_completion_email_sent'), description: t('inst_completion_email_sent_desc') });
       onOpenChange(false);
@@ -130,10 +137,23 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
   };
 
   const handleServiceNeeded = async () => {
+    if (!showServiceForm) {
+      // First click: show the form
+      setShowServiceForm(true);
+      return;
+    }
+    
+    // Second click: validate and submit
+    if (!serviceDescription.trim()) {
+      toast({ title: t('inst_service_desc_required'), variant: 'destructive' });
+      return;
+    }
+
     setProcessing(true);
     const success = await completeTask();
     if (success) {
-      await sendNotification('installation_service_needed');
+      await updateProjectStatus('completed_with_service');
+      await sendNotification('installation_service_needed', serviceDescription);
       toast({ title: t('inst_service_email_sent'), description: t('inst_service_email_sent_desc') });
       onOpenChange(false);
       onServiceTicketNeeded();
@@ -168,6 +188,19 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
             {t('inst_fully_completed')}
           </Button>
 
+          {showServiceForm && (
+            <div className="space-y-2 p-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+              <Label className="text-sm font-medium">{t('inst_service_description')}</Label>
+              <Textarea
+                placeholder={t('inst_service_description_placeholder')}
+                value={serviceDescription}
+                onChange={e => setServiceDescription(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          )}
+
           <Button
             className="w-full h-16 text-base"
             variant="outline"
@@ -179,7 +212,7 @@ const InstallationCompletionDialog: React.FC<InstallationCompletionDialogProps> 
             ) : (
               <Wrench className="h-5 w-5 mr-2" />
             )}
-            {t('inst_open_items')}
+            {showServiceForm ? t('inst_send_service_ticket') : t('inst_open_items')}
           </Button>
         </div>
       </DialogContent>
