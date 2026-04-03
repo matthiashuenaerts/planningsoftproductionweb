@@ -635,7 +635,6 @@ const InstallationTeamsSettings: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                )}
               </div>
               
               <div className="flex justify-end space-x-2 mt-4">
