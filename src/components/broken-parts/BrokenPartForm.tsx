@@ -238,7 +238,11 @@ const BrokenPartForm: React.FC<BrokenPartFormProps> = ({ prefilledProjectId, onS
         description: t('bp_success_msg'),
       });
       
-      navigate(createLocalizedPath('/broken-parts'));
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate(createLocalizedPath('/broken-parts'));
+      }
     } catch (error) {
       console.error('Error reporting broken part:', error);
       toast({
