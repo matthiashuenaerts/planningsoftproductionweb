@@ -299,9 +299,13 @@ const NavbarContent = ({
 
 const Navbar = () => {
   const isMobile = useIsMobile();
+  const { currentEmployee } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  if (isMobile) {
+  // Installation team role always uses drawer (collapsed) layout
+  const useDrawerLayout = isMobile || currentEmployee?.role === 'installation_team';
+
+  if (useDrawerLayout) {
     return (
       <Drawer direction="left" open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
