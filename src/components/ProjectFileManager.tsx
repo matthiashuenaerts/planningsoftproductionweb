@@ -76,6 +76,7 @@ const YardPhotoThumbnail: React.FC<{ filePath: string; onClick: () => void; onDe
 
 const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -103,6 +104,20 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
       .from('project_files')
       .createSignedUrl(`yard-photos/${projectId}/${name}`, 3600);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const deletePhoto = async (name: string) => {
+    const path = `yard-photos/${projectId}/${name}`;
+    try {
+      await supabase.storage.from('project_files').remove([path]);
+      // Also remove from installation_photos and project_files tables
+      await supabase.from('installation_photos' as any).delete().eq('file_path', path);
+      await supabase.from('project_files' as any).delete().eq('file_path', path);
+      toast({ title: t('inst_photo_deleted') || 'Photo deleted' });
+      loadPhotos();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -133,6 +148,7 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
                   key={photo.id}
                   filePath={`yard-photos/${projectId}/${photo.name}`}
                   onClick={() => openPhoto(photo.name)}
+                  onDelete={() => deletePhoto(photo.name)}
                 />
               ))}
             </div>
