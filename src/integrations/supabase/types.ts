@@ -4496,6 +4496,7 @@ export type Database = {
           efficiency_percentage: number | null
           id: string
           installation_date: string
+          installation_status: string | null
           name: string
           progress: number | null
           project_link_id: string | null
@@ -4515,6 +4516,7 @@ export type Database = {
           efficiency_percentage?: number | null
           id?: string
           installation_date: string
+          installation_status?: string | null
           name: string
           progress?: number | null
           project_link_id?: string | null
@@ -4534,6 +4536,7 @@ export type Database = {
           efficiency_percentage?: number | null
           id?: string
           installation_date?: string
+          installation_status?: string | null
           name?: string
           progress?: number | null
           project_link_id?: string | null
