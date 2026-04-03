@@ -171,7 +171,7 @@ const InstallationTeamDashboard: React.FC = () => {
         .from('project_team_assignments')
         .select(`
           id, project_id, team_id, team, start_date, duration,
-          is_service_ticket, service_hours, service_notes, order_index
+          is_service_ticket, service_hours, service_notes
         `)
         .in('team_id', [...allTeamIds])
         .gte('start_date', today)
