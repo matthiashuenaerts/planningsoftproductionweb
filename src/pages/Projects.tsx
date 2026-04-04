@@ -38,6 +38,9 @@ const Projects = () => {
   const [exportingProject, setExportingProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
+  const [archiveDialogProject, setArchiveDialogProject] = useState<Project | null>(null);
+  const [archiveStep, setArchiveStep] = useState<'confirm' | 'delete_data'>('confirm');
+  const [archiving, setArchiving] = useState(false);
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
   const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
