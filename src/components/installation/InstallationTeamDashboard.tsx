@@ -888,12 +888,15 @@ const InstallationTeamDashboard: React.FC = () => {
                                       {a.is_service_ticket && <span className="text-xs">🔧</span>}
                                       <div className="min-w-0">
                                         <p className="font-medium text-sm truncate">{a.project.name}</p>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 flex-wrap">
                                           <p className="text-xs text-muted-foreground truncate">{a.project.client}</p>
                                           {a.truck_number && (
                                             <Badge variant="outline" className="text-[9px] h-4 px-1">
                                               <Truck className="h-2.5 w-2.5 mr-0.5" />{a.truck_number}
                                             </Badge>
+                                          )}
+                                          {a.co_assigned_names && a.co_assigned_names.length > 0 && (
+                                            <span className="text-[9px] text-muted-foreground">👥 {a.co_assigned_names.join(', ')}</span>
                                           )}
                                         </div>
                                       </div>
