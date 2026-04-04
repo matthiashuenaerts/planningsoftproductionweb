@@ -656,6 +656,58 @@ const Projects = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Archive Dialog */}
+      <AlertDialog open={!!archiveDialogProject} onOpenChange={open => { if (!open) { setArchiveDialogProject(null); setArchiveStep('confirm'); } }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {archiveStep === 'confirm'
+                ? (t('archive_project') || 'Archive Project')
+                : (t('delete_production_data') || 'Delete Production Data?')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {archiveStep === 'confirm'
+                ? (t('archive_project_description') || `Archive "${archiveDialogProject?.name}"? A ZIP backup will be downloaded first.`)
+                : (t('delete_production_data_description') || 'Do you want to delete all tasks, documents, orders and accessories? This cannot be undone.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={archiving}>{t('cancel')}</AlertDialogCancel>
+            {archiveStep === 'confirm' ? (
+              <AlertDialogAction
+                className="rounded-xl"
+                disabled={archiving}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setArchiveStep('delete_data');
+                }}
+              >
+                {archiving ? '...' : (t('continue') || 'Continue')}
+              </AlertDialogAction>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  disabled={archiving}
+                  onClick={() => archiveDialogProject && handleArchiveProject(archiveDialogProject, false)}
+                >
+                  {t('keep_data') || 'Keep Data'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="rounded-xl"
+                  disabled={archiving}
+                  onClick={() => archiveDialogProject && handleArchiveProject(archiveDialogProject, true)}
+                >
+                  {t('delete_data') || 'Delete Data'}
+                </Button>
+              </div>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 };
