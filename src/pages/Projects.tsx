@@ -443,17 +443,18 @@ const Projects = () => {
   };
 
   const isMobile = useIsMobile();
+  const useDrawerLayout = isMobile || currentEmployee?.role === 'installation_team';
 
   return (
     <div className="flex min-h-screen bg-background">
-      {!isMobile && (
+      {!useDrawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
+      {useDrawerLayout && <Navbar />}
       
-      <div className={`flex-1 ${!isMobile ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
+      <div className={`flex-1 ${!useDrawerLayout ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
