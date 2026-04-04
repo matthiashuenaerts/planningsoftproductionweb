@@ -71,6 +71,8 @@ interface InstallationAssignment {
   };
   truck_number?: string | null;
   driving_time_text?: string | null;
+  co_assigned_names?: string[];
+  service_ticket_items?: any[];
 }
 
 const InstallationTeamDashboard: React.FC = () => {
