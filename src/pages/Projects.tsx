@@ -175,6 +175,63 @@ const Projects = () => {
     navigate(createLocalizedPath(`/projects/${projectId}`));
   };
 
+  const handleArchiveProject = async (project: Project, deleteData: boolean) => {
+    setArchiving(true);
+    try {
+      // 1. Check for OneDrive connection
+      const oneDriveConfig = await oneDriveService.getProjectOneDriveConfig(project.id);
+      
+      // 2. Export as ZIP
+      if (oneDriveConfig) {
+        // TODO: Upload zip to OneDrive via edge function
+        // For now, still download
+        toast({ title: t('info') || 'Info', description: 'OneDrive upload not yet available, downloading ZIP instead.' });
+      }
+      await exportProjectDataAsZip(project);
+
+      // 3. Delete production data if requested
+      if (deleteData) {
+        // Delete tasks, orders, accessories, project_files
+        const { data: phases } = await supabase.from('phases').select('id').eq('project_id', project.id);
+        if (phases && phases.length > 0) {
+          const phaseIds = phases.map(p => p.id);
+          await supabase.from('tasks').delete().in('phase_id', phaseIds);
+        }
+        await supabase.from('orders').delete().eq('project_id', project.id);
+        await supabase.from('accessories').delete().eq('project_id', project.id);
+        // Remove storage files
+        const { data: storageFiles } = await supabase.storage.from('project_files').list(project.id);
+        if (storageFiles && storageFiles.length > 0) {
+          await supabase.storage.from('project_files').remove(storageFiles.map(f => `${project.id}/${f.name}`));
+        }
+        toast({ title: t('success'), description: t('production_data_deleted') || 'Production data deleted' });
+      }
+
+      // 4. Mark project as archived
+      await supabase.from('projects').update({ status: 'archived' }).eq('id', project.id);
+      
+      toast({ title: t('success'), description: t('project_archived') || 'Project archived' });
+      loadProjects();
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally {
+      setArchiving(false);
+      setArchiveDialogProject(null);
+      setArchiveStep('confirm');
+    }
+  };
+
+  const handleCompleteProject = async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await supabase.from('projects').update({ installation_status: 'completed' }).eq('id', project.id);
+      toast({ title: t('success'), description: t('project_completed') || 'Project marked as complete' });
+      loadProjects();
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    }
+  };
+
 // Function to get icon based on workstation name or uploaded icon
   const getWorkstationIcon = (workstationName: string) => {
     // Find the workstation to check if it has an uploaded icon
