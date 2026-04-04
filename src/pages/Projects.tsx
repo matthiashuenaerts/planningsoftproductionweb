@@ -532,6 +532,7 @@ const Projects = () => {
                                 <Package className="mr-2 h-4 w-4" />
                                 {exportingProject === project.id ? t('exporting_project') : t('export_zip_archive')}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${project.id}/edit`)); }}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 {t('edit_project')}
@@ -540,6 +541,16 @@ const Projects = () => {
                                 <Package className="mr-2 h-4 w-4" />
                                 {t('orders')}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={e => { handleCompleteProject(project, e); }}>
+                                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                                {t('complete_project') || 'Complete project'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setArchiveDialogProject(project); setArchiveStep('confirm'); }}>
+                                <Archive className="mr-2 h-4 w-4" />
+                                {t('archive_project') || 'Archive'}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={e => { e.stopPropagation(); setProjectToDelete(project.id); }}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 {t('delete_project')}
