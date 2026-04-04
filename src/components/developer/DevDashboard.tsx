@@ -239,6 +239,18 @@ const DevDashboard: React.FC = () => {
             <TenantStatsTable />
           </CardContent>
         </Card>
+
+        {/* Storage Usage per Tenant */}
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2 text-sm">
+              <Server className="h-4 w-4" /> Storage & DB Usage
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StorageUsagePanel tenantMap={tenantMap} />
+          </CardContent>
+        </Card>
         {/* Automation Logs */}
         <Card className="bg-white/5 border-white/10 lg:col-span-2">
           <CardHeader>
