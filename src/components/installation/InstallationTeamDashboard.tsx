@@ -578,11 +578,21 @@ const InstallationTeamDashboard: React.FC = () => {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          {/* Truck indicator */}
-                          {currentAssignment.truck_number && (
-                            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
-                              <Truck className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="font-medium">{t('inst_truck')}: {currentAssignment.truck_number}</span>
+                          {/* Truck + Co-assigned indicator */}
+                          {(currentAssignment.truck_number || (currentAssignment.co_assigned_names && currentAssignment.co_assigned_names.length > 0)) && (
+                            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2 flex-wrap">
+                              {currentAssignment.truck_number && (
+                                <span className="flex items-center gap-1.5">
+                                  <Truck className="h-4 w-4 text-primary flex-shrink-0" />
+                                  <span className="font-medium">{t('inst_truck')}: {currentAssignment.truck_number}</span>
+                                </span>
+                              )}
+                              {currentAssignment.co_assigned_names && currentAssignment.co_assigned_names.length > 0 && (
+                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                  <span>👥</span>
+                                  <span>{currentAssignment.co_assigned_names.join(', ')}</span>
+                                </span>
+                              )}
                             </div>
                           )}
 
