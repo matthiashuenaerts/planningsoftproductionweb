@@ -71,6 +71,8 @@ interface InstallationAssignment {
   };
   truck_number?: string | null;
   driving_time_text?: string | null;
+  co_assigned_names?: string[];
+  service_ticket_items?: any[];
 }
 
 const InstallationTeamDashboard: React.FC = () => {
@@ -237,6 +239,46 @@ const InstallationTeamDashboard: React.FC = () => {
       const projectMap = Object.fromEntries((projects || []).map(p => [p.id, p]));
       const teamMap = Object.fromEntries((teams || []).map((t: any) => [t.id, t]));
 
+      // Load co-assigned employees for each project
+      const coAssignedMap: Record<string, string[]> = {};
+      for (const projectId of projectIds) {
+        const relevantAssignments = filteredAssignments.filter(a => a.project_id === projectId);
+        for (const a of relevantAssignments) {
+          if (!a.team_id || !a.start_date) continue;
+          const { data: coAssigned } = await supabase
+            .from('daily_team_assignments' as any)
+            .select('employee_id')
+            .eq('team_id', a.team_id)
+            .eq('date', a.start_date)
+            .eq('is_available', true)
+            .neq('employee_id', currentEmployee.id);
+          if (coAssigned && coAssigned.length > 0) {
+            const empIds = (coAssigned as any[]).map(c => c.employee_id);
+            const { data: empNames } = await supabase
+              .from('employees')
+              .select('id, name')
+              .in('id', empIds);
+            coAssignedMap[a.id] = (empNames || []).map((e: any) => e.name);
+          }
+        }
+      }
+
+      // Load service ticket items for service ticket assignments
+      const serviceAssignmentIds = filteredAssignments.filter(a => a.is_service_ticket).map(a => a.id);
+      let serviceItemsMap: Record<string, any[]> = {};
+      if (serviceAssignmentIds.length > 0) {
+        const { data: items } = await supabase
+          .from('service_ticket_items' as any)
+          .select('*')
+          .in('assignment_id', serviceAssignmentIds);
+        if (items) {
+          for (const item of items as any[]) {
+            if (!serviceItemsMap[item.assignment_id]) serviceItemsMap[item.assignment_id] = [];
+            serviceItemsMap[item.assignment_id].push(item);
+          }
+        }
+      }
+
       const enriched: InstallationAssignment[] = filteredAssignments
         .filter(a => projectMap[a.project_id])
         .map(a => ({
@@ -245,6 +287,8 @@ const InstallationTeamDashboard: React.FC = () => {
           project: projectMap[a.project_id],
           team_info: a.team_id ? teamMap[a.team_id] : undefined,
           truck_number: truckMap[a.project_id] || null,
+          co_assigned_names: coAssignedMap[a.id] || [],
+          service_ticket_items: serviceItemsMap[a.id] || [],
         }));
 
       // Sort: by date, then by order_index for same-day items
@@ -534,22 +578,52 @@ const InstallationTeamDashboard: React.FC = () => {
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                          {/* Truck indicator */}
-                          {currentAssignment.truck_number && (
-                            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
-                              <Truck className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="font-medium">{t('inst_truck')}: {currentAssignment.truck_number}</span>
+                          {/* Truck + Co-assigned indicator */}
+                          {(currentAssignment.truck_number || (currentAssignment.co_assigned_names && currentAssignment.co_assigned_names.length > 0)) && (
+                            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2 flex-wrap">
+                              {currentAssignment.truck_number && (
+                                <span className="flex items-center gap-1.5">
+                                  <Truck className="h-4 w-4 text-primary flex-shrink-0" />
+                                  <span className="font-medium">{t('inst_truck')}: {currentAssignment.truck_number}</span>
+                                </span>
+                              )}
+                              {currentAssignment.co_assigned_names && currentAssignment.co_assigned_names.length > 0 && (
+                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                  <span>👥</span>
+                                  <span>{currentAssignment.co_assigned_names.join(', ')}</span>
+                                </span>
+                              )}
                             </div>
                           )}
 
                           {/* Service ticket details */}
                           {currentAssignment.is_service_ticket && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-md p-3 space-y-1">
+                            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-md p-3 space-y-2">
                               {currentAssignment.service_hours && (
                                 <p className="text-sm"><strong>{t('inst_service_hours')}:</strong> {currentAssignment.service_hours}h</p>
                               )}
                               {currentAssignment.service_notes && (
                                 <p className="text-sm text-muted-foreground">{currentAssignment.service_notes}</p>
+                              )}
+                              {/* Service ticket items */}
+                              {currentAssignment.service_ticket_items && currentAssignment.service_ticket_items.length > 0 && (
+                                <div className="border-t border-amber-200 dark:border-amber-800 pt-2 mt-2 space-y-1.5">
+                                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t('inst_service_items')}:</p>
+                                  {currentAssignment.service_ticket_items.map((item: any) => (
+                                    <div key={item.id} className="flex items-start gap-2 text-xs">
+                                      <Badge variant="outline" className="text-[9px] h-4 px-1 flex-shrink-0">
+                                        {item.item_type === 'order_request' ? '📦' : item.item_type === 'production_task' ? '🔨' : item.item_type === 'office_task' ? '🏢' : '☑️'}
+                                      </Badge>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="font-medium">{item.title}</span>
+                                        {item.description && <p className="text-muted-foreground truncate">{item.description}</p>}
+                                      </div>
+                                      <Badge className={`text-[9px] h-4 ${item.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {item.status}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           )}
@@ -814,12 +888,15 @@ const InstallationTeamDashboard: React.FC = () => {
                                       {a.is_service_ticket && <span className="text-xs">🔧</span>}
                                       <div className="min-w-0">
                                         <p className="font-medium text-sm truncate">{a.project.name}</p>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1 flex-wrap">
                                           <p className="text-xs text-muted-foreground truncate">{a.project.client}</p>
                                           {a.truck_number && (
                                             <Badge variant="outline" className="text-[9px] h-4 px-1">
                                               <Truck className="h-2.5 w-2.5 mr-0.5" />{a.truck_number}
                                             </Badge>
+                                          )}
+                                          {a.co_assigned_names && a.co_assigned_names.length > 0 && (
+                                            <span className="text-[9px] text-muted-foreground">👥 {a.co_assigned_names.join(', ')}</span>
                                           )}
                                         </div>
                                       </div>

@@ -239,6 +239,18 @@ const DevDashboard: React.FC = () => {
             <TenantStatsTable />
           </CardContent>
         </Card>
+
+        {/* Storage Usage per Tenant */}
+        <Card className="bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2 text-sm">
+              <Server className="h-4 w-4" /> Storage & DB Usage
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StorageUsagePanel tenantMap={tenantMap} />
+          </CardContent>
+        </Card>
         {/* Automation Logs */}
         <Card className="bg-white/5 border-white/10 lg:col-span-2">
           <CardHeader>
@@ -263,6 +275,60 @@ const DevDashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+};
+
+// Storage usage panel
+const StorageUsagePanel: React.FC<{ tenantMap?: Record<string, { name: string; slug: string }> }> = ({ tenantMap }) => {
+  const { data: usage, isLoading } = useQuery({
+    queryKey: ["dev", "dashboard", "storage-usage"],
+    queryFn: async () => {
+      // Get counts per tenant for projects, tasks, orders, employees, files
+      const [projects, employees, orders] = await Promise.all([
+        supabase.from("projects").select("tenant_id"),
+        supabase.from("employees").select("tenant_id"),
+        supabase.from("orders").select("tenant_id"),
+      ]);
+
+      const tenantStats: Record<string, { projects: number; employees: number; orders: number }> = {};
+      for (const p of (projects.data ?? [])) {
+        if (!p.tenant_id) continue;
+        if (!tenantStats[p.tenant_id]) tenantStats[p.tenant_id] = { projects: 0, employees: 0, orders: 0 };
+        tenantStats[p.tenant_id].projects++;
+      }
+      for (const e of (employees.data ?? [])) {
+        if (!e.tenant_id) continue;
+        if (!tenantStats[e.tenant_id]) tenantStats[e.tenant_id] = { projects: 0, employees: 0, orders: 0 };
+        tenantStats[e.tenant_id].employees++;
+      }
+      for (const o of (orders.data ?? [])) {
+        if (!o.tenant_id) continue;
+        if (!tenantStats[o.tenant_id]) tenantStats[o.tenant_id] = { projects: 0, employees: 0, orders: 0 };
+        tenantStats[o.tenant_id].orders++;
+      }
+      return tenantStats;
+    },
+    refetchInterval: 120000,
+  });
+
+  const getTenantName = (id: string) => tenantMap?.[id]?.name ?? id.slice(0, 8);
+
+  if (isLoading) return <p className="text-slate-400 text-sm">Loading...</p>;
+  if (!usage || Object.keys(usage).length === 0) return <p className="text-slate-400 text-sm">No data</p>;
+
+  return (
+    <div className="space-y-2">
+      {Object.entries(usage).map(([tid, stats]) => (
+        <div key={tid} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
+          <span className="text-sm text-white">{getTenantName(tid)}</span>
+          <div className="flex gap-3 text-xs text-slate-400">
+            <span>{stats.projects} projects</span>
+            <span>{stats.employees} employees</span>
+            <span>{stats.orders} orders</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

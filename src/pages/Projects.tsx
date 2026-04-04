@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -19,6 +19,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import { oneDriveService } from '@/services/oneDriveService';
 
 
 const Projects = () => {
@@ -37,6 +38,9 @@ const Projects = () => {
   const [exportingProject, setExportingProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [projectProgress, setProjectProgress] = useState<Record<string, { earliestIncomplete: string | null, farthestTodo: string | null }>>({});
+  const [archiveDialogProject, setArchiveDialogProject] = useState<Project | null>(null);
+  const [archiveStep, setArchiveStep] = useState<'confirm' | 'delete_data'>('confirm');
+  const [archiving, setArchiving] = useState(false);
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
   const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
@@ -169,6 +173,63 @@ const Projects = () => {
   };
   const handleProjectClick = (projectId: string) => {
     navigate(createLocalizedPath(`/projects/${projectId}`));
+  };
+
+  const handleArchiveProject = async (project: Project, deleteData: boolean) => {
+    setArchiving(true);
+    try {
+      // 1. Check for OneDrive connection
+      const oneDriveConfig = await oneDriveService.getProjectOneDriveConfig(project.id);
+      
+      // 2. Export as ZIP
+      if (oneDriveConfig) {
+        // TODO: Upload zip to OneDrive via edge function
+        // For now, still download
+        toast({ title: t('info') || 'Info', description: 'OneDrive upload not yet available, downloading ZIP instead.' });
+      }
+      await exportProjectDataAsZip(project);
+
+      // 3. Delete production data if requested
+      if (deleteData) {
+        // Delete tasks, orders, accessories, project_files
+        const { data: phases } = await supabase.from('phases').select('id').eq('project_id', project.id);
+        if (phases && phases.length > 0) {
+          const phaseIds = phases.map(p => p.id);
+          await supabase.from('tasks').delete().in('phase_id', phaseIds);
+        }
+        await supabase.from('orders').delete().eq('project_id', project.id);
+        await supabase.from('accessories').delete().eq('project_id', project.id);
+        // Remove storage files
+        const { data: storageFiles } = await supabase.storage.from('project_files').list(project.id);
+        if (storageFiles && storageFiles.length > 0) {
+          await supabase.storage.from('project_files').remove(storageFiles.map(f => `${project.id}/${f.name}`));
+        }
+        toast({ title: t('success'), description: t('production_data_deleted') || 'Production data deleted' });
+      }
+
+      // 4. Mark project as archived
+      await supabase.from('projects').update({ status: 'archived' }).eq('id', project.id);
+      
+      toast({ title: t('success'), description: t('project_archived') || 'Project archived' });
+      loadProjects();
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    } finally {
+      setArchiving(false);
+      setArchiveDialogProject(null);
+      setArchiveStep('confirm');
+    }
+  };
+
+  const handleCompleteProject = async (project: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await supabase.from('projects').update({ installation_status: 'completed' }).eq('id', project.id);
+      toast({ title: t('success'), description: t('project_completed') || 'Project marked as complete' });
+      loadProjects();
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+    }
   };
 
 // Function to get icon based on workstation name or uploaded icon
@@ -382,17 +443,18 @@ const Projects = () => {
   };
 
   const isMobile = useIsMobile();
+  const useDrawerLayout = isMobile || currentEmployee?.role === 'installation_team';
 
   return (
     <div className="flex min-h-screen bg-background">
-      {!isMobile && (
+      {!useDrawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
+      {useDrawerLayout && <Navbar />}
       
-      <div className={`flex-1 ${!isMobile ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
+      <div className={`flex-1 ${!useDrawerLayout ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
@@ -471,6 +533,7 @@ const Projects = () => {
                                 <Package className="mr-2 h-4 w-4" />
                                 {exportingProject === project.id ? t('exporting_project') : t('export_zip_archive')}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(createLocalizedPath(`/projects/${project.id}/edit`)); }}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 {t('edit_project')}
@@ -479,6 +542,16 @@ const Projects = () => {
                                 <Package className="mr-2 h-4 w-4" />
                                 {t('orders')}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={e => { handleCompleteProject(project, e); }}>
+                                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                                {t('complete_project') || 'Complete project'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setArchiveDialogProject(project); setArchiveStep('confirm'); }}>
+                                <Archive className="mr-2 h-4 w-4" />
+                                {t('archive_project') || 'Archive'}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={e => { e.stopPropagation(); setProjectToDelete(project.id); }}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 {t('delete_project')}
@@ -580,6 +653,58 @@ const Projects = () => {
             <AlertDialogAction onClick={handleDeleteProject} className="bg-destructive hover:bg-destructive/90 rounded-xl">
               {t('delete_project')}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive Dialog */}
+      <AlertDialog open={!!archiveDialogProject} onOpenChange={open => { if (!open) { setArchiveDialogProject(null); setArchiveStep('confirm'); } }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {archiveStep === 'confirm'
+                ? (t('archive_project') || 'Archive Project')
+                : (t('delete_production_data') || 'Delete Production Data?')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {archiveStep === 'confirm'
+                ? (t('archive_project_description') || `Archive "${archiveDialogProject?.name}"? A ZIP backup will be downloaded first.`)
+                : (t('delete_production_data_description') || 'Do you want to delete all tasks, documents, orders and accessories? This cannot be undone.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={archiving}>{t('cancel')}</AlertDialogCancel>
+            {archiveStep === 'confirm' ? (
+              <AlertDialogAction
+                className="rounded-xl"
+                disabled={archiving}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setArchiveStep('delete_data');
+                }}
+              >
+                {archiving ? '...' : (t('continue') || 'Continue')}
+              </AlertDialogAction>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  disabled={archiving}
+                  onClick={() => archiveDialogProject && handleArchiveProject(archiveDialogProject, false)}
+                >
+                  {t('keep_data') || 'Keep Data'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="rounded-xl"
+                  disabled={archiving}
+                  onClick={() => archiveDialogProject && handleArchiveProject(archiveDialogProject, true)}
+                >
+                  {t('delete_data') || 'Delete Data'}
+                </Button>
+              </div>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

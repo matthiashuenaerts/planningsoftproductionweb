@@ -80,6 +80,9 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [expanded, setExpanded] = useState(false);
   const [photos, setPhotos] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [isDraggingYard, setIsDraggingYard] = useState(false);
+  const fileInputYardRef = useRef<HTMLInputElement>(null);
 
   const loadPhotos = useCallback(async () => {
     setLoading(true);
@@ -110,7 +113,6 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
     const path = `yard-photos/${projectId}/${name}`;
     try {
       await supabase.storage.from('project_files').remove([path]);
-      // Also remove from installation_photos and project_files tables
       await supabase.from('installation_photos' as any).delete().eq('file_path', path);
       await supabase.from('project_files' as any).delete().eq('file_path', path);
       toast({ title: t('inst_photo_deleted') || 'Photo deleted' });
@@ -118,6 +120,21 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
+  };
+
+  const uploadYardFiles = async (files: FileList | File[]) => {
+    for (const file of Array.from(files)) {
+      const fileName = `${Date.now()}_${file.name}`;
+      await supabase.storage.from('project_files').upload(`yard-photos/${projectId}/${fileName}`, file, { cacheControl: '3600', upsert: true });
+    }
+    toast({ title: t('success') || 'Success' });
+    loadPhotos();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingYard(false);
+    if (e.dataTransfer.files.length > 0) uploadYardFiles(e.dataTransfer.files);
   };
 
   return (
@@ -138,7 +155,26 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
       </button>
       {expanded && (
-        <CardContent className="pt-0 px-3 sm:px-6 pb-4">
+        <CardContent className="pt-0 px-3 sm:px-6 pb-4 space-y-3">
+          {/* Upload area */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${isDraggingYard ? 'border-primary bg-primary/5' : 'border-border'}`}
+            onDragOver={(e) => { e.preventDefault(); setIsDraggingYard(true); }}
+            onDragLeave={() => setIsDraggingYard(false)}
+            onDrop={handleDrop}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileInputYardRef.current?.click()}>
+                <Upload className="h-3 w-3 mr-1" /> {t('upload') || 'Upload'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
+                <Camera className="h-3 w-3 mr-1" /> {t('inst_take_photo') || 'Camera'}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">{t('drag_drop') || 'or drag & drop images here'}</p>
+            <input ref={fileInputYardRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && uploadYardFiles(e.target.files)} />
+          </div>
+
           {loading ? (
             <div className="py-4 text-center"><Loader2Icon className="h-5 w-5 animate-spin mx-auto" /></div>
           ) : photos.length > 0 ? (
@@ -155,9 +191,34 @@ const YardPhotosFolder: React.FC<{ projectId: string }> = ({ projectId }) => {
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">{t('inst_no_documents')}</p>
           )}
+
+          {/* Camera dialog - reuse InstallationPhotoCapture */}
+          {cameraOpen && (
+            <React.Suspense fallback={null}>
+              <InstallationPhotoCaptureDialog
+                open={cameraOpen}
+                onOpenChange={setCameraOpen}
+                projectId={projectId}
+                onPhotoTaken={() => loadPhotos()}
+              />
+            </React.Suspense>
+          )}
         </CardContent>
       )}
     </Card>
+  );
+};
+
+// Lazy wrapper for InstallationPhotoCapture
+const InstallationPhotoCaptureDialog: React.FC<{ open: boolean; onOpenChange: (o: boolean) => void; projectId: string; onPhotoTaken: () => void }> = ({ open, onOpenChange, projectId, onPhotoTaken }) => {
+  const InstallationPhotoCapture = React.lazy(() => import('@/components/installation/InstallationPhotoCapture'));
+  return (
+    <InstallationPhotoCapture
+      open={open}
+      onOpenChange={(o) => { onOpenChange(o); if (!o) onPhotoTaken(); }}
+      projectId={projectId}
+      projectName=""
+    />
   );
 };
 
