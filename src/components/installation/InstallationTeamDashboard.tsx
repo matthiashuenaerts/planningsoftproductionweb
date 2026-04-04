@@ -598,12 +598,32 @@ const InstallationTeamDashboard: React.FC = () => {
 
                           {/* Service ticket details */}
                           {currentAssignment.is_service_ticket && (
-                            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-md p-3 space-y-1">
+                            <div className="bg-amber-50 dark:bg-amber-950/20 rounded-md p-3 space-y-2">
                               {currentAssignment.service_hours && (
                                 <p className="text-sm"><strong>{t('inst_service_hours')}:</strong> {currentAssignment.service_hours}h</p>
                               )}
                               {currentAssignment.service_notes && (
                                 <p className="text-sm text-muted-foreground">{currentAssignment.service_notes}</p>
+                              )}
+                              {/* Service ticket items */}
+                              {currentAssignment.service_ticket_items && currentAssignment.service_ticket_items.length > 0 && (
+                                <div className="border-t border-amber-200 dark:border-amber-800 pt-2 mt-2 space-y-1.5">
+                                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t('inst_service_items')}:</p>
+                                  {currentAssignment.service_ticket_items.map((item: any) => (
+                                    <div key={item.id} className="flex items-start gap-2 text-xs">
+                                      <Badge variant="outline" className="text-[9px] h-4 px-1 flex-shrink-0">
+                                        {item.item_type === 'order_request' ? '📦' : item.item_type === 'production_task' ? '🔨' : item.item_type === 'office_task' ? '🏢' : '☑️'}
+                                      </Badge>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="font-medium">{item.title}</span>
+                                        {item.description && <p className="text-muted-foreground truncate">{item.description}</p>}
+                                      </div>
+                                      <Badge className={`text-[9px] h-4 ${item.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {item.status}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           )}
