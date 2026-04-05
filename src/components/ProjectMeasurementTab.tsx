@@ -126,7 +126,7 @@ const ProjectMeasurementTab: React.FC<Props> = ({ projectId, projectName, client
   };
 
   const handleDownloadFile = async (fileName: string) => {
-    const url = await getSignedUrl('measurement-files', `measurements/${projectId}/${fileName}`);
+    const url = await createSignedUrl('measurement-files', `measurements/${projectId}/${fileName}`);
     if (url) window.open(url, '_blank');
   };
 
