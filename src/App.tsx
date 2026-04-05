@@ -58,6 +58,7 @@ import DeveloperRoute from "@/components/DeveloperRoute";
 import HomeRedirect from "@/components/HomeRedirect";
 import TenantLayout from "@/components/TenantLayout";
 import DeveloperPortal from "@/pages/DeveloperPortal";
+import CustomerPortfolio from "@/pages/CustomerPortfolio";
 
 // Marketing site
 import MarketingLayout from "@/components/marketing/MarketingLayout";
