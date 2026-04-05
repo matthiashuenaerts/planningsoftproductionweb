@@ -22,7 +22,7 @@ export const measurementService = {
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as ProjectMeasurement[];
+    return (data ?? []) as unknown as ProjectMeasurement[];
   },
 
   async create(measurement: Partial<ProjectMeasurement>): Promise<ProjectMeasurement> {
@@ -32,7 +32,7 @@ export const measurementService = {
       .select()
       .single();
     if (error) throw error;
-    return data as ProjectMeasurement;
+    return data as unknown as ProjectMeasurement;
   },
 
   async update(id: string, updates: Partial<ProjectMeasurement>): Promise<ProjectMeasurement> {
@@ -43,7 +43,7 @@ export const measurementService = {
       .select()
       .single();
     if (error) throw error;
-    return data as ProjectMeasurement;
+    return data as unknown as ProjectMeasurement;
   },
 
   async delete(id: string): Promise<void> {

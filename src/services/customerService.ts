@@ -25,25 +25,25 @@ export const customerService = {
     query = applyTenantFilter(query, tenantId);
     const { data, error } = await query;
     if (error) throw error;
-    return (data ?? []) as Customer[];
+    return (data ?? []) as unknown as Customer[];
   },
 
   async getById(id: string): Promise<Customer | null> {
     const { data, error } = await supabase.from('customers' as any).select('*').eq('id', id).single();
     if (error) { if (error.code === 'PGRST116') return null; throw error; }
-    return data as Customer;
+    return data as unknown as Customer;
   },
 
   async create(customer: Partial<Customer>): Promise<Customer> {
     const { data, error } = await supabase.from('customers' as any).insert(customer).select().single();
     if (error) throw error;
-    return data as Customer;
+    return data as unknown as Customer;
   },
 
   async update(id: string, updates: Partial<Customer>): Promise<Customer> {
     const { data, error } = await supabase.from('customers' as any).update(updates).eq('id', id).select().single();
     if (error) throw error;
-    return data as Customer;
+    return data as unknown as Customer;
   },
 
   async delete(id: string): Promise<void> {
@@ -56,6 +56,6 @@ export const customerService = {
     q = applyTenantFilter(q, tenantId);
     const { data, error } = await q;
     if (error) throw error;
-    return (data ?? []) as Customer[];
+    return (data ?? []) as unknown as Customer[];
   },
 };

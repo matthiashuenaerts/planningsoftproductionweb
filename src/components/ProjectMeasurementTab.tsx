@@ -14,7 +14,7 @@ import { useTenant } from '@/context/TenantContext';
 import { useAuth } from '@/context/AuthContext';
 import { measurementService, ProjectMeasurement } from '@/services/measurementService';
 import { supabase } from '@/integrations/supabase/client';
-import { getSignedUrl } from '@/lib/storageUtils';
+import { createSignedUrl } from '@/lib/storageUtils';
 
 interface Props {
   projectId: string;
