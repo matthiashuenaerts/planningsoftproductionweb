@@ -1031,7 +1031,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   <FormItem>
                     <FormLabel>{t('npm_client')}</FormLabel>
                     <FormControl>
-                      <Input placeholder={t('npm_client_placeholder')} className={cn(isMobile && "h-9 text-sm")} {...field} />
+                      <CustomerSelector
+                        value={field.value}
+                        onChange={field.onChange}
+                        onSelectCustomer={(customer) => {
+                          field.onChange(customer.name);
+                          // Auto-fill address from customer if empty
+                          if (customer.address_street && !form.getValues('address_street')) {
+                            form.setValue('address_street', customer.address_street);
+                            form.setValue('address_number', customer.address_number || '');
+                            form.setValue('address_postal_code', customer.address_postal_code || '');
+                            form.setValue('address_city', customer.address_city || '');
+                          }
+                        }}
+                        className={cn(isMobile && "h-9 text-sm")}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
