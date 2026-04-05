@@ -1191,6 +1191,16 @@ const ProjectDetails = () => {
                 <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
                   <Folder className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
+                  {['admin', 'manager', 'measurer'].includes(currentEmployee?.role) && (
+                    <Button
+                      size="sm"
+                      variant={activeTab === 'measurement' ? 'default' : 'ghost'}
+                      onClick={() => setActiveTab('measurement')}
+                      className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'measurement' && 'text-muted-foreground hover:text-foreground')}
+                    >
+                      <Calendar className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Measurement
+                    </Button>
+                  )}
                   {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
                     <Button
                       size="sm"
