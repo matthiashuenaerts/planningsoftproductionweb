@@ -1203,6 +1203,68 @@ export type Database = {
           },
         ]
       }
+      customers: {
+        Row: {
+          address_city: string | null
+          address_country: string | null
+          address_number: string | null
+          address_postal_code: string | null
+          address_street: string | null
+          company_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          tenant_id: string
+          updated_at: string
+          vat_number: string | null
+        }
+        Insert: {
+          address_city?: string | null
+          address_country?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          tenant_id: string
+          updated_at?: string
+          vat_number?: string | null
+        }
+        Update: {
+          address_city?: string | null
+          address_country?: string | null
+          address_number?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_team_assignments: {
         Row: {
           created_at: string
@@ -3937,6 +3999,67 @@ export type Database = {
           },
         ]
       }
+      project_measurements: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          id: string
+          measurement_date: string | null
+          measurer_id: string | null
+          notes: string | null
+          project_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          id?: string
+          measurement_date?: string | null
+          measurer_id?: string | null
+          notes?: string | null
+          project_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          id?: string
+          measurement_date?: string | null
+          measurer_id?: string | null
+          notes?: string | null
+          project_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_measurements_measurer_id_fkey"
+            columns: ["measurer_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_measurements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_measurements_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_message_reads: {
         Row: {
           created_at: string
@@ -4492,6 +4615,7 @@ export type Database = {
           address_street: string | null
           client: string
           created_at: string
+          customer_id: string | null
           description: string | null
           efficiency_percentage: number | null
           id: string
@@ -4512,6 +4636,7 @@ export type Database = {
           address_street?: string | null
           client: string
           created_at?: string
+          customer_id?: string | null
           description?: string | null
           efficiency_percentage?: number | null
           id?: string
@@ -4532,6 +4657,7 @@ export type Database = {
           address_street?: string | null
           client?: string
           created_at?: string
+          customer_id?: string | null
           description?: string | null
           efficiency_percentage?: number | null
           id?: string
@@ -4546,6 +4672,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -6720,6 +6853,7 @@ export type Database = {
         | "calculator"
         | "developer"
         | "teamleader"
+        | "measurer"
       holiday_request_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
@@ -6859,6 +6993,7 @@ export const Constants = {
         "calculator",
         "developer",
         "teamleader",
+        "measurer",
       ],
       holiday_request_status: ["pending", "approved", "rejected"],
     },

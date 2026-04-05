@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -465,12 +465,19 @@ const Projects = () => {
               </p>
             </div>
             
-            {isAdmin && (
-              <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('new_project')}
-              </Button>
-            )}
+            <div className="flex gap-2 flex-wrap">
+              {['admin', 'manager'].includes(currentEmployee?.role) && (
+                <Button variant="outline" onClick={() => navigate(createLocalizedPath('/customers'))} className="rounded-xl">
+                  <Users className="mr-2 h-4 w-4" /> Customer Portfolio
+                </Button>
+              )}
+              {isAdmin && (
+                <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('new_project')}
+                </Button>
+              )}
+            </div>
           </div>
           
           {/* Search */}

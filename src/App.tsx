@@ -58,6 +58,7 @@ import DeveloperRoute from "@/components/DeveloperRoute";
 import HomeRedirect from "@/components/HomeRedirect";
 import TenantLayout from "@/components/TenantLayout";
 import DeveloperPortal from "@/pages/DeveloperPortal";
+import CustomerPortfolio from "@/pages/CustomerPortfolio";
 
 // Marketing site
 import MarketingLayout from "@/components/marketing/MarketingLayout";
@@ -137,6 +138,7 @@ function App() {
 
                     {/* Tenant app pages under /:tenant/:lang/... */}
                     <Route path=":lang" element={<P><Index /></P>} />
+                    <Route path=":lang/customers" element={<P><CustomerPortfolio /></P>} />
                     <Route path=":lang/projects" element={<P><Projects /></P>} />
                     <Route path=":lang/projects/:projectId" element={<P><ProjectDetails /></P>} />
                     <Route path=":lang/projects/:projectId/orders" element={<P><ProjectOrders /></P>} />

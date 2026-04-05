@@ -41,6 +41,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { PartDetailDialog } from '@/components/PartDetailDialog';
 import { ProjectCostingTab } from '@/components/ProjectCostingTab';
 import AfterSalesTab from '@/components/AfterSalesTab';
+import ProjectMeasurementTab from '@/components/ProjectMeasurementTab';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -1190,6 +1191,16 @@ const ProjectDetails = () => {
                 <Button size="sm" variant={activeTab === 'onedrive' ? 'default' : 'ghost'} onClick={() => setActiveTab('onedrive')} className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'onedrive' && 'text-muted-foreground hover:text-foreground')}>
                   <Folder className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> {t('onedrive')}
                 </Button>
+                  {['admin', 'manager', 'measurer'].includes(currentEmployee?.role) && (
+                    <Button
+                      size="sm"
+                      variant={activeTab === 'measurement' ? 'default' : 'ghost'}
+                      onClick={() => setActiveTab('measurement')}
+                      className={cn("h-7 sm:h-8 text-[11px] sm:text-sm px-2 sm:px-3 rounded-full", activeTab !== 'measurement' && 'text-muted-foreground hover:text-foreground')}
+                    >
+                      <Calendar className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Measurement
+                    </Button>
+                  )}
                   {['admin', 'manager', 'calculator'].includes(currentEmployee?.role) && (
                     <Button
                       size="sm"
@@ -1220,7 +1231,15 @@ const ProjectDetails = () => {
             ))}
           </div>
 
-          {activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'aftersales' ? <AfterSalesTab projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
+          {activeTab === 'measurement' ? (
+            <ProjectMeasurementTab
+              projectId={projectId!}
+              projectName={project?.name || ''}
+              clientName={project?.client || ''}
+              clientEmail=""
+              projectAddress={[project?.address_street, project?.address_number, project?.address_postal_code, project?.address_city].filter(Boolean).join(', ')}
+            />
+          ) : activeTab === 'files' ? <ProjectFileManager projectId={projectId!} /> : activeTab === 'onedrive' ? <OneDriveIntegration projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'aftersales' ? <AfterSalesTab projectId={projectId!} projectName={project?.name || ''} /> : activeTab === 'chat' ? <ProjectChatInline projectId={projectId!} projectName={project?.name || ''} onUnreadCountChange={setUnreadChatCount} /> : activeTab === 'parts' ? <div className="space-y-4">
               {partsLists.length > 0 ? <div className="space-y-4">
                   {/* Parts List Management Header */}
                   <Card>
