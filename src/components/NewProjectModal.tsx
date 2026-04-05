@@ -49,6 +49,7 @@ import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import CustomerSelector from '@/components/CustomerSelector';
 
 // Add the missing interface
 interface NewProjectModalProps {
