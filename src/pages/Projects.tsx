@@ -465,12 +465,19 @@ const Projects = () => {
               </p>
             </div>
             
-            {isAdmin && (
-              <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
-                <Plus className="mr-2 h-4 w-4" />
-                {t('new_project')}
-              </Button>
-            )}
+            <div className="flex gap-2 flex-wrap">
+              {['admin', 'manager'].includes(currentEmployee?.role) && (
+                <Button variant="outline" onClick={() => navigate(createLocalizedPath('/customers'))} className="rounded-xl">
+                  <Users className="mr-2 h-4 w-4" /> Customer Portfolio
+                </Button>
+              )}
+              {isAdmin && (
+                <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t('new_project')}
+                </Button>
+              )}
+            </div>
           </div>
           
           {/* Search */}
