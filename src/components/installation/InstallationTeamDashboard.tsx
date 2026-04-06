@@ -1157,6 +1157,22 @@ const InstallationTeamDashboard: React.FC = () => {
                       }}
                     />
                   )}
+
+                  {/* Route Map Dialog for multi-stop days */}
+                  <RouteMapDialog
+                    open={routeDialogOpen}
+                    onOpenChange={setRouteDialogOpen}
+                    waypoints={routeWaypoints}
+                    routeGeometry={routeGeometry}
+                    teamName={currentAssignment?.team_info?.name || ''}
+                    dateLabel={currentAssignment?.start_date ? format(parseISO(currentAssignment.start_date), 'EEEE d MMMM yyyy', { locale: dateFnsLocale }) : ''}
+                    startPoint={routeStartPoint}
+                    totalDrivingMinutes={routeTotalDrivingMin}
+                    departureTime={routeDepartureTime}
+                    workStartTime={routeWorkStartTime}
+                    workEndTime={routeWorkEndTime}
+                    returnTime={routeReturnTime}
+                  />
                 </>
               )}
             </>
