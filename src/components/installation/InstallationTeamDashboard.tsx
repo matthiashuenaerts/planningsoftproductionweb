@@ -350,7 +350,139 @@ const InstallationTeamDashboard: React.FC = () => {
         .sort((a, b) => (a.order_index || 999) - (b.order_index || 999))
     : [];
 
+  // Route optimization for multi-stop days
+  const computeOptimizedRoute = useCallback(async () => {
+    if (allSameDayItems.length < 2 || !currentAssignment?.start_date) return;
+
+    try {
+      // Get team info for start address
+      const teamInfo = (allSameDayItems[0] as any).team_info;
+      const teamAddress = teamInfo?.start_street
+        ? [teamInfo.start_street, teamInfo.start_number, teamInfo.start_postal_code, teamInfo.start_city].filter(Boolean).join(' ')
+        : null;
+
+      if (!teamAddress) return;
+
+      // Get working hours
+      const dayOfWeek = parseISO(currentAssignment.start_date).getDay();
+      const allWorkingHours = await workingHoursService.getWorkingHours(tenant?.id);
+      const installationHours = workingHoursService.getWorkingHoursForDay(allWorkingHours, 'installation', dayOfWeek);
+      const workStart = installationHours?.start_time || '08:00';
+      const workEnd = installationHours?.end_time || '17:00';
+
+      // Geocode all addresses
+      const geocodeAddr = async (addr: string) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
+          const data = await res.json();
+          if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        } catch {}
+        return null;
+      };
+
+      const startCoords = await geocodeAddr(teamAddress);
+      if (!startCoords) return;
+
+      const unrecognized: string[] = [];
+      const stopsWithCoords = await Promise.all(
+        allSameDayItems.map(async (a, idx) => {
+          const addr = [a.project.address_street, a.project.address_number, a.project.address_postal_code, a.project.address_city].filter(Boolean).join(' ');
+          const coords = addr ? await geocodeAddr(addr) : null;
+          if (!coords && addr) unrecognized.push(`${a.project.name}: ${addr}`);
+          return {
+            ...a,
+            _addr: addr,
+            _lat: coords?.lat,
+            _lng: coords?.lng,
+            _serviceHours: a.is_service_ticket ? (a.service_hours || 0) : (a.duration * 8),
+          };
+        })
+      );
+
+      const validStops = stopsWithCoords.filter(s => s._lat && s._lng);
+      if (validStops.length === 0) return;
+
+      // Build OSRM route
+      const coords: string[] = [`${startCoords.lng},${startCoords.lat}`];
+      validStops.forEach(s => coords.push(`${s._lng},${s._lat}`));
+      coords.push(`${startCoords.lng},${startCoords.lat}`);
+
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
+      const resp = await fetch(osrmUrl);
+      const data = await resp.json();
+
+      let geometry: [number, number][] = [];
+      let totalDrivingMin: number | undefined;
+      let depTime: string | undefined;
+      let retTime: string | undefined;
+
+      const waypoints: RouteWaypoint[] = validStops.map((s, idx) => ({
+        name: s.project.name,
+        client: s.project.client,
+        address: s._addr,
+        lat: s._lat!,
+        lng: s._lng!,
+        order: idx + 1,
+        serviceHours: s.is_service_ticket ? (s.service_hours || 0) : undefined,
+      }));
+
+      if (data.code === 'Ok' && data.routes?.[0]) {
+        const route = data.routes[0];
+        geometry = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+        totalDrivingMin = route.duration ? route.duration / 60 : undefined;
+        const legDurations = route.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+
+        const [wH, wM] = workStart.split(':').map(Number);
+        const workStartMin = wH * 60 + wM;
+        const firstLegMin = legDurations.length > 0 ? legDurations[0] : 0;
+        const departureMin = Math.max(0, workStartMin - Math.ceil(firstLegMin));
+        depTime = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(departureMin % 60).padStart(2, '0')}`;
+
+        let currentTimeMin = workStartMin;
+        waypoints.forEach((wp, i) => {
+          const arrivalMin = currentTimeMin;
+          const serviceMin = (wp.serviceHours || 0) * 60;
+          const departureMin = arrivalMin + serviceMin;
+          wp.estimatedArrival = `${String(Math.floor(arrivalMin / 60)).padStart(2, '0')}:${String(Math.round(arrivalMin % 60)).padStart(2, '0')}`;
+          wp.estimatedDeparture = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(Math.round(departureMin % 60)).padStart(2, '0')}`;
+          const nextLegIdx = i + 1;
+          const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
+          currentTimeMin = departureMin + Math.ceil(drivingToNext);
+        });
+
+        // Return time
+        const lastWp = waypoints[waypoints.length - 1];
+        if (lastWp?.estimatedDeparture) {
+          const lastLeg = legDurations[legDurations.length - 1] || 0;
+          const [lh, lm] = lastWp.estimatedDeparture.split(':').map(Number);
+          const returnMin = lh * 60 + lm + Math.ceil(lastLeg);
+          retTime = `${String(Math.floor(returnMin / 60)).padStart(2, '0')}:${String(returnMin % 60).padStart(2, '0')}`;
+        }
+      }
+
+      setRouteWaypoints(waypoints);
+      setRouteGeometry(geometry);
+      setRouteStartPoint({ ...startCoords, address: teamAddress });
+      setRouteTotalDrivingMin(totalDrivingMin);
+      setRouteDepartureTime(depTime);
+      setRouteReturnTime(retTime);
+      setRouteWorkStartTime(workStart);
+      setRouteWorkEndTime(workEnd);
+    } catch (err) {
+      console.error('Route optimization error:', err);
+    }
+  }, [allSameDayItems.length, currentAssignment?.start_date, tenant?.id]);
+
+  // Auto-compute route when multi-stop day detected
   useEffect(() => {
+    if (allSameDayItems.length >= 2) {
+      computeOptimizedRoute();
+    } else {
+      setRouteWaypoints([]);
+      setRouteGeometry([]);
+    }
+  }, [allSameDayItems.length, computeOptimizedRoute]);
+
     if (!address || !mapContainerRef.current) return;
     setDrivingTime(null);
 
