@@ -483,6 +483,7 @@ const InstallationTeamDashboard: React.FC = () => {
     }
   }, [allSameDayItems.length, computeOptimizedRoute]);
 
+  useEffect(() => {
     if (!address || !mapContainerRef.current) return;
     setDrivingTime(null);
 
