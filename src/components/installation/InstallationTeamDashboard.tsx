@@ -650,11 +650,23 @@ const InstallationTeamDashboard: React.FC = () => {
                   {sameDayAssignments.length > 0 && (
                     <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
                       <CardContent className="py-3 px-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                            {allSameDayItems.length} {t('inst_tasks_same_day')}
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                              {allSameDayItems.length} {t('inst_tasks_same_day')}
+                            </span>
+                          </div>
+                          {routeWaypoints.length >= 2 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => setRouteDialogOpen(true)}
+                            >
+                              <RouteIcon className="h-3.5 w-3.5 mr-1" /> {t('inst_show_route') || 'Show Route'}
+                            </Button>
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           {allSameDayItems.map((a, idx) => (
