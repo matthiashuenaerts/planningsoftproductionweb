@@ -97,6 +97,15 @@ const InstallationTeamDashboard: React.FC = () => {
   const [completionTaskId, setCompletionTaskId] = useState<string>('');
   const [installationStandardTaskIds, setInstallationStandardTaskIds] = useState<string[]>([]);
   const [drivingTime, setDrivingTime] = useState<string | null>(null);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [routeWaypoints, setRouteWaypoints] = useState<RouteWaypoint[]>([]);
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
+  const [routeStartPoint, setRouteStartPoint] = useState<{ lat: number; lng: number; address: string } | undefined>();
+  const [routeTotalDrivingMin, setRouteTotalDrivingMin] = useState<number | undefined>();
+  const [routeDepartureTime, setRouteDepartureTime] = useState<string | undefined>();
+  const [routeReturnTime, setRouteReturnTime] = useState<string | undefined>();
+  const [routeWorkStartTime, setRouteWorkStartTime] = useState<string | undefined>();
+  const [routeWorkEndTime, setRouteWorkEndTime] = useState<string | undefined>();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
