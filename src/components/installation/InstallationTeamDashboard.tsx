@@ -684,12 +684,12 @@ const InstallationTeamDashboard: React.FC = () => {
                                 {a.is_service_ticket ? '🔧' : '📦'}
                               </Badge>
                               <span className="truncate flex-1">{a.project.name}</span>
+                              {routeWaypoints[idx]?.estimatedArrival && (
+                                <span className="text-[10px] text-primary flex-shrink-0 font-mono">🕐 {routeWaypoints[idx].estimatedArrival}</span>
+                              )}
                               <span className="text-xs text-muted-foreground flex-shrink-0">
                                 {a.is_service_ticket ? `${a.service_hours || 0}h` : `${a.duration}d`}
                               </span>
-                              {a.driving_time_text && (
-                                <span className="text-[10px] text-primary flex-shrink-0">🚗 {a.driving_time_text}</span>
-                              )}
                             </button>
                           ))}
                         </div>
