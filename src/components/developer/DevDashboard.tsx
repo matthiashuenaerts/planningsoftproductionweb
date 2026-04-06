@@ -281,51 +281,63 @@ const DevDashboard: React.FC = () => {
 
 // Storage usage panel
 const StorageUsagePanel: React.FC<{ tenantMap?: Record<string, { name: string; slug: string }> }> = ({ tenantMap }) => {
-  const { data: usage, isLoading } = useQuery({
-    queryKey: ["dev", "dashboard", "storage-usage"],
+  const { data: usage, isLoading, refetch } = useQuery({
+    queryKey: ["dev", "dashboard", "storage-usage-v2"],
     queryFn: async () => {
-      // Get counts per tenant for projects, tasks, orders, employees, files
-      const [projects, employees, orders] = await Promise.all([
-        supabase.from("projects").select("tenant_id"),
-        supabase.from("employees").select("tenant_id"),
-        supabase.from("orders").select("tenant_id"),
-      ]);
-
-      const tenantStats: Record<string, { projects: number; employees: number; orders: number }> = {};
-      for (const p of (projects.data ?? [])) {
-        if (!p.tenant_id) continue;
-        if (!tenantStats[p.tenant_id]) tenantStats[p.tenant_id] = { projects: 0, employees: 0, orders: 0 };
-        tenantStats[p.tenant_id].projects++;
-      }
-      for (const e of (employees.data ?? [])) {
-        if (!e.tenant_id) continue;
-        if (!tenantStats[e.tenant_id]) tenantStats[e.tenant_id] = { projects: 0, employees: 0, orders: 0 };
-        tenantStats[e.tenant_id].employees++;
-      }
-      for (const o of (orders.data ?? [])) {
-        if (!o.tenant_id) continue;
-        if (!tenantStats[o.tenant_id]) tenantStats[o.tenant_id] = { projects: 0, employees: 0, orders: 0 };
-        tenantStats[o.tenant_id].orders++;
-      }
-      return tenantStats;
+      const { data, error } = await supabase.functions.invoke('tenant-storage-stats');
+      if (error) throw error;
+      return (data?.tenants ?? []) as Array<{
+        tenant_id: string;
+        tenant_name: string;
+        tenant_slug: string;
+        projects: number;
+        tasks: number;
+        orders: number;
+        employees: number;
+        schedules: number;
+        parts_lists: number;
+        total_records: number;
+      }>;
     },
-    refetchInterval: 120000,
+    refetchInterval: 300000, // 5 min
   });
 
-  const getTenantName = (id: string) => tenantMap?.[id]?.name ?? id.slice(0, 8);
+  if (isLoading) return <p className="text-slate-400 text-sm">Loading storage metrics...</p>;
+  if (!usage || usage.length === 0) return <p className="text-slate-400 text-sm">No data</p>;
 
-  if (isLoading) return <p className="text-slate-400 text-sm">Loading...</p>;
-  if (!usage || Object.keys(usage).length === 0) return <p className="text-slate-400 text-sm">No data</p>;
+  // Sort by total records descending
+  const sorted = [...usage].sort((a, b) => b.total_records - a.total_records);
 
   return (
-    <div className="space-y-2">
-      {Object.entries(usage).map(([tid, stats]) => (
-        <div key={tid} className="flex items-center justify-between bg-white/5 rounded-md px-3 py-2">
-          <span className="text-sm text-white">{getTenantName(tid)}</span>
-          <div className="flex gap-3 text-xs text-slate-400">
-            <span>{stats.projects} projects</span>
-            <span>{stats.employees} employees</span>
-            <span>{stats.orders} orders</span>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs text-slate-500">Database records per tenant</p>
+        <Button variant="ghost" size="sm" onClick={() => refetch()} className="text-slate-400 hover:text-white text-xs h-7">
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
+      </div>
+      {sorted.map((t) => (
+        <div key={t.tenant_id} className="bg-white/5 rounded-md px-3 py-2.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white font-medium">{t.tenant_name}</span>
+            <Badge className="text-[10px] bg-blue-600/40 text-blue-300">
+              {t.total_records.toLocaleString()} records
+            </Badge>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-400">
+            <span>📁 {t.projects} projects</span>
+            <span>✅ {t.tasks} tasks</span>
+            <span>📦 {t.orders} orders</span>
+            <span>👤 {t.employees} employees</span>
+            <span>📅 {t.schedules} schedules</span>
+            <span>🔧 {t.parts_lists} parts lists</span>
+          </div>
+          {/* Relative usage bar */}
+          <div className="w-full bg-white/10 rounded-full h-1.5">
+            <div
+              className="bg-blue-500 h-1.5 rounded-full transition-all"
+              style={{ width: `${Math.min(100, (t.total_records / Math.max(1, sorted[0].total_records)) * 100)}%` }}
+            />
           </div>
         </div>
       ))}

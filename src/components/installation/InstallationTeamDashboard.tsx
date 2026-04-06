@@ -15,7 +15,7 @@ import { nl, fr, enUS } from 'date-fns/locale';
 import {
   MapPin, Camera, ChevronLeft, ChevronRight, ExternalLink, CalendarDays,
   Clock, Wrench, ClipboardList, Navigation, Zap, AlertTriangle, CheckCircle2,
-  FileText, Play, Truck, AlertCircle
+  FileText, Play, Truck, AlertCircle, Route as RouteIcon
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import L from 'leaflet';
@@ -27,6 +27,8 @@ import InstallationTaskList from './InstallationTaskList';
 import InstallationCompletionDialog from './InstallationCompletionDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import BrokenPartForm from '@/components/broken-parts/BrokenPartForm';
+import RouteMapDialog, { RouteWaypoint } from '@/components/service/RouteMapDialog';
+import { workingHoursService } from '@/services/workingHoursService';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -95,6 +97,15 @@ const InstallationTeamDashboard: React.FC = () => {
   const [completionTaskId, setCompletionTaskId] = useState<string>('');
   const [installationStandardTaskIds, setInstallationStandardTaskIds] = useState<string[]>([]);
   const [drivingTime, setDrivingTime] = useState<string | null>(null);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [routeWaypoints, setRouteWaypoints] = useState<RouteWaypoint[]>([]);
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
+  const [routeStartPoint, setRouteStartPoint] = useState<{ lat: number; lng: number; address: string } | undefined>();
+  const [routeTotalDrivingMin, setRouteTotalDrivingMin] = useState<number | undefined>();
+  const [routeDepartureTime, setRouteDepartureTime] = useState<string | undefined>();
+  const [routeReturnTime, setRouteReturnTime] = useState<string | undefined>();
+  const [routeWorkStartTime, setRouteWorkStartTime] = useState<string | undefined>();
+  const [routeWorkEndTime, setRouteWorkEndTime] = useState<string | undefined>();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -339,6 +350,139 @@ const InstallationTeamDashboard: React.FC = () => {
         .sort((a, b) => (a.order_index || 999) - (b.order_index || 999))
     : [];
 
+  // Route optimization for multi-stop days
+  const computeOptimizedRoute = useCallback(async () => {
+    if (allSameDayItems.length < 2 || !currentAssignment?.start_date) return;
+
+    try {
+      // Get team info for start address
+      const teamInfo = (allSameDayItems[0] as any).team_info;
+      const teamAddress = teamInfo?.start_street
+        ? [teamInfo.start_street, teamInfo.start_number, teamInfo.start_postal_code, teamInfo.start_city].filter(Boolean).join(' ')
+        : null;
+
+      if (!teamAddress) return;
+
+      // Get working hours
+      const dayOfWeek = parseISO(currentAssignment.start_date).getDay();
+      const allWorkingHours = await workingHoursService.getWorkingHours(tenant?.id);
+      const installationHours = workingHoursService.getWorkingHoursForDay(allWorkingHours, 'installation', dayOfWeek);
+      const workStart = installationHours?.start_time || '08:00';
+      const workEnd = installationHours?.end_time || '17:00';
+
+      // Geocode all addresses
+      const geocodeAddr = async (addr: string) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
+          const data = await res.json();
+          if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        } catch {}
+        return null;
+      };
+
+      const startCoords = await geocodeAddr(teamAddress);
+      if (!startCoords) return;
+
+      const unrecognized: string[] = [];
+      const stopsWithCoords = await Promise.all(
+        allSameDayItems.map(async (a, idx) => {
+          const addr = [a.project.address_street, a.project.address_number, a.project.address_postal_code, a.project.address_city].filter(Boolean).join(' ');
+          const coords = addr ? await geocodeAddr(addr) : null;
+          if (!coords && addr) unrecognized.push(`${a.project.name}: ${addr}`);
+          return {
+            ...a,
+            _addr: addr,
+            _lat: coords?.lat,
+            _lng: coords?.lng,
+            _serviceHours: a.is_service_ticket ? (a.service_hours || 0) : (a.duration * 8),
+          };
+        })
+      );
+
+      const validStops = stopsWithCoords.filter(s => s._lat && s._lng);
+      if (validStops.length === 0) return;
+
+      // Build OSRM route
+      const coords: string[] = [`${startCoords.lng},${startCoords.lat}`];
+      validStops.forEach(s => coords.push(`${s._lng},${s._lat}`));
+      coords.push(`${startCoords.lng},${startCoords.lat}`);
+
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson&steps=false&annotations=duration`;
+      const resp = await fetch(osrmUrl);
+      const data = await resp.json();
+
+      let geometry: [number, number][] = [];
+      let totalDrivingMin: number | undefined;
+      let depTime: string | undefined;
+      let retTime: string | undefined;
+
+      const waypoints: RouteWaypoint[] = validStops.map((s, idx) => ({
+        name: s.project.name,
+        client: s.project.client,
+        address: s._addr,
+        lat: s._lat!,
+        lng: s._lng!,
+        order: idx + 1,
+        serviceHours: s.is_service_ticket ? (s.service_hours || 0) : undefined,
+      }));
+
+      if (data.code === 'Ok' && data.routes?.[0]) {
+        const route = data.routes[0];
+        geometry = route.geometry.coordinates.map((c: [number, number]) => [c[1], c[0]] as [number, number]);
+        totalDrivingMin = route.duration ? route.duration / 60 : undefined;
+        const legDurations = route.legs?.map((leg: any) => (leg.duration || 0) / 60) || [];
+
+        const [wH, wM] = workStart.split(':').map(Number);
+        const workStartMin = wH * 60 + wM;
+        const firstLegMin = legDurations.length > 0 ? legDurations[0] : 0;
+        const departureMin = Math.max(0, workStartMin - Math.ceil(firstLegMin));
+        depTime = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(departureMin % 60).padStart(2, '0')}`;
+
+        let currentTimeMin = workStartMin;
+        waypoints.forEach((wp, i) => {
+          const arrivalMin = currentTimeMin;
+          const serviceMin = (wp.serviceHours || 0) * 60;
+          const departureMin = arrivalMin + serviceMin;
+          wp.estimatedArrival = `${String(Math.floor(arrivalMin / 60)).padStart(2, '0')}:${String(Math.round(arrivalMin % 60)).padStart(2, '0')}`;
+          wp.estimatedDeparture = `${String(Math.floor(departureMin / 60)).padStart(2, '0')}:${String(Math.round(departureMin % 60)).padStart(2, '0')}`;
+          const nextLegIdx = i + 1;
+          const drivingToNext = nextLegIdx < legDurations.length ? legDurations[nextLegIdx] : 0;
+          currentTimeMin = departureMin + Math.ceil(drivingToNext);
+        });
+
+        // Return time
+        const lastWp = waypoints[waypoints.length - 1];
+        if (lastWp?.estimatedDeparture) {
+          const lastLeg = legDurations[legDurations.length - 1] || 0;
+          const [lh, lm] = lastWp.estimatedDeparture.split(':').map(Number);
+          const returnMin = lh * 60 + lm + Math.ceil(lastLeg);
+          retTime = `${String(Math.floor(returnMin / 60)).padStart(2, '0')}:${String(returnMin % 60).padStart(2, '0')}`;
+        }
+      }
+
+      setRouteWaypoints(waypoints);
+      setRouteGeometry(geometry);
+      setRouteStartPoint({ ...startCoords, address: teamAddress });
+      setRouteTotalDrivingMin(totalDrivingMin);
+      setRouteDepartureTime(depTime);
+      setRouteReturnTime(retTime);
+      setRouteWorkStartTime(workStart);
+      setRouteWorkEndTime(workEnd);
+    } catch (err) {
+      console.error('Route optimization error:', err);
+    }
+  }, [allSameDayItems.length, currentAssignment?.start_date, tenant?.id]);
+
+  // Auto-compute route when multi-stop day detected
+  useEffect(() => {
+    if (allSameDayItems.length >= 2) {
+      computeOptimizedRoute();
+    } else {
+      setRouteWaypoints([]);
+      setRouteGeometry([]);
+    }
+  }, [allSameDayItems.length, computeOptimizedRoute]);
+
   useEffect(() => {
     if (!address || !mapContainerRef.current) return;
     setDrivingTime(null);
@@ -506,11 +650,23 @@ const InstallationTeamDashboard: React.FC = () => {
                   {sameDayAssignments.length > 0 && (
                     <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
                       <CardContent className="py-3 px-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                            {allSameDayItems.length} {t('inst_tasks_same_day')}
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                              {allSameDayItems.length} {t('inst_tasks_same_day')}
+                            </span>
+                          </div>
+                          {routeWaypoints.length >= 2 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => setRouteDialogOpen(true)}
+                            >
+                              <RouteIcon className="h-3.5 w-3.5 mr-1" /> {t('inst_show_route') || 'Show Route'}
+                            </Button>
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           {allSameDayItems.map((a, idx) => (
@@ -528,12 +684,12 @@ const InstallationTeamDashboard: React.FC = () => {
                                 {a.is_service_ticket ? '🔧' : '📦'}
                               </Badge>
                               <span className="truncate flex-1">{a.project.name}</span>
+                              {routeWaypoints[idx]?.estimatedArrival && (
+                                <span className="text-[10px] text-primary flex-shrink-0 font-mono">🕐 {routeWaypoints[idx].estimatedArrival}</span>
+                              )}
                               <span className="text-xs text-muted-foreground flex-shrink-0">
                                 {a.is_service_ticket ? `${a.service_hours || 0}h` : `${a.duration}d`}
                               </span>
-                              {a.driving_time_text && (
-                                <span className="text-[10px] text-primary flex-shrink-0">🚗 {a.driving_time_text}</span>
-                              )}
                             </button>
                           ))}
                         </div>
@@ -1001,6 +1157,22 @@ const InstallationTeamDashboard: React.FC = () => {
                       }}
                     />
                   )}
+
+                  {/* Route Map Dialog for multi-stop days */}
+                  <RouteMapDialog
+                    open={routeDialogOpen}
+                    onOpenChange={setRouteDialogOpen}
+                    waypoints={routeWaypoints}
+                    routeGeometry={routeGeometry}
+                    teamName={currentAssignment?.team_info?.name || ''}
+                    dateLabel={currentAssignment?.start_date ? format(parseISO(currentAssignment.start_date), 'EEEE d MMMM yyyy', { locale: dateFnsLocale }) : ''}
+                    startPoint={routeStartPoint}
+                    totalDrivingMinutes={routeTotalDrivingMin}
+                    departureTime={routeDepartureTime}
+                    workStartTime={routeWorkStartTime}
+                    workEndTime={routeWorkEndTime}
+                    returnTime={routeReturnTime}
+                  />
                 </>
               )}
             </>

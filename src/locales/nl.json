@@ -1728,6 +1728,7 @@
   "inst_tasks_same_day": "taken op dezelfde dag",
   "inst_service_hours": "Service uren",
   "inst_start_service": "Start Service",
+  "inst_show_route": "Toon Route",
   "inst_driving_time": "Rijtijd",
   "inst_no_recipients": "Geen ontvangers",
   "inst_no_recipients_desc": "Er zijn geen e-mailadressen geconfigureerd voor deze notificatie. Configureer dit in de instellingen.",
