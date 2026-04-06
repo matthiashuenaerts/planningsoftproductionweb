@@ -15,7 +15,7 @@ import { nl, fr, enUS } from 'date-fns/locale';
 import {
   MapPin, Camera, ChevronLeft, ChevronRight, ExternalLink, CalendarDays,
   Clock, Wrench, ClipboardList, Navigation, Zap, AlertTriangle, CheckCircle2,
-  FileText, Play, Truck, AlertCircle
+  FileText, Play, Truck, AlertCircle, Route as RouteIcon
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import L from 'leaflet';
@@ -27,6 +27,8 @@ import InstallationTaskList from './InstallationTaskList';
 import InstallationCompletionDialog from './InstallationCompletionDialog';
 import ProjectFilesPopup from '@/components/ProjectFilesPopup';
 import BrokenPartForm from '@/components/broken-parts/BrokenPartForm';
+import RouteMapDialog, { RouteWaypoint } from '@/components/service/RouteMapDialog';
+import { workingHoursService } from '@/services/workingHoursService';
 
 // Fix Leaflet default marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
