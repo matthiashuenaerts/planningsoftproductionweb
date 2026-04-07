@@ -912,19 +912,7 @@ const InstallationTeamDashboard: React.FC = () => {
                         </Button>
                       )}
 
-                      {/* Service Start Button for service tickets */}
-                      {currentAssignment.is_service_ticket && (
-                        <Button
-                          className="w-full h-14 text-lg font-semibold"
-                          variant="default"
-                          onClick={() => {
-                            window.open(`/${tenant?.slug}/${lang}/service-installation`, '_blank');
-                          }}
-                        >
-                          <Play className="h-6 w-6 mr-2" />
-                          {t('inst_start_service')}
-                        </Button>
-                      )}
+                      {/* Service Start Button removed — service-installation page deprecated */}
 
                       {/* Service + Rush Order + Broken Part cards */}
                       <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
