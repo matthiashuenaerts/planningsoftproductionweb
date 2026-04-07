@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt, Wrench, X, ChevronRight, Globe } from 'lucide-react';
+import { Home, ListChecks, LayoutDashboard, Settings, Users, PackagePlus, Truck, LogOut, User, AlertTriangle, Menu, Clock, FileText, HelpCircle, Receipt, Wrench, X, ChevronRight, Globe, Ruler } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { rushOrderService } from '@/services/rushOrderService';
@@ -40,26 +40,6 @@ const NavbarContent = ({
   const { canAccess } = useRolePermissions();
   const canSeeInvoices = canAccess('invoices');
 
-  const { data: isServiceMember } = useQuery({
-    queryKey: ['isServiceTeamMember', currentEmployee?.id],
-    queryFn: async () => {
-      if (!currentEmployee) return false;
-      const { data: memberships } = await supabase
-        .from('placement_team_members' as any)
-        .select('team_id')
-        .eq('employee_id', currentEmployee.id);
-      if (!memberships || memberships.length === 0) return false;
-      const teamIds = (memberships as any[]).map((m: any) => m.team_id);
-      const { data: serviceTeams } = await (supabase
-        .from('placement_teams')
-        .select('id') as any)
-        .eq('team_type', 'service')
-        .eq('is_active', true)
-        .in('id', teamIds);
-      return serviceTeams && serviceTeams.length > 0;
-    },
-    enabled: !!currentEmployee,
-  });
 
   const {
     data: rushOrders,
@@ -136,31 +116,10 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {canAccess('control-panel') && (
-            <NavLink to={createLocalizedPath("/control-panel")} className={navLinkClass("/control-panel")} onClick={handleItemClick}>
-              <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('control_panel')}</span>
-            </NavLink>
-          )}
-
           {canAccess('projects') && (
             <NavLink to={createLocalizedPath("/projects")} className={navLinkClass("/projects")} onClick={handleItemClick}>
               <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
               <span>{t('projects')}</span>
-            </NavLink>
-          )}
-
-          {canAccess('workstations') && (
-            <NavLink to={createLocalizedPath("/workstations")} className={navLinkClass("/workstations")} onClick={handleItemClick}>
-              <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('workstations')}</span>
-            </NavLink>
-          )}
-
-          {canAccess('broken-parts') && (
-            <NavLink to={createLocalizedPath("/broken-parts")} className={navLinkClass("/broken-parts")} onClick={handleItemClick}>
-              <AlertTriangle className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('broken_parts')}</span>
             </NavLink>
           )}
 
@@ -171,17 +130,24 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {canAccess('notes-and-tasks') && (
-            <NavLink to={createLocalizedPath("/notes-and-tasks")} className={navLinkClass("/notes-and-tasks")} onClick={handleItemClick}>
-              <FileText className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('Tasks_Notes')}</span>
+          {canAccess('workstations') && (
+            <NavLink to={createLocalizedPath("/workstations")} className={navLinkClass("/workstations")} onClick={handleItemClick}>
+              <Truck className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('workstations')}</span>
             </NavLink>
           )}
 
-          {(canAccess('service-installation') || isServiceMember) && (
-            <NavLink to={createLocalizedPath("/service-installation")} className={navLinkClass("/service-installation")} onClick={handleItemClick}>
-              <Wrench className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('service_installation')}</span>
+          {canAccess('measurement-calendar') && (
+            <NavLink to={createLocalizedPath("/measurement-calendar")} className={navLinkClass("/measurement-calendar")} onClick={handleItemClick}>
+              <Ruler className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('measurement_calendar') || 'Measurement Calendar'}</span>
+            </NavLink>
+          )}
+
+          {canAccess('planning') && (
+            <NavLink to={createLocalizedPath("/planning")} className={navLinkClass("/planning")} onClick={handleItemClick}>
+              <Users className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('planning')}</span>
             </NavLink>
           )}
 
@@ -192,10 +158,29 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {canAccess('planning') && (
-            <NavLink to={createLocalizedPath("/planning")} className={navLinkClass("/planning")} onClick={handleItemClick}>
-              <Users className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('planning')}</span>
+          {canAccess('broken-parts') && (
+            <NavLink to={createLocalizedPath("/broken-parts")} className={navLinkClass("/broken-parts")} onClick={handleItemClick}>
+              <AlertTriangle className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('broken_parts')}</span>
+            </NavLink>
+          )}
+
+          {canAccess('rush-orders') && (
+            <NavLink to={createLocalizedPath("/rush-orders")} className={navLinkClass("/rush-orders")} onClick={handleItemClick}>
+              <PackagePlus className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span className="flex-1">{t('rush_orders')}</span>
+              <div className="flex items-center gap-1">
+                {pendingOrdersCount > 0 && (
+                  <span className="bg-amber-400 text-amber-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {pendingOrdersCount}
+                  </span>
+                )}
+                {totalUnreadMessages > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {totalUnreadMessages}
+                  </span>
+                )}
+              </div>
             </NavLink>
           )}
 
@@ -220,22 +205,10 @@ const NavbarContent = ({
             </NavLink>
           )}
 
-          {canAccess('rush-orders') && (
-            <NavLink to={createLocalizedPath("/rush-orders")} className={navLinkClass("/rush-orders")} onClick={handleItemClick}>
-              <PackagePlus className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span className="flex-1">{t('rush_orders')}</span>
-              <div className="flex items-center gap-1">
-                {pendingOrdersCount > 0 && (
-                  <span className="bg-amber-400 text-amber-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {pendingOrdersCount}
-                  </span>
-                )}
-                {totalUnreadMessages > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {totalUnreadMessages}
-                  </span>
-                )}
-              </div>
+          {canAccess('notes-and-tasks') && (
+            <NavLink to={createLocalizedPath("/notes-and-tasks")} className={navLinkClass("/notes-and-tasks")} onClick={handleItemClick}>
+              <FileText className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('Tasks_Notes')}</span>
             </NavLink>
           )}
 
