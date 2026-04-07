@@ -40,7 +40,22 @@ const NavbarContent = ({
   const { canAccess } = useRolePermissions();
   const canSeeInvoices = canAccess('invoices');
 
-
+  const { data: unscheduledServiceCount } = useQuery({
+    queryKey: ['unscheduled-services', 'navbar', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return 0;
+      const { data, error } = await supabase
+        .from('project_team_assignments' as any)
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('is_service_ticket', true)
+        .is('start_date', null);
+      if (error) return 0;
+      return (data ?? []).length;
+    },
+    enabled: !!canAccess('daily-tasks') && !!tenant?.id,
+    refetchInterval: 30000,
+  });
   const {
     data: rushOrders,
   } = useQuery({
@@ -154,7 +169,15 @@ const NavbarContent = ({
           {canAccess('daily-tasks') && (
             <NavLink to={createLocalizedPath("/daily-tasks")} className={navLinkClass("/daily-tasks")} onClick={handleItemClick}>
               <ListChecks className="w-[18px] h-[18px] shrink-0 opacity-80" />
-              <span>{t('installation_planning')}</span>
+              <span className="flex-1">{t('installation_planning')}</span>
+              {(unscheduledServiceCount ?? 0) > 0 && (
+                <div className="flex items-center gap-0.5">
+                  <Wrench className="w-3 h-3 text-amber-400" />
+                  <span className="bg-amber-400 text-amber-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {unscheduledServiceCount}
+                  </span>
+                </div>
+              )}
             </NavLink>
           )}
 
