@@ -226,6 +226,13 @@ const NavbarContent = ({
             </NavLink>
           )}
 
+          {canAccess('control-panel') && (
+            <NavLink to={createLocalizedPath("/control-panel")} className={navLinkClass("/control-panel")} onClick={handleItemClick}>
+              <LayoutDashboard className="w-[18px] h-[18px] shrink-0 opacity-80" />
+              <span>{t('control_panel')}</span>
+            </NavLink>
+          )}
+
           {canAccess('settings') && (
             <NavLink to={createLocalizedPath("/settings")} className={navLinkClass("/settings")} onClick={handleItemClick}>
               <Settings className="w-[18px] h-[18px] shrink-0 opacity-80" />
