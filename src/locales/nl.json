@@ -1520,7 +1520,7 @@
   "inv_status_overdue": "Achterstallig",
   "inv_status_cancelled": "Geannuleerd",
   "service_installation": "Service Installatie",
-  "measurement_calendar": "Inmeetkalender",
+  "measurement_calendar": "Opmeetkalender",
   "measurement_calendar_desc": "Overzicht van alle geplande inmetingen",
   "set_system_settings": "Systeeminstellingen",
   "set_access_denied": "Toegang Geweigerd",
