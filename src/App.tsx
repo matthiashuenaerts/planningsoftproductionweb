@@ -39,8 +39,8 @@ import NotesAndTasks from "./pages/NotesAndTasks";
 import ControlPanel from "./pages/ControlPanel";
 import WorkstationControl from "./pages/WorkstationControl";
 import TruckLoadingView from "./pages/TruckLoadingView";
-import ServiceInstallation from "./pages/ServiceInstallation";
 import PDFEditorFullscreen from "./pages/PDFEditorFullscreen";
+import MeasurementCalendar from "./pages/MeasurementCalendar";
 import ScannerPage from "./pages/ScannerPage";
 import OneDriveCallback from "./pages/OneDriveCallback";
 import EditProject from "@/pages/EditProject";
@@ -174,7 +174,7 @@ function App() {
                     <Route path=":lang/control-panel" element={<R navbarItem="control-panel"><ControlPanel /></R>} />
                     <Route path=":lang/control-panel/:workstationId" element={<R navbarItem="control-panel"><WorkstationControl /></R>} />
                     <Route path=":lang/truck-loading" element={<R navbarItem="daily-tasks"><TruckLoadingView /></R>} />
-                    <Route path=":lang/service-installation" element={<P><ServiceInstallation /></P>} />
+                    <Route path=":lang/measurement-calendar" element={<P><MeasurementCalendar /></P>} />
                     <Route path=":lang/scanner/:workstationId" element={<P><ScannerPage /></P>} />
                   </Route>
                 </Routes>
