@@ -1518,6 +1518,8 @@
   "inv_status_overdue": "En retard",
   "inv_status_cancelled": "Annulée",
   "service_installation": "Service Installation",
+  "measurement_calendar": "Calendrier de mesure",
+  "measurement_calendar_desc": "Aperçu de toutes les mesures planifiées",
   "set_system_settings": "Paramètres du système",
   "set_access_denied": "Accès refusé",
   "set_no_permission": "Vous n'avez pas la permission d'accéder à la page des paramètres",

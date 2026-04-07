@@ -1078,6 +1078,8 @@
   "inv_status_overdue": "Overdue",
   "inv_status_cancelled": "Cancelled",
   "service_installation": "Service Installation",
+  "measurement_calendar": "Measurement Calendar",
+  "measurement_calendar_desc": "Overview of all scheduled measurements",
   "set_system_settings": "System Settings",
   "set_access_denied": "Access Denied",
   "set_no_permission": "You don't have permission to access the settings page",
