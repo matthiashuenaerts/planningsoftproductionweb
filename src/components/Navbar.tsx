@@ -40,7 +40,22 @@ const NavbarContent = ({
   const { canAccess } = useRolePermissions();
   const canSeeInvoices = canAccess('invoices');
 
-
+  const { data: unscheduledServiceCount } = useQuery({
+    queryKey: ['unscheduled-services', 'navbar', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return 0;
+      const { data, error } = await supabase
+        .from('project_team_assignments' as any)
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('is_service_ticket', true)
+        .is('start_date', null);
+      if (error) return 0;
+      return (data ?? []).length;
+    },
+    enabled: !!canAccess('daily-tasks') && !!tenant?.id,
+    refetchInterval: 30000,
+  });
   const {
     data: rushOrders,
   } = useQuery({
