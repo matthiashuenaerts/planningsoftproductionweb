@@ -444,7 +444,6 @@ const Projects = () => {
 
   const isMobile = useIsMobile();
   const drawerLayout = useDrawerLayout();
-  const drawerLayout = useDrawerLayout();
 
   return (
     <div className="flex min-h-screen bg-background">
