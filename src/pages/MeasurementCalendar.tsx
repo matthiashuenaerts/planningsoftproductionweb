@@ -71,6 +71,7 @@ const MeasurementCalendar = () => {
         const { data: projects } = await supabase
           .from('projects')
           .select('id, name, project_number')
+          .eq('tenant_id', tenant.id)
           .in('id', projectIds);
         const projectMap = new Map((projects ?? []).map((p: any) => [p.id, p]));
         entries.forEach(e => {
@@ -300,7 +301,7 @@ const MeasurementCalendar = () => {
                               <div className="flex items-center gap-1">
                                 <Ruler className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate font-medium">
-                                  {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || m.project_id}
+                                  {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
                                 </span>
                               </div>
                               {m.measurer_name && (
