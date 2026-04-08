@@ -256,6 +256,7 @@ const EmployeeSettings: React.FC = () => {
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
                       <SelectItem value="teamleader">Team Leader</SelectItem>
+                      <SelectItem value="measurer">Measurer</SelectItem>
                       <SelectItem value="worker">Worker</SelectItem>
                       <SelectItem value="preparater">Preparater</SelectItem>
                       <SelectItem value="installation_team">Installation Team</SelectItem>
