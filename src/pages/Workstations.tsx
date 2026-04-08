@@ -27,6 +27,7 @@ import { KeyboardScannerListener } from '@/components/KeyboardScannerListener';
 import { qrCodeService } from '@/services/qrCodeService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 // Define workstation with appropriate icon mapping
 interface WorkstationWithIcon {
@@ -259,16 +260,17 @@ const Workstations: React.FC = () => {
     }
   };
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   if (loading) {
     return <div className="flex min-h-screen bg-background">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full flex justify-center items-center ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="flex flex-col items-center gap-3">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
             <p className="text-sm text-muted-foreground">{t('workstations_title')}...</p>
@@ -278,13 +280,13 @@ const Workstations: React.FC = () => {
   }
   const selectedWorkstationForTasks = workstations.find(ws => ws.id === showWorkstationTasks);
   return <div className="flex min-h-screen bg-background">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
         <ScrollArea className="h-screen">
           <div className={isMobile ? 'p-4' : 'p-8'}>
             <div className="max-w-7xl mx-auto">

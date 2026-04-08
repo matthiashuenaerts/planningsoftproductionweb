@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { projectService } from '@/services/dataService';
 import { Project } from '@/services/dataService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface Order {
   id: string;

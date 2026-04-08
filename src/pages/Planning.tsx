@@ -62,6 +62,7 @@ import { projectCompletionService } from '@/services/projectCompletionService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { recurringTaskService } from '@/services/recurringTaskService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface WorkerTask {
   id: string;
@@ -130,6 +131,7 @@ const Planning = () => {
   const { toast } = useToast();
   const isAdmin = currentEmployee?.role === 'admin';
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const { tenant } = useTenant();
 
   // Scroll position preservation
@@ -2049,13 +2051,13 @@ const Planning = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -2065,12 +2067,12 @@ const Planning = () => {
   return (
     <div className="flex min-h-screen">
       <div className="flex min-h-screen w-full">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0 left-0 z-10">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
         <div 
           ref={mainContentRef}
           className={`w-full p-3 md:p-6 overflow-x-hidden overflow-y-auto ${!isMobile ? 'md:ml-64' : 'pt-16'}`}

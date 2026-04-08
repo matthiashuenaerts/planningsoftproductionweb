@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const MigrateAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);

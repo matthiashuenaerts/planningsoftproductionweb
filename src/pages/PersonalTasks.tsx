@@ -22,6 +22,7 @@ import { standardTasksService } from '@/services/standardTasksService';
 import { checklistService } from '@/services/checklistService';
 import TaskCompletionChecklistDialog from '@/components/TaskCompletionChecklistDialog';
 import TaskExtraTimeDialog from '@/components/TaskExtraTimeDialog';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface Task {
   id: string;
@@ -89,6 +90,7 @@ const PersonalTasks = () => {
   const [showBarcodeDialog, setShowBarcodeDialog] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const [checklistDialogTask, setChecklistDialogTask] = useState<{
     taskId: string;
     standardTaskId: string;
@@ -763,13 +765,13 @@ const PersonalTasks = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`flex-1 ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`flex-1 ${drawerLayout ? 'p-3 pt-16' : 'p-6 ml-64'}`}>
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
           </div>
@@ -780,13 +782,13 @@ const PersonalTasks = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`flex-1 max-w-none ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`flex-1 max-w-none ${drawerLayout ? 'p-3 pt-16' : 'p-6 ml-64'}`}>
         {/* Date Navigation Header */}
         <div className={`${isMobile ? 'mb-4' : 'mb-8'}`}>
           <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>

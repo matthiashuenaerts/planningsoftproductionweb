@@ -42,6 +42,7 @@ import { PartDetailDialog } from '@/components/PartDetailDialog';
 import { ProjectCostingTab } from '@/components/ProjectCostingTab';
 import AfterSalesTab from '@/components/AfterSalesTab';
 import ProjectMeasurementTab from '@/components/ProjectMeasurementTab';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 interface TaskWithTimeData extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
@@ -113,6 +114,7 @@ const ProjectDetails = () => {
     createLocalizedPath
   } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const calculateAndSaveTaskEfficiency = useCallback(async (completedTasks: TaskWithTimeData[]) => {
     if (!projectId || completedTasks.length === 0) return [];
 
@@ -1007,13 +1009,13 @@ const ProjectDetails = () => {
   };
   if (loading) {
     return <div className="flex min-h-screen bg-background">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full flex justify-center items-center ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="flex flex-col items-center gap-3">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
             <p className="text-sm text-muted-foreground">{t('loading') || 'Loading...'}</p>
@@ -1023,13 +1025,13 @@ const ProjectDetails = () => {
   }
   if (!project) {
     return <div className="flex min-h-screen">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full p-6 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
@@ -1137,13 +1139,13 @@ const ProjectDetails = () => {
 
   return (
     <div className="flex min-h-screen">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-4 sm:mb-6">
             <Button variant="ghost" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 sm:mb-4 h-8 text-xs sm:text-sm rounded-xl hover:bg-muted/60 -ml-2">

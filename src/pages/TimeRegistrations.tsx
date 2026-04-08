@@ -27,6 +27,7 @@ import { workingHoursService, WorkingHours } from '@/services/workingHoursServic
 import { useIsMobile } from '@/hooks/use-mobile';
 import { standardTasksService, StandardTask } from '@/services/standardTasksService';
 import { useTenant } from '@/context/TenantContext';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const TimeRegistrations = () => {
   const { currentEmployee } = useAuth();
@@ -49,6 +50,7 @@ const TimeRegistrations = () => {
     endDate: format(new Date(), 'yyyy-MM-dd')
   });
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const queryClient = useQueryClient();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTimeframe, setDeleteTimeframe] = useState<'week' | 'month' | '6months' | 'year' | null>(null);
@@ -808,13 +810,13 @@ const TimeRegistrations = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
           <div>{t("loading")}</div>
         </div>
       </div>
@@ -824,13 +826,13 @@ const TimeRegistrations = () => {
   if (!canViewAllRegistrations) {
     return (
       <div className="min-h-screen bg-background flex">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
           <div className={isMobile ? 'mb-4' : 'mb-8'}>
             <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("my_time_registrations")}</h1>
             {!isMobile && <p className="text-muted-foreground mt-2">{t("my_time_registrations_description")}</p>}
@@ -1056,13 +1058,13 @@ const TimeRegistrations = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-3 pb-4' : 'ml-64 p-6'}`}>
         <div className={isMobile ? 'mb-4' : 'mb-8'}>
           <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-3xl'}`}>{t("time_registration_dashboard")}</h1>
           {!isMobile && <p className="text-muted-foreground mt-2">{t("time_registration_dashboard_description")}</p>}

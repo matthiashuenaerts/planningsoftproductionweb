@@ -4,10 +4,12 @@ import BrokenPartsSummary from '@/components/broken-parts/BrokenPartsSummary';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const BrokenPartsSummaryPage: React.FC = () => {
   const { currentEmployee } = useAuth();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -16,7 +18,7 @@ const BrokenPartsSummaryPage: React.FC = () => {
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
+      {drawerLayout && <Navbar />}
       <div className={`flex-1 overflow-auto min-w-0 ${isMobile ? 'pt-16' : ''}`}>
         <div className={`${isMobile ? 'px-3 py-4' : 'container mx-auto px-4 py-6'}`}>
           <BrokenPartsSummary />

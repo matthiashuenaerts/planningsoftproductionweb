@@ -21,6 +21,7 @@ import { PartsListDialog } from '@/components/PartsListDialog';
 import { OrderPartsListEditor } from '@/components/OrderPartsListEditor';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 type LogisticsOutOrder = Order & { 
   project_name: string;
@@ -42,6 +43,7 @@ const LogisticsOut: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<LogisticsOutOrder[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -230,13 +232,13 @@ const LogisticsOut: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen bg-background">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`w-full p-4 md:p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full p-4 md:p-6 flex justify-center items-center ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
         </div>
       </div>
@@ -245,13 +247,13 @@ const LogisticsOut: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-3 pb-4' : 'ml-64 p-4 md:p-6'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-3 pb-4' : 'ml-64 p-4 md:p-6'}`}>
         {/* Header */}
         <div className={`flex flex-col gap-2 ${isMobile ? 'mb-4' : 'sm:flex-row sm:items-center sm:justify-between gap-3 mb-6'}`}>
           <div className="min-w-0">

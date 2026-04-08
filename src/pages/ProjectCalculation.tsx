@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import ProjectCalculationVariables from '@/components/ProjectCalculationVariables';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const ProjectCalculation = () => {
   const { projectId } = useParams<{ projectId: string }>();

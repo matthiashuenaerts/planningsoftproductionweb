@@ -17,6 +17,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { customerService, Customer } from '@/services/customerService';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const CustomerPortfolio: React.FC = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const CustomerPortfolio: React.FC = () => {
   const { t, createLocalizedPath } = useLanguage();
   const { tenant } = useTenant();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,9 +155,9 @@ const CustomerPortfolio: React.FC = () => {
 
   return (
     <div className="flex min-h-screen">
-      {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
+      {!drawerLayout && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           <Button variant="ghost" size="sm" onClick={() => navigate(createLocalizedPath('/projects'))} className="mb-3 -ml-2">
             <ArrowLeft className="mr-1.5 h-4 w-4" /> {t('back_to_projects')}

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Play, Route, Loader2, Navigation, Home, ChevronLeft, ChevronRight, Calendar, Pin } from 'lucide-react';
 import L from 'leaflet';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface ServiceStop {
   assignmentId: string;
@@ -57,6 +58,7 @@ interface SavedRouteData {
 
 const ServiceInstallation: React.FC = () => {
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const { currentEmployee } = useAuth();
   const { tenant } = useTenant();
   const { toast } = useToast();
@@ -434,13 +436,13 @@ const ServiceInstallation: React.FC = () => {
 
   return (
     <div className="flex min-h-screen">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
         <div className={`${isMobile ? 'px-3 py-3' : 'p-6'} max-w-7xl mx-auto`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} mb-4`}>
             <div>

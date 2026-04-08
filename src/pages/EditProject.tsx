@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { projectService, Project, phaseService, Phase, taskService, Task } from '@/services/dataService';
 import { useLanguage } from '@/context/LanguageContext';
 import { standardTasksService } from '@/services/standardTasksService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const EditProject = () => {
   const { projectId } = useParams<{ projectId: string }>();
