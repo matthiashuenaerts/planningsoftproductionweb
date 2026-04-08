@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { oneDriveService } from '@/services/oneDriveService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 
 const Projects = () => {
