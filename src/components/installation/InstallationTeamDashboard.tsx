@@ -506,15 +506,52 @@ const InstallationTeamDashboard: React.FC = () => {
           attribution: '© OpenStreetMap',
         }).addTo(map);
 
-        L.marker([destLat, destLng]).addTo(map).bindPopup(
-          `<strong>${currentAssignment?.project.name}</strong><br/>${address}`
-        ).openPopup();
+        // If multi-stop day with route data, show full optimized route on main map
+        if (routeGeometry.length > 0 && routeWaypoints.length >= 2 && routeStartPoint) {
+          // Draw route polyline
+          L.polyline(routeGeometry, { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
+
+          // Add start point marker (team base)
+          const startIcon = L.divIcon({
+            html: '<div style="background:#16a34a;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">🏠</div>',
+            className: '',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          });
+          L.marker([routeStartPoint.lat, routeStartPoint.lng], { icon: startIcon }).addTo(map)
+            .bindPopup(`<strong>Base</strong><br/>${routeStartPoint.address}`);
+
+          // Add waypoint markers
+          routeWaypoints.forEach((wp, idx) => {
+            const isCurrentStop = wp.name === currentAssignment?.project.name;
+            const wpIcon = L.divIcon({
+              html: `<div style="background:${isCurrentStop ? '#dc2626' : '#2563eb'};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${idx + 1}</div>`,
+              className: '',
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+            });
+            L.marker([wp.lat, wp.lng], { icon: wpIcon }).addTo(map)
+              .bindPopup(`<strong>${idx + 1}. ${wp.name}</strong><br/>${wp.client || ''}<br/>${wp.address}${wp.estimatedArrival ? `<br/>🕐 ${wp.estimatedArrival}` : ''}`);
+          });
+
+          // Fit map to show entire route
+          const allPoints: [number, number][] = [
+            [routeStartPoint.lat, routeStartPoint.lng],
+            ...routeWaypoints.map(wp => [wp.lat, wp.lng] as [number, number])
+          ];
+          map.fitBounds(L.latLngBounds(allPoints.map(p => L.latLng(p[0], p[1]))), { padding: [30, 30] });
+        } else {
+          // Single stop: show single marker
+          L.marker([destLat, destLng]).addTo(map).bindPopup(
+            `<strong>${currentAssignment?.project.name}</strong><br/>${address}`
+          ).openPopup();
+        }
 
         mapRef.current = map;
         setTimeout(() => map.invalidateSize(), 200);
 
-        // Calculate driving time from team's base address
-        if (currentAssignment?.team_id) {
+        // Calculate driving time from team's base address (single stop mode only)
+        if (!routeStartPoint && currentAssignment?.team_id) {
           const teamInfo = (currentAssignment as any).team_info;
           const teamAddress = teamInfo?.start_street
             ? [teamInfo.start_street, teamInfo.start_number, teamInfo.start_postal_code, teamInfo.start_city].filter(Boolean).join(' ')
@@ -556,7 +593,7 @@ const InstallationTeamDashboard: React.FC = () => {
         mapRef.current = null;
       }
     };
-  }, [address, currentIndex, isMobile]);
+  }, [address, currentIndex, isMobile, routeGeometry, routeWaypoints, routeStartPoint]);
 
   const getEndDate = (assignment: InstallationAssignment) => {
     if (!assignment.start_date) return null;
