@@ -107,10 +107,10 @@ const MeasurementCalendar = () => {
       if (!tenant?.id) return [];
       const { data } = await supabase
         .from('projects')
-        .select('id, name, project_number')
+        .select('id, name')
         .eq('tenant_id', tenant.id)
         .order('name');
-      return (data ?? []) as { id: string; name: string; project_number: string | null }[];
+      return (data ?? []) as unknown as { id: string; name: string; project_number: string | null }[];
     },
     enabled: !!tenant?.id && addDialogOpen,
   });
