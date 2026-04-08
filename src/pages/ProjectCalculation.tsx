@@ -11,14 +11,23 @@ const ProjectCalculation = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { createLocalizedPath } = useLanguage();
+  const drawerLayout = useDrawerLayout();
 
   if (!projectId) {
     return (
       <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6">
+        {!drawerLayout && (
+
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+            <Navbar />
+
+          </div>
+
+        )}
+
+        {drawerLayout && <Navbar />}
+        <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6">
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
@@ -35,10 +44,18 @@ const ProjectCalculation = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!drawerLayout && (
+
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+          <Navbar />
+
+        </div>
+
+      )}
+
+      {drawerLayout && <Navbar />}
+      <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6">
         <div className="max-w-4xl mx-auto">
           <Button 
             variant="outline" 

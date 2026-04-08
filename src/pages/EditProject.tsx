@@ -21,6 +21,7 @@ const EditProject = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t, createLocalizedPath } = useLanguage();
+  const drawerLayout = useDrawerLayout();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
@@ -216,10 +217,18 @@ const EditProject = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6 flex justify-center items-center">
+        {!drawerLayout && (
+
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+            <Navbar />
+
+          </div>
+
+        )}
+
+        {drawerLayout && <Navbar />}
+        <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6 flex justify-center items-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -229,10 +238,18 @@ const EditProject = () => {
   if (!project) {
     return (
       <div className="flex min-h-screen">
-        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-          <Navbar />
-        </div>
-        <div className="ml-64 w-full p-6">
+        {!drawerLayout && (
+
+          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+            <Navbar />
+
+          </div>
+
+        )}
+
+        {drawerLayout && <Navbar />}
+        <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6">
           <div className="max-w-3xl mx-auto">
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">{t('project_not_found')}</h2>
@@ -249,10 +266,18 @@ const EditProject = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!drawerLayout && (
+
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+          <Navbar />
+
+        </div>
+
+      )}
+
+      {drawerLayout && <Navbar />}
+      <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-4">
             <Button 

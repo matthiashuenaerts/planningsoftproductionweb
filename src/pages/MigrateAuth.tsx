@@ -13,6 +13,7 @@ const MigrateAuth: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
   const navigate = useNavigate();
+  const drawerLayout = useDrawerLayout();
   const { toast } = useToast();
 
   const runMigration = async () => {
@@ -61,10 +62,18 @@ const MigrateAuth: React.FC = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="w-full p-6 ml-64">
+      {!drawerLayout && (
+
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+          <Navbar />
+
+        </div>
+
+      )}
+
+      {drawerLayout && <Navbar />}
+      <div className={`w-full p-6 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
         <div className="max-w-4xl mx-auto space-y-6">
           <h1 className="text-3xl font-bold mb-6">Migrate to Supabase Authentication</h1>
 

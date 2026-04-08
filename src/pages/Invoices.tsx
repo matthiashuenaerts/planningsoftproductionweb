@@ -12,6 +12,7 @@ import { FileText, Download, Eye, ExternalLink, X, Calendar, Euro } from 'lucide
 import { format } from 'date-fns';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -35,6 +36,7 @@ const InvoiceRow: React.FC<{ invoice: any; onPreview: (url: string) => void }> =
   const { t } = useLanguage();
   const signedUrl = useSignedUrl('invoices', invoice.pdf_path);
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   const handleDownload = () => {
     if (signedUrl) {
@@ -163,6 +165,7 @@ const Invoices: React.FC = () => {
   const { tenant } = useTenant();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const { data: invoices, isLoading } = useQuery({
@@ -186,7 +189,7 @@ const Invoices: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-background">
       <Navbar />
-      <main className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-4 pb-6' : 'ml-64 p-6'}`}>
+      <main className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-4 pb-6' : 'ml-64 p-6'}`}>
         {/* Header */}
         <div className={`${isMobile ? 'pt-2 pb-4' : 'mb-6'}`}>
           <h1 className={`font-bold text-foreground ${isMobile ? 'text-xl' : 'text-2xl'}`}>
