@@ -19,6 +19,7 @@ import { rushOrderService } from '@/services/rushOrderService';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const RushOrders = () => {
   const { currentEmployee } = useAuth();
@@ -26,6 +27,7 @@ const RushOrders = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const { tenant } = useTenant();
   
   const canCreateRushOrder = !!currentEmployee;
@@ -47,13 +49,13 @@ const RushOrders = () => {
   
   return (
     <div className="flex min-h-screen bg-background">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`flex-1 min-w-0 overflow-x-hidden ${isMobile ? 'pt-16 px-4 pb-4' : 'ml-64 p-4 md:p-6'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`flex-1 min-w-0 overflow-x-hidden ${drawerLayout ? 'pt-16 px-4 pb-4' : 'ml-64 p-4 md:p-6'}`}>
         <div className={`flex items-center justify-between gap-2 ${isMobile ? 'mb-4' : 'mb-6'}`}>
           <h1 className={`font-bold text-foreground min-w-0 truncate ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'}`}>{t('rush_orders')}</h1>
           

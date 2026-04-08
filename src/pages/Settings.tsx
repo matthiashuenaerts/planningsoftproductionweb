@@ -25,6 +25,7 @@ import SupabaseConnectionSettings from '@/components/settings/SupabaseConnection
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const tabConfig = [
   { value: 'workstations', labelKey: 'set_workstations' },
@@ -53,6 +54,7 @@ const Settings: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const defaultTab = searchParams.get('tab') || 'workstations';
   const [activeTab, setActiveTab] = useState(defaultTab);
 
@@ -82,7 +84,7 @@ const Settings: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-background">
       <Navbar />
-      <div className={`flex-1 min-w-0 overflow-x-hidden p-4 md:p-6 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      <div className={`flex-1 min-w-0 overflow-x-hidden p-4 md:p-6 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
         <h1 className="text-2xl font-bold mb-4 md:mb-6">{t('set_system_settings')}</h1>
 
         {isMobile ? (

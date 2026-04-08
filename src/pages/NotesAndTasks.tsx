@@ -15,6 +15,7 @@ import EditPersonalItemDialog from '@/components/personal-items/EditPersonalItem
 import SharePersonalItemDialog from '@/components/personal-items/SharePersonalItemDialog';
 import Navbar from '@/components/Navbar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 export interface PersonalItem {
   id: string;
@@ -229,17 +230,18 @@ const NotesAndTasks = () => {
   };
 
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   if (!currentEmployee) {
     return (
       <div className="flex min-h-screen">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`flex-1 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="flex items-center justify-center h-64">
             <p className="text-gray-500">Please log in to access your notes and tasks.</p>
           </div>
@@ -251,13 +253,13 @@ const NotesAndTasks = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-screen">
-        {!isMobile && (
-          <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-            <Navbar />
-          </div>
-        )}
-        {isMobile && <Navbar />}
-        <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && (
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+          <Navbar />
+        </div>
+      )}
+        {drawerLayout && <Navbar />}
+        <div className={`flex-1 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
           </div>
@@ -268,13 +270,13 @@ const NotesAndTasks = () => {
 
   return (
     <div className="flex min-h-screen">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`flex-1 ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`flex-1 ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
         <div className={`${isMobile ? 'px-3 py-4' : 'container mx-auto px-4 py-6'}`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'} mb-4 sm:mb-6`}>
             <h1 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold`}>{t('nt_title')}</h1>

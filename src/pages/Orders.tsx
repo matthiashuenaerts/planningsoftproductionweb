@@ -39,6 +39,7 @@ import ImportStockOrderModal from '@/components/ImportStockOrderModal';
 import { EnhancedDeliveryConfirmationModal } from '@/components/logistics/EnhancedDeliveryConfirmationModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -205,6 +206,7 @@ const Orders: React.FC = () => {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ORDERS_PER_PAGE);
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const { tenant } = useTenant();
   const sentinelRef = useRef<HTMLDivElement>(null);
   
@@ -372,9 +374,9 @@ const Orders: React.FC = () => {
   if (loading) {
     return (
       <div className="flex min-h-screen">
-        {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
-        {isMobile && <Navbar />}
-        <div className={`w-full p-6 flex justify-center items-center ${!isMobile ? 'ml-64' : 'pt-16'}`}>
+        {!drawerLayout && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
+        {drawerLayout && <Navbar />}
+        <div className={`w-full p-6 flex justify-center items-center ${!drawerLayout ? 'ml-64' : 'pt-16'}`}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -383,9 +385,9 @@ const Orders: React.FC = () => {
   
   return (
     <div className="flex min-h-screen">
-      {!isMobile && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${isMobile ? 'p-3 pt-16' : 'p-6 ml-64'} overflow-x-hidden`}>
+      {!drawerLayout && <div className="w-64 bg-sidebar fixed top-0 bottom-0"><Navbar /></div>}
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${drawerLayout ? 'p-3 pt-16' : 'p-6 ml-64'} overflow-x-hidden`}>
         <div className="w-full max-w-full">
           <div className={`flex flex-col gap-2 mb-4 ${isMobile ? '' : 'md:flex-row md:items-center md:justify-between md:gap-3'}`}>
             <h1 className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{t('ord_all_orders')}</h1>

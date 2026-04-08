@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, BarChart } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const BrokenParts: React.FC = () => {
   const { currentEmployee } = useAuth();
   const { t, createLocalizedPath } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -21,7 +23,7 @@ const BrokenParts: React.FC = () => {
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
+      {drawerLayout && <Navbar />}
       <div className={`flex-1 overflow-auto min-w-0 ${isMobile ? 'pt-16' : ''}`}>
         <div className={`${isMobile ? 'px-3 py-4' : 'px-4 py-6'} max-w-full`}>
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'justify-between items-center'} mb-4 sm:mb-6`}>

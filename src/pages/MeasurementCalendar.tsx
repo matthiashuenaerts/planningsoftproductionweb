@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Ruler } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface MeasurementEntry {
   id: string;
@@ -30,6 +31,7 @@ const MeasurementCalendar = () => {
   const { t, lang, createLocalizedPath } = useLanguage();
   const { tenant } = useTenant();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -105,13 +107,13 @@ const MeasurementCalendar = () => {
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">

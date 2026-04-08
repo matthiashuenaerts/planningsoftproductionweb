@@ -8,11 +8,13 @@ import InstallationTeamDashboard from '@/components/installation/InstallationTea
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/context/LanguageContext';
 import NotificationDropdown from '@/components/NotificationDropdown';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 const Index = () => {
   const { currentEmployee } = useAuth();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
 
   if (currentEmployee?.role === 'workstation') {
     return <WorkstationDashboard />;
@@ -31,13 +33,13 @@ const Index = () => {
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${!isMobile ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${!drawerLayout ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Modern Header */}
           <div className={`mb-6 ${isMobile ? 'mb-4' : 'mb-8'}`}>

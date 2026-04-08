@@ -12,6 +12,7 @@ import ServiceTeamCalendar from '@/components/ServiceTeamCalendar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 interface ProjectWithTeam {
   id: string;
   name: string;
@@ -35,6 +36,7 @@ const DailyTasks: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const drawerLayout = useDrawerLayout();
   const { tenant } = useTenant();
 
   const fetchAllProjects = async () => {
@@ -83,13 +85,13 @@ const DailyTasks: React.FC = () => {
     }
   }, [displayMode]);
   return <div className="flex min-h-screen">
-      {!isMobile && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {isMobile && <Navbar />}
-      <div className={`w-full ${isMobile ? 'px-2 py-3 pt-16' : 'p-6 ml-64'}`}>
+      {drawerLayout && <Navbar />}
+      <div className={`w-full ${drawerLayout ? 'px-2 py-3 pt-16' : 'p-6 ml-64'}`}>
         <div className="max-w-7xl mx-auto">
           <div className={`flex ${isMobile ? 'flex-col gap-2' : 'flex-row items-center justify-between'} mb-4 sm:mb-6`}>
             <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-foreground`}>{t('dt_installation_calendar')}</h1>

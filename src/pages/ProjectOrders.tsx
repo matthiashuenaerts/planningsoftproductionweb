@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { projectService } from '@/services/dataService';
 import { Project } from '@/services/dataService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 interface Order {
   id: string;
@@ -89,6 +90,7 @@ const ProjectOrders = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { createLocalizedPath } = useLanguage();
+  const drawerLayout = useDrawerLayout();
   const [orders, setOrders] = useState<Order[]>([]);
   const [project, setProject] = useState<Project | null>(null);
   const [accessories, setAccessories] = useState<Accessory[]>([]);
@@ -318,10 +320,18 @@ const ProjectOrders = () => {
 
   return (
     <div className="flex min-h-screen">
-      <div className="w-64 bg-sidebar fixed top-0 bottom-0">
-        <Navbar />
-      </div>
-      <div className="ml-64 w-full p-6">
+      {!drawerLayout && (
+
+        <div className="w-64 bg-sidebar fixed top-0 bottom-0">
+
+          <Navbar />
+
+        </div>
+
+      )}
+
+      {drawerLayout && <Navbar />}
+      <div className="${!drawerLayout ? 'ml-64' : 'pt-16'} w-full p-6">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <Button 

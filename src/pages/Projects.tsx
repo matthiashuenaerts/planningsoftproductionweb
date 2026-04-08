@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { oneDriveService } from '@/services/oneDriveService';
+import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 
 
 const Projects = () => {
@@ -443,18 +444,18 @@ const Projects = () => {
   };
 
   const isMobile = useIsMobile();
-  const useDrawerLayout = isMobile || currentEmployee?.role === 'installation_team';
+  const drawerLayout = useDrawerLayout();
 
   return (
     <div className="flex min-h-screen bg-background">
-      {!useDrawerLayout && (
+      {!drawerLayout && (
         <div className="w-64 bg-sidebar fixed top-0 bottom-0">
           <Navbar />
         </div>
       )}
-      {useDrawerLayout && <Navbar />}
+      {drawerLayout && <Navbar />}
       
-      <div className={`flex-1 ${!useDrawerLayout ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
+      <div className={`flex-1 ${!drawerLayout ? 'ml-64 p-8' : 'px-4 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
