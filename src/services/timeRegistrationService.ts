@@ -478,6 +478,34 @@ export const timeRegistrationService = {
     }
   },
 
+  async stopActiveRegistrationsForTask(taskId: string): Promise<void> {
+    const { data: activeRegistrations, error: fetchError } = await supabase
+      .from('time_registrations')
+      .select('id, start_time')
+      .eq('task_id', taskId)
+      .eq('is_active', true);
+    
+    if (fetchError) throw fetchError;
+    
+    if (activeRegistrations && activeRegistrations.length > 0) {
+      const endTime = new Date();
+      
+      for (const registration of activeRegistrations) {
+        const startTime = new Date(registration.start_time);
+        const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        
+        await supabase
+          .from('time_registrations')
+          .update({
+            end_time: endTime.toISOString(),
+            duration_minutes: durationMinutes,
+            is_active: false
+          })
+          .eq('id', registration.id);
+      }
+    }
+  },
+
   async getActiveRegistration(employeeId: string): Promise<TimeRegistration | null> {
     const { data, error } = await supabase
       .from('time_registrations')
