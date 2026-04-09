@@ -575,7 +575,10 @@ const TaskList: React.FC<TaskListProps> = ({
               {!compact && (
                 <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-4">
                   {task.estimated_duration && t('tl_duration_label', { duration: String(task.estimated_duration) })}
-                  {task.estimated_duration && task.description && '\n'}
+                  {task.actual_duration_minutes != null && task.actual_duration_minutes > 0 && (
+                    <> · {t('tl_actual', { duration: formatDuration(task.actual_duration_minutes) })}</>
+                  )}
+                  {(task.estimated_duration || (task.actual_duration_minutes != null && task.actual_duration_minutes > 0)) && task.description && '\n'}
                   {task.description}
                 </p>
               )}
