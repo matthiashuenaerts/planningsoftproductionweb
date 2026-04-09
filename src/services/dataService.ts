@@ -595,7 +595,8 @@ export const taskService = {
           task_id,
           tasks (
             *,
-            phases!inner(project_id)
+            phases!inner(project_id),
+            started_by_employee:started_by(name)
           )
         `)
         .eq('workstation_id', workstationId);
