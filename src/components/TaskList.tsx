@@ -62,6 +62,13 @@ const TaskList: React.FC<TaskListProps> = ({
     taskName: string;
   } | null>(null);
   const [activeUsersPerTask, setActiveUsersPerTask] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
+  const [activeRegistrationsPerTask, setActiveRegistrationsPerTask] = useState<Map<string, { start_time: string; id: string }>>(new Map());
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingBackToTodoTask, setPendingBackToTodoTask] = useState<{
+    task: ExtendedTask;
+    overTimeMinutes: number;
+    elapsedMinutes: number;
+  } | null>(null);
 
   // Track active users on tasks via realtime subscription
   useEffect(() => {
