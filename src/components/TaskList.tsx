@@ -679,14 +679,6 @@ const TaskList: React.FC<TaskListProps> = ({
                             t('tl_complete')
                           )}
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleBackToTodo(task)}
-                          className="h-8 text-xs sm:text-sm"
-                        >
-                          {t('tl_back_to_todo')}
-                        </Button>
                       </>
                     );
                   })()}
