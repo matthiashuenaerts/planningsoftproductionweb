@@ -7,6 +7,7 @@ import { Task } from '@/services/dataService';
 import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react';
 import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
+import TaskExtraTimeDialog from './TaskExtraTimeDialog';
 import { checklistService } from '@/services/checklistService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
