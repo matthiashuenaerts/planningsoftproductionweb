@@ -22,6 +22,7 @@ interface ExtendedTask extends Task {
   efficiency_percentage?: number;
   total_duration?: number;
   completed_by_employee?: { name: string };
+  started_by_employee?: { name: string };
   is_workstation_task?: boolean;
   estimated_duration?: number;
 }
@@ -507,7 +508,13 @@ const TaskList: React.FC<TaskListProps> = ({
                     <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{t('tl_due_label', { date: new Date(task.due_date).toLocaleDateString() })}</span>
                   </div>
-                  {task.status === 'IN_PROGRESS' && task.assignee_name && (
+                  {task.started_by_employee?.name && (
+                    <div className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>{t('tl_started_by', { name: task.started_by_employee.name })}</span>
+                    </div>
+                  )}
+                  {!task.started_by_employee?.name && task.status === 'IN_PROGRESS' && task.assignee_name && (
                     <div className="flex items-center gap-1">
                       <User className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>{t('tl_started_by', { name: task.assignee_name })}</span>

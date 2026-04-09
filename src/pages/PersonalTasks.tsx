@@ -228,7 +228,8 @@ const PersonalTasks = () => {
               name,
               client
             )
-          )
+          ),
+          started_by_employee:started_by(name)
         `)
         .eq('assignee_id', currentEmployee.id)
         .order('due_date', { ascending: true });

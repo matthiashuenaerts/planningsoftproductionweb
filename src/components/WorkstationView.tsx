@@ -40,6 +40,7 @@ interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
   assignee_name?: string;
+  started_by_name?: string;
   active_workers?: number;
   active_users?: Array<{ id: string; name: string }>;
   project_id?: string;
@@ -248,6 +249,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
               assigneeName = employeeData.name;
             }
           }
+
+          // Fetch started_by name
+          let startedByName = '';
+          if ((task as any).started_by) {
+            const { data: starterData } = await supabase
+              .from('employees')
+              .select('name')
+              .eq('id', (task as any).started_by)
+              .single();
+            if (starterData) {
+              startedByName = starterData.name;
+            }
+          }
           
           let activeWorkers = 0;
           if (task.status === 'IN_PROGRESS') {
@@ -267,6 +281,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
             project_name: projectData.name,
             project_id: phaseData.project_id,
             assignee_name: assigneeName,
+            started_by_name: startedByName,
             active_workers: activeWorkers,
             is_workstation_task: false
           } as ExtendedTask;
@@ -663,13 +678,22 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           remainingDuration: remainingDuration
         });
 
-        // Also update the task status to IN_PROGRESS
+        // Also update the task status to IN_PROGRESS and set started_by if not set
+        const startUpdateData: any = {
+          status: 'IN_PROGRESS',
+          updated_at: new Date().toISOString()
+        };
+        const { data: pendingTask } = await supabase
+          .from('tasks')
+          .select('started_by')
+          .eq('id', pendingNewTaskId)
+          .single();
+        if (!pendingTask?.started_by && currentEmployee) {
+          startUpdateData.started_by = currentEmployee.id;
+        }
         await supabase
           .from('tasks')
-          .update({
-            status: 'IN_PROGRESS',
-            updated_at: new Date().toISOString()
-          })
+          .update(startUpdateData)
           .eq('id', pendingNewTaskId);
 
         setTasks(prevTasks => 
@@ -813,6 +837,18 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         status: newStatus,
         updated_at: new Date().toISOString()
       };
+
+      // Set started_by when first starting the task
+      if (newStatus === 'IN_PROGRESS' && currentEmployee) {
+        const { data: existingTask } = await supabase
+          .from('tasks')
+          .select('started_by')
+          .eq('id', taskId)
+          .single();
+        if (!existingTask?.started_by) {
+          updateData.started_by = currentEmployee.id;
+        }
+      }
       
       const { error } = await supabase
         .from('tasks')
@@ -1085,6 +1121,12 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                         {task.assignee_name && (
                           <p className="text-sm text-primary font-medium">
                             {t('assigned_to_label', { name: task.assignee_name })}
+                          </p>
+                        )}
+                        
+                        {task.started_by_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {t('tl_started_by', { name: task.started_by_name })}
                           </p>
                         )}
                         

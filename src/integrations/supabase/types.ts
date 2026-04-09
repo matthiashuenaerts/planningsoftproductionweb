@@ -5787,6 +5787,7 @@ export type Database = {
           phase_id: string
           priority: string
           standard_task_id: string | null
+          started_by: string | null
           status: string
           status_changed_at: string | null
           tenant_id: string
@@ -5810,6 +5811,7 @@ export type Database = {
           phase_id: string
           priority: string
           standard_task_id?: string | null
+          started_by?: string | null
           status: string
           status_changed_at?: string | null
           tenant_id?: string
@@ -5833,6 +5835,7 @@ export type Database = {
           phase_id?: string
           priority?: string
           standard_task_id?: string | null
+          started_by?: string | null
           status?: string
           status_changed_at?: string | null
           tenant_id?: string
@@ -5868,6 +5871,13 @@ export type Database = {
             columns: ["standard_task_id"]
             isOneToOne: false
             referencedRelation: "standard_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {

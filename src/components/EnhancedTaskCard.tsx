@@ -18,6 +18,7 @@ interface Task {
   phase_id: string;
   duration: number;
   standard_task_id?: string;
+  started_by_employee?: { name: string };
   phases: {
     name: string;
     projects: {
@@ -126,6 +127,12 @@ const EnhancedTaskCard: React.FC<EnhancedTaskCardProps> = ({
             <User className="h-3 w-3" />
             <span className="truncate">Workstation: {task.workstation}</span>
           </div>
+          {task.started_by_employee?.name && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <User className="h-3 w-3 text-blue-500" />
+              <span className="truncate">Started by: {task.started_by_employee.name}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <Calendar className="h-3 w-3" />
             <span>Due: {format(new Date(task.due_date), 'MMM dd, yyyy')}</span>
