@@ -246,6 +246,78 @@ const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
+  const handleBackToTodo = async (task: ExtendedTask) => {
+    // Check if the task has an active registration with negative time
+    const regInfo = activeRegistrationsPerTask.get(task.id);
+    if (regInfo && task.duration) {
+      const start = new Date(regInfo.start_time);
+      const now = new Date();
+      const elapsedMs = now.getTime() - start.getTime();
+      const activeUsers = activeUsersPerTask.get(task.id) || [];
+      const adjustedDurationMs = task.duration * 60 * 1000 / Math.max(1, activeUsers.length);
+      const remainingMs = adjustedDurationMs - elapsedMs;
+      
+      if (remainingMs < 0) {
+        const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+        const actualElapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+        setPendingBackToTodoTask({
+          task,
+          overTimeMinutes,
+          elapsedMinutes: actualElapsedMinutes
+        });
+        setShowExtraTimeDialog(true);
+        return;
+      }
+    }
+    
+    // No negative time, proceed normally
+    await handleStatusChange(task, 'TODO');
+  };
+
+  const handleExtraTimeConfirmForBackToTodo = async (totalMinutes: number) => {
+    if (!pendingBackToTodoTask) return;
+    const { task } = pendingBackToTodoTask;
+    
+    try {
+      // First stop registrations and update actual duration (handled by stopActiveRegistrationsForTask)
+      await timeRegistrationService.stopActiveRegistrationsForTask(task.id);
+      
+      // Update the task duration for the next session
+      await supabase
+        .from('tasks')
+        .update({ 
+          duration: totalMinutes,
+          status: 'TODO',
+          status_changed_at: new Date().toISOString()
+        })
+        .eq('id', task.id);
+      
+      toast({
+        title: t('task_updated'),
+        description: t('task_updated_desc', { status: 'TODO' })
+      });
+      
+      // Trigger refresh
+      if (onTaskUpdate) {
+        onTaskUpdate({ ...task, status: 'TODO' as any });
+      }
+      // Also call onTaskStatusChange callback to refresh parent (but skip the default stop logic)
+      if (onTaskStatusChange) {
+        // We already handled everything, just refresh
+        await onTaskStatusChange(task.id, 'TODO');
+      }
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+    
+    setShowExtraTimeDialog(false);
+    setPendingBackToTodoTask(null);
+  };
+
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
     if (newStatus === 'COMPLETED') {
       // Check if multiple users are active on this task
