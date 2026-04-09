@@ -22,6 +22,7 @@ interface ExtendedTask extends Task {
   efficiency_percentage?: number;
   total_duration?: number;
   completed_by_employee?: { name: string };
+  started_by_employee?: { name: string };
   is_workstation_task?: boolean;
   estimated_duration?: number;
 }
