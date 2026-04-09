@@ -40,6 +40,7 @@ interface ExtendedTask extends Task {
   timeRemaining?: string;
   isOvertime?: boolean;
   assignee_name?: string;
+  started_by_name?: string;
   active_workers?: number;
   active_users?: Array<{ id: string; name: string }>;
   project_id?: string;
