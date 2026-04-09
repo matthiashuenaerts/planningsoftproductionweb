@@ -94,6 +94,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
       if (!error && data) {
         const usersMap = new Map<string, Array<{ id: string; name: string }>>();
+        const regsMap = new Map<string, { start_time: string; id: string }>();
         data.forEach((reg: any) => {
           const taskId = reg.task_id || reg.workstation_task_id;
           if (taskId) {
@@ -104,9 +105,14 @@ const TaskList: React.FC<TaskListProps> = ({
               id: reg.employees.id,
               name: reg.employees.name
             });
+            // Store first registration info per task for timer checks
+            if (!regsMap.has(taskId)) {
+              regsMap.set(taskId, { start_time: reg.start_time, id: reg.id });
+            }
           }
         });
         setActiveUsersPerTask(usersMap);
+        setActiveRegistrationsPerTask(regsMap);
       }
     };
 
