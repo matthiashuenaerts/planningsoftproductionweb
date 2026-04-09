@@ -249,6 +249,19 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
               assigneeName = employeeData.name;
             }
           }
+
+          // Fetch started_by name
+          let startedByName = '';
+          if (task.started_by) {
+            const { data: starterData } = await supabase
+              .from('employees')
+              .select('name')
+              .eq('id', task.started_by)
+              .single();
+            if (starterData) {
+              startedByName = starterData.name;
+            }
+          }
           
           let activeWorkers = 0;
           if (task.status === 'IN_PROGRESS') {
@@ -268,6 +281,7 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
             project_name: projectData.name,
             project_id: phaseData.project_id,
             assignee_name: assigneeName,
+            started_by_name: startedByName,
             active_workers: activeWorkers,
             is_workstation_task: false
           } as ExtendedTask;
