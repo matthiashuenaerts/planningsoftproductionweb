@@ -83,6 +83,7 @@ const TaskList: React.FC<TaskListProps> = ({
           task_id,
           workstation_task_id,
           employee_id,
+          start_time,
           employees:employee_id (
             id,
             name
