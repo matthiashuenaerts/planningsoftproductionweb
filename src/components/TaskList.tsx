@@ -746,6 +746,21 @@ const TaskList: React.FC<TaskListProps> = ({
           onComplete={handleChecklistComplete}
         />
       )}
+      
+      {/* Extra Time Dialog for Back to Todo with negative timer */}
+      {pendingBackToTodoTask && (
+        <TaskExtraTimeDialog
+          isOpen={showExtraTimeDialog}
+          onClose={() => {
+            setShowExtraTimeDialog(false);
+            setPendingBackToTodoTask(null);
+          }}
+          onConfirm={handleExtraTimeConfirmForBackToTodo}
+          taskTitle={pendingBackToTodoTask.task.title}
+          overTimeMinutes={pendingBackToTodoTask.overTimeMinutes}
+          elapsedMinutes={pendingBackToTodoTask.elapsedMinutes}
+        />
+      )}
     </div>
   );
 };
