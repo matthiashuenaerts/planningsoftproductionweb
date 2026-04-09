@@ -1300,9 +1300,9 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                           </div>
                         )}
                         
-                        {task.started_by && (
+                        {task.started_by_name && (
                           <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                            {t('started_by')}: {task.started_by}
+                            {t('started_by')}: {task.started_by_name}
                           </p>
                         )}
                       </div>
