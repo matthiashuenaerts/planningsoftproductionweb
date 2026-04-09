@@ -7,6 +7,7 @@ import { Task } from '@/services/dataService';
 import { Calendar, User, AlertCircle, Zap, Clock, CheckCircle, Pause, Timer, Loader, TrendingUp, TrendingDown, AlertTriangle, Users } from 'lucide-react';
 import { differenceInDays, isBefore } from 'date-fns';
 import TaskCompletionChecklistDialog from './TaskCompletionChecklistDialog';
+import TaskExtraTimeDialog from './TaskExtraTimeDialog';
 import { checklistService } from '@/services/checklistService';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +62,13 @@ const TaskList: React.FC<TaskListProps> = ({
     taskName: string;
   } | null>(null);
   const [activeUsersPerTask, setActiveUsersPerTask] = useState<Map<string, Array<{ id: string; name: string }>>>(new Map());
+  const [activeRegistrationsPerTask, setActiveRegistrationsPerTask] = useState<Map<string, { start_time: string; id: string }>>(new Map());
+  const [showExtraTimeDialog, setShowExtraTimeDialog] = useState(false);
+  const [pendingBackToTodoTask, setPendingBackToTodoTask] = useState<{
+    task: ExtendedTask;
+    overTimeMinutes: number;
+    elapsedMinutes: number;
+  } | null>(null);
 
   // Track active users on tasks via realtime subscription
   useEffect(() => {
@@ -75,6 +83,7 @@ const TaskList: React.FC<TaskListProps> = ({
           task_id,
           workstation_task_id,
           employee_id,
+          start_time,
           employees:employee_id (
             id,
             name
@@ -85,6 +94,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
       if (!error && data) {
         const usersMap = new Map<string, Array<{ id: string; name: string }>>();
+        const regsMap = new Map<string, { start_time: string; id: string }>();
         data.forEach((reg: any) => {
           const taskId = reg.task_id || reg.workstation_task_id;
           if (taskId) {
@@ -95,9 +105,14 @@ const TaskList: React.FC<TaskListProps> = ({
               id: reg.employees.id,
               name: reg.employees.name
             });
+            // Store first registration info per task for timer checks
+            if (!regsMap.has(taskId)) {
+              regsMap.set(taskId, { start_time: reg.start_time, id: reg.id });
+            }
           }
         });
         setActiveUsersPerTask(usersMap);
+        setActiveRegistrationsPerTask(regsMap);
       }
     };
 
@@ -229,6 +244,78 @@ const TaskList: React.FC<TaskListProps> = ({
         variant: 'destructive'
       });
     }
+  };
+
+  const handleBackToTodo = async (task: ExtendedTask) => {
+    // Check if the task has an active registration with negative time
+    const regInfo = activeRegistrationsPerTask.get(task.id);
+    if (regInfo && task.duration) {
+      const start = new Date(regInfo.start_time);
+      const now = new Date();
+      const elapsedMs = now.getTime() - start.getTime();
+      const activeUsers = activeUsersPerTask.get(task.id) || [];
+      const adjustedDurationMs = task.duration * 60 * 1000 / Math.max(1, activeUsers.length);
+      const remainingMs = adjustedDurationMs - elapsedMs;
+      
+      if (remainingMs < 0) {
+        const overTimeMinutes = Math.floor(Math.abs(remainingMs) / (1000 * 60));
+        const actualElapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+        setPendingBackToTodoTask({
+          task,
+          overTimeMinutes,
+          elapsedMinutes: actualElapsedMinutes
+        });
+        setShowExtraTimeDialog(true);
+        return;
+      }
+    }
+    
+    // No negative time, proceed normally
+    await handleStatusChange(task, 'TODO');
+  };
+
+  const handleExtraTimeConfirmForBackToTodo = async (totalMinutes: number) => {
+    if (!pendingBackToTodoTask) return;
+    const { task } = pendingBackToTodoTask;
+    
+    try {
+      // First stop registrations and update actual duration (handled by stopActiveRegistrationsForTask)
+      await timeRegistrationService.stopActiveRegistrationsForTask(task.id);
+      
+      // Update the task duration for the next session
+      await supabase
+        .from('tasks')
+        .update({ 
+          duration: totalMinutes,
+          status: 'TODO',
+          status_changed_at: new Date().toISOString()
+        })
+        .eq('id', task.id);
+      
+      toast({
+        title: t('task_updated'),
+        description: t('task_updated_desc', { status: 'TODO' })
+      });
+      
+      // Trigger refresh
+      if (onTaskUpdate) {
+        onTaskUpdate({ ...task, status: 'TODO' as any });
+      }
+      // Also call onTaskStatusChange callback to refresh parent (but skip the default stop logic)
+      if (onTaskStatusChange) {
+        // We already handled everything, just refresh
+        await onTaskStatusChange(task.id, 'TODO');
+      }
+    } catch (error: any) {
+      toast({
+        title: t('error'),
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+    
+    setShowExtraTimeDialog(false);
+    setPendingBackToTodoTask(null);
   };
 
   const handleStatusChange = async (task: ExtendedTask, newStatus: "TODO" | "IN_PROGRESS" | "COMPLETED" | "HOLD") => {
@@ -488,7 +575,10 @@ const TaskList: React.FC<TaskListProps> = ({
               {!compact && (
                 <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-4">
                   {task.estimated_duration && t('tl_duration_label', { duration: String(task.estimated_duration) })}
-                  {task.estimated_duration && task.description && '\n'}
+                  {task.actual_duration_minutes != null && task.actual_duration_minutes > 0 && (
+                    <> · {t('tl_actual', { duration: formatDuration(task.actual_duration_minutes) })}</>
+                  )}
+                  {(task.estimated_duration || (task.actual_duration_minutes != null && task.actual_duration_minutes > 0)) && task.description && '\n'}
                   {task.description}
                 </p>
               )}
@@ -592,7 +682,7 @@ const TaskList: React.FC<TaskListProps> = ({
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleStatusChange(task, 'TODO')}
+                          onClick={() => handleBackToTodo(task)}
                           className="h-8 text-xs sm:text-sm"
                         >
                           {t('tl_back_to_todo')}
@@ -657,6 +747,21 @@ const TaskList: React.FC<TaskListProps> = ({
           standardTaskId={checklistDialogTask.standardTaskId}
           taskName={checklistDialogTask.taskName}
           onComplete={handleChecklistComplete}
+        />
+      )}
+      
+      {/* Extra Time Dialog for Back to Todo with negative timer */}
+      {pendingBackToTodoTask && (
+        <TaskExtraTimeDialog
+          isOpen={showExtraTimeDialog}
+          onClose={() => {
+            setShowExtraTimeDialog(false);
+            setPendingBackToTodoTask(null);
+          }}
+          onConfirm={handleExtraTimeConfirmForBackToTodo}
+          taskTitle={pendingBackToTodoTask.task.title}
+          overTimeMinutes={pendingBackToTodoTask.overTimeMinutes}
+          elapsedMinutes={pendingBackToTodoTask.elapsedMinutes}
         />
       )}
     </div>

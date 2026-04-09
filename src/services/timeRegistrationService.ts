@@ -487,12 +487,15 @@ export const timeRegistrationService = {
     
     if (fetchError) throw fetchError;
     
+    let totalElapsedMinutes = 0;
+    
     if (activeRegistrations && activeRegistrations.length > 0) {
       const endTime = new Date();
       
       for (const registration of activeRegistrations) {
         const startTime = new Date(registration.start_time);
         const durationMinutes = Math.floor((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        totalElapsedMinutes += durationMinutes;
         
         await supabase
           .from('time_registrations')
@@ -502,6 +505,29 @@ export const timeRegistrationService = {
             is_active: false
           })
           .eq('id', registration.id);
+      }
+      
+      // Update actual_duration_minutes and efficiency on the task
+      const { data: currentTask } = await supabase
+        .from('tasks')
+        .select('actual_duration_minutes, duration')
+        .eq('id', taskId)
+        .single();
+      
+      if (currentTask) {
+        const newActualDuration = (currentTask.actual_duration_minutes || 0) + totalElapsedMinutes;
+        const estimatedDuration = currentTask.duration || 0;
+        const efficiencyPercentage = estimatedDuration > 0
+          ? Math.round(((estimatedDuration - newActualDuration) / estimatedDuration) * 100)
+          : 0;
+        
+        await supabase
+          .from('tasks')
+          .update({
+            actual_duration_minutes: newActualDuration,
+            efficiency_percentage: efficiencyPercentage
+          })
+          .eq('id', taskId);
       }
     }
   },
