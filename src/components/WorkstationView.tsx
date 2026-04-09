@@ -813,6 +813,18 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
         status: newStatus,
         updated_at: new Date().toISOString()
       };
+
+      // Set started_by when first starting the task
+      if (newStatus === 'IN_PROGRESS' && currentEmployee) {
+        const { data: existingTask } = await supabase
+          .from('tasks')
+          .select('started_by')
+          .eq('id', taskId)
+          .single();
+        if (!existingTask?.started_by) {
+          updateData.started_by = currentEmployee.id;
+        }
+      }
       
       const { error } = await supabase
         .from('tasks')
