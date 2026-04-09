@@ -920,7 +920,23 @@ export const employeeService = {
       body: { id, ...employee }
     });
 
-    if (error) throw error;
+    // supabase.functions.invoke wraps non-2xx as FunctionsHttpError
+    // but the response body may contain the actual error message
+    if (error) {
+      // Try to extract the error message from the response context
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          const body = await ctx.json();
+          throw new Error(body?.error || error.message);
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== error.message) {
+            throw parseErr;
+          }
+        }
+      }
+      throw error;
+    }
     if (data?.error) throw new Error(data.error);
     return data.employee as Employee;
   },
