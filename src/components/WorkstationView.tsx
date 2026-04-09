@@ -663,13 +663,22 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
           remainingDuration: remainingDuration
         });
 
-        // Also update the task status to IN_PROGRESS
+        // Also update the task status to IN_PROGRESS and set started_by if not set
+        const startUpdateData: any = {
+          status: 'IN_PROGRESS',
+          updated_at: new Date().toISOString()
+        };
+        const { data: pendingTask } = await supabase
+          .from('tasks')
+          .select('started_by')
+          .eq('id', pendingNewTaskId)
+          .single();
+        if (!pendingTask?.started_by && currentEmployee) {
+          startUpdateData.started_by = currentEmployee.id;
+        }
         await supabase
           .from('tasks')
-          .update({
-            status: 'IN_PROGRESS',
-            updated_at: new Date().toISOString()
-          })
+          .update(startUpdateData)
           .eq('id', pendingNewTaskId);
 
         setTasks(prevTasks => 
