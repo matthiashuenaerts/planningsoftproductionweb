@@ -1124,6 +1124,12 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                           </p>
                         )}
                         
+                        {task.started_by_name && (
+                          <p className="text-xs text-muted-foreground">
+                            {t('tl_started_by', { name: task.started_by_name })}
+                          </p>
+                        )}
+                        
                         {/* Active Users Display */}
                         {(() => {
                           const activeUsers = activeUsersPerTask.get(task.id) || [];
