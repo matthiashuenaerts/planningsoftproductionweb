@@ -164,11 +164,23 @@ export const timeRegistrationService = {
       
       // If no one is currently working on the task, update task status to IN_PROGRESS
       if (!currentlyActive || currentlyActive.length === 0) {
+        // Check if someone already started this task before (started_by already set)
+        const { data: existingTask } = await supabase
+          .from('tasks')
+          .select('started_by')
+          .eq('id', taskId)
+          .single();
+
         const updateData: any = { 
           status: 'IN_PROGRESS',
           status_changed_at: new Date().toISOString(),
           assignee_id: employeeId
         };
+
+        // Only set started_by if not already set (first person to ever start it)
+        if (!existingTask?.started_by) {
+          updateData.started_by = employeeId;
+        }
         
         // If we have remaining duration, update the task with it
         if (remainingDurationMinutes !== undefined) {

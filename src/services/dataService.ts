@@ -524,7 +524,8 @@ export const taskService = {
         *,
         phases!inner(project_id),
         assignee:assignee_id(name),
-        completed_by_employee:completed_by(name)
+        completed_by_employee:completed_by(name),
+        started_by_employee:started_by(name)
       `)
       .eq('phase_id', phaseId)
       .order('due_date', { ascending: true });
