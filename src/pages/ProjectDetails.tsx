@@ -372,6 +372,30 @@ const ProjectDetails = () => {
     };
     fetchProjectData();
   }, [projectId, toast, fetchAndSetSortedTasks, t]);
+
+  // Realtime: refresh tasks when task status changes (e.g. TaskTimer pause)
+  useEffect(() => {
+    if (!projectId) return;
+
+    const channel = supabase
+      .channel(`project-tasks-${projectId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks' },
+        (payload) => {
+          const updated = payload.new as any;
+          // Only refresh if this task belongs to our project (check via current tasks)
+          if (tasks.some(t => t.id === updated.id)) {
+            fetchAndSetSortedTasks(projectId);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, tasks, fetchAndSetSortedTasks]);
   useEffect(() => {
     if (projectId) {
       loadPartsLists();
@@ -793,24 +817,26 @@ const ProjectDetails = () => {
           title: t('task_completed'),
           description: t('task_completed_desc')
         });
+      } else if (statusValue === 'TODO') {
+        // Stop any active time registrations for this task
+        await timeRegistrationService.stopActiveRegistrationsForTask(taskId);
+        await taskService.update(taskId, {
+          status: 'TODO',
+          status_changed_at: new Date().toISOString()
+        });
+        toast({
+          title: t('task_updated'),
+          description: t('task_updated_desc', { status: 'TODO' })
+        });
       } else {
         const updateData: Partial<Task> = {
           status: newStatus,
           status_changed_at: new Date().toISOString()
         };
-        if (statusValue === 'IN_PROGRESS') {
-          updateData.assignee_id = currentEmployee.id;
-        }
-        if (statusValue === 'COMPLETED') {
-          updateData.completed_at = new Date().toISOString();
-          updateData.completed_by = currentEmployee.id;
-        }
         await taskService.update(taskId, updateData);
         toast({
           title: t('task_updated'),
-          description: t('task_updated_desc', {
-            status: newStatus
-          })
+          description: t('task_updated_desc', { status: newStatus })
         });
       }
       if (newStatus === 'COMPLETED') {
