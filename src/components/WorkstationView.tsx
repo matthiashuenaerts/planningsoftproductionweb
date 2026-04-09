@@ -252,11 +252,11 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
 
           // Fetch started_by name
           let startedByName = '';
-          if (task.started_by) {
+          if ((task as any).started_by) {
             const { data: starterData } = await supabase
               .from('employees')
               .select('name')
-              .eq('id', task.started_by)
+              .eq('id', (task as any).started_by)
               .single();
             if (starterData) {
               startedByName = starterData.name;
