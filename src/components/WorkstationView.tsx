@@ -1294,10 +1294,16 @@ const WorkstationView: React.FC<WorkstationViewProps> = ({
                             {urgency && (
                               <Badge variant={urgency.variant} className={isMobile ? 'text-[10px] px-1.5 py-0' : 'text-xs'}>
                                 {urgency.class === 'overdue' && <AlertTriangle className="h-3 w-3 mr-0.5" />}
-                                {urgency.label}
+                              {urgency.label}
                               </Badge>
                             )}
                           </div>
+                        )}
+                        
+                        {task.started_by_name && (
+                          <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                            {t('started_by')}: {task.started_by_name}
+                          </p>
                         )}
                       </div>
                       
