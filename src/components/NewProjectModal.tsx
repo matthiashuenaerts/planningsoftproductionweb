@@ -612,6 +612,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         address_number: data.address_number || null,
         address_postal_code: data.address_postal_code || null,
         address_city: data.address_city || null,
+        customer_id: selectedCustomerId || null,
       } as any);
       
       // Create a generic phase for these tasks
