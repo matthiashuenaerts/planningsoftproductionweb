@@ -855,6 +855,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       setSyncedData(null);
       setPendingOrders([]);
       setPendingTeamAssignment(null);
+      setSelectedCustomerId(null);
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error: any) {
