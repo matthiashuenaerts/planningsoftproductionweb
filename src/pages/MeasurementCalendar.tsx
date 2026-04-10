@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ChevronLeft, ChevronRight, Ruler, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ruler, Plus, Edit3, CalendarCheck, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useDrawerLayout } from '@/hooks/useDrawerLayout';
@@ -28,6 +28,7 @@ interface MeasurementEntry {
   measurer_id: string | null;
   status: string;
   notes: string | null;
+  customer_email: string | null;
   project_name?: string;
   project_number?: string;
   measurer_name?: string;
@@ -43,11 +44,14 @@ const MeasurementCalendar = () => {
   const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingMeasurement, setEditingMeasurement] = useState<MeasurementEntry | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [newProjectId, setNewProjectId] = useState('');
   const [newMeasurerId, setNewMeasurerId] = useState('');
   const [newStatus, setNewStatus] = useState('scheduled');
   const [newNotes, setNewNotes] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
   const [saving, setSaving] = useState(false);
 
   const dateLocale = lang === 'nl' ? nl : lang === 'fr' ? fr : enUS;
@@ -65,13 +69,12 @@ const MeasurementCalendar = () => {
 
       const entries = (data ?? []) as unknown as MeasurementEntry[];
 
-      // Fetch project names
+      // Fetch project names from the projects table
       const projectIds = [...new Set(entries.map(e => e.project_id))];
       if (projectIds.length > 0) {
         const { data: projects } = await supabase
           .from('projects')
           .select('id, name, project_number')
-          .eq('tenant_id', tenant.id)
           .in('id', projectIds);
         const projectMap = new Map((projects ?? []).map((p: any) => [p.id, p]));
         entries.forEach(e => {
@@ -108,12 +111,12 @@ const MeasurementCalendar = () => {
       if (!tenant?.id) return [];
       const { data } = await supabase
         .from('projects')
-        .select('id, name')
+        .select('id, name, project_number')
         .eq('tenant_id', tenant.id)
         .order('name');
       return (data ?? []) as unknown as { id: string; name: string; project_number: string | null }[];
     },
-    enabled: !!tenant?.id && addDialogOpen,
+    enabled: !!tenant?.id && (addDialogOpen || editDialogOpen),
   });
 
   // Employees who can measure
@@ -127,7 +130,7 @@ const MeasurementCalendar = () => {
         .eq('tenant_id', tenant.id);
       return ((data ?? []) as any[]).filter(e => ['admin', 'manager', 'measurer'].includes(e.role));
     },
-    enabled: !!tenant?.id && addDialogOpen,
+    enabled: !!tenant?.id && (addDialogOpen || editDialogOpen),
   });
 
   const monthStart = startOfMonth(currentMonth);
@@ -149,7 +152,11 @@ const MeasurementCalendar = () => {
     }
   };
 
-  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const localizedWeekDays = lang === 'nl'
+    ? ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+    : lang === 'fr'
+    ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   const openAddDialog = (date?: Date) => {
     setSelectedDate(date ? format(date, 'yyyy-MM-dd') : '');
@@ -157,7 +164,53 @@ const MeasurementCalendar = () => {
     setNewMeasurerId('');
     setNewStatus('scheduled');
     setNewNotes('');
+    setNewCustomerEmail('');
     setAddDialogOpen(true);
+  };
+
+  const openEditDialog = (m: MeasurementEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingMeasurement(m);
+    setNewProjectId(m.project_id);
+    setSelectedDate(m.measurement_date || '');
+    setNewMeasurerId(m.measurer_id || '');
+    setNewStatus(m.status);
+    setNewNotes(m.notes || '');
+    setNewCustomerEmail(m.customer_email || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleScheduleDefinitive = async (m: MeasurementEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await measurementService.update(m.id, { status: 'scheduled' });
+      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      toast({ title: t('mc_scheduled_definitively') || 'Definitief ingepland' });
+    } catch (err: any) {
+      toast({ title: t('error') || 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const handleSendOutlookMail = (m: MeasurementEntry, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const projectName = m.project_name || m.project_id;
+    const dateStr = m.measurement_date ? format(new Date(m.measurement_date), 'dd/MM/yyyy') : '';
+    const measurerName = m.measurer_name || '';
+    
+    const subject = encodeURIComponent(
+      lang === 'nl' ? `Opmeting ${projectName} - ${dateStr}` :
+      lang === 'fr' ? `Mesurage ${projectName} - ${dateStr}` :
+      `Measurement ${projectName} - ${dateStr}`
+    );
+    const body = encodeURIComponent(
+      lang === 'nl'
+        ? `Beste klant,\n\nHierbij bevestigen wij de opmeting voor project "${projectName}" op ${dateStr}.\n${measurerName ? `Opmeter: ${measurerName}\n` : ''}\nMet vriendelijke groeten`
+        : lang === 'fr'
+        ? `Cher client,\n\nNous confirmons le mesurage pour le projet "${projectName}" le ${dateStr}.\n${measurerName ? `Mesureur: ${measurerName}\n` : ''}\nCordialement`
+        : `Dear customer,\n\nWe confirm the measurement for project "${projectName}" on ${dateStr}.\n${measurerName ? `Measurer: ${measurerName}\n` : ''}\nBest regards`
+    );
+    const email = m.customer_email || '';
+    window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
 
   const handleSave = async () => {
@@ -170,17 +223,143 @@ const MeasurementCalendar = () => {
         measurer_id: newMeasurerId || null,
         status: newStatus,
         notes: newNotes || null,
+        customer_email: newCustomerEmail || null,
         tenant_id: tenant.id,
       });
       queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
       setAddDialogOpen(false);
-      toast({ title: t('measurement_added') || 'Measurement added' });
+      toast({ title: t('mc_measurement_added') || 'Opmeting toegevoegd' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: t('error') || 'Error', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
   };
+
+  const handleUpdate = async () => {
+    if (!editingMeasurement || !newProjectId || !selectedDate) return;
+    setSaving(true);
+    try {
+      await measurementService.update(editingMeasurement.id, {
+        project_id: newProjectId,
+        measurement_date: selectedDate,
+        measurer_id: newMeasurerId || null,
+        status: newStatus,
+        notes: newNotes || null,
+        customer_email: newCustomerEmail || null,
+      });
+      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      setEditDialogOpen(false);
+      setEditingMeasurement(null);
+      toast({ title: t('mc_measurement_updated') || 'Opmeting bijgewerkt' });
+    } catch (err: any) {
+      toast({ title: t('error') || 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingMeasurement) return;
+    try {
+      await measurementService.delete(editingMeasurement.id);
+      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      setEditDialogOpen(false);
+      setEditingMeasurement(null);
+      toast({ title: t('mc_measurement_deleted') || 'Opmeting verwijderd' });
+    } catch (err: any) {
+      toast({ title: t('error') || 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  const MeasurementForm = ({ onSubmit, submitLabel, showDelete }: { onSubmit: () => void; submitLabel: string; showDelete?: boolean }) => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>{t('project') || 'Project'}</Label>
+        <Select value={newProjectId} onValueChange={setNewProjectId}>
+          <SelectTrigger>
+            <SelectValue placeholder={t('mc_select_project') || 'Selecteer project'} />
+          </SelectTrigger>
+          <SelectContent>
+            {projects.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.project_number ? `${p.project_number} - ` : ''}{p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('mc_measurement_date') || 'Datum'}</Label>
+        <Input
+          type="date"
+          value={selectedDate}
+          onChange={e => setSelectedDate(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('mc_measurer') || 'Opmeter'}</Label>
+        <Select value={newMeasurerId} onValueChange={setNewMeasurerId}>
+          <SelectTrigger>
+            <SelectValue placeholder={t('mc_select_measurer') || 'Selecteer opmeter'} />
+          </SelectTrigger>
+          <SelectContent>
+            {measurers.map((e: any) => (
+              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('mc_customer_email') || 'E-mail klant'}</Label>
+        <Input
+          type="email"
+          value={newCustomerEmail}
+          onChange={e => setNewCustomerEmail(e.target.value)}
+          placeholder={t('mc_customer_email_placeholder') || 'klant@voorbeeld.be'}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('status') || 'Status'}</Label>
+        <Select value={newStatus} onValueChange={setNewStatus}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="scheduled">{t('mc_status_scheduled') || 'Gepland'}</SelectItem>
+            <SelectItem value="provisional">{t('mc_status_provisional') || 'Voorlopig'}</SelectItem>
+            <SelectItem value="completed">{t('mc_status_completed') || 'Afgerond'}</SelectItem>
+            <SelectItem value="cancelled">{t('mc_status_cancelled') || 'Geannuleerd'}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t('notes') || 'Notities'}</Label>
+        <Textarea
+          value={newNotes}
+          onChange={e => setNewNotes(e.target.value)}
+          placeholder={t('mc_notes_placeholder') || 'Optionele notities...'}
+          rows={3}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        {showDelete && (
+          <Button variant="destructive" onClick={handleDelete} type="button" className="mr-auto">
+            {t('delete') || 'Verwijderen'}
+          </Button>
+        )}
+        <Button onClick={onSubmit} disabled={!newProjectId || !selectedDate || saving} className={showDelete ? '' : 'w-full'}>
+          {saving ? '...' : submitLabel}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -204,7 +383,7 @@ const MeasurementCalendar = () => {
             </div>
             <Button onClick={() => openAddDialog()} className="rounded-xl">
               <Plus className="h-4 w-4 mr-1.5" />
-              {t('new_measurement') || 'Nieuwe opmeting'}
+              {t('mc_new_measurement') || 'Nieuwe opmeting'}
             </Button>
           </div>
 
@@ -212,19 +391,19 @@ const MeasurementCalendar = () => {
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
-              <span>{t('status_scheduled') || 'Gepland'}</span>
+              <span>{t('mc_status_scheduled') || 'Gepland'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-3 h-3 rounded bg-amber-100 border border-amber-300 border-dashed" />
-              <span>{t('status_provisional') || 'Voorlopig'}</span>
+              <span>{t('mc_status_provisional') || 'Voorlopig'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-3 h-3 rounded bg-green-100 border border-green-200" />
-              <span>{t('status_completed') || 'Afgerond'}</span>
+              <span>{t('mc_status_completed') || 'Afgerond'}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-3 h-3 rounded bg-red-100 border border-red-200" />
-              <span>{t('status_cancelled') || 'Geannuleerd'}</span>
+              <span>{t('mc_status_cancelled') || 'Geannuleerd'}</span>
             </div>
           </div>
 
@@ -245,11 +424,11 @@ const MeasurementCalendar = () => {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="flex items-center justify-center py-20 text-muted-foreground">Loading...</div>
+                <div className="flex items-center justify-center py-20 text-muted-foreground">{t('loading') || 'Laden...'}</div>
               ) : (
                 <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
                   {/* Week day headers */}
-                  {weekDays.map(day => (
+                  {localizedWeekDays.map(day => (
                     <div key={day} className="bg-muted px-2 py-2 text-center text-xs font-medium text-muted-foreground">
                       {day}
                     </div>
@@ -258,7 +437,7 @@ const MeasurementCalendar = () => {
                   {/* Calendar cells */}
                   {calendarDays.map(day => {
                     const dayMeasurements = getMeasurementsForDay(day);
-                    const isToday = isSameDay(day, new Date());
+                    const isCurrentDay = isSameDay(day, new Date());
                     const isCurrentMonth = isSameMonth(day, currentMonth);
 
                     return (
@@ -267,13 +446,13 @@ const MeasurementCalendar = () => {
                         className={cn(
                           "bg-background min-h-[100px] p-1.5 transition-colors group relative",
                           !isCurrentMonth && "opacity-40",
-                          isToday && "ring-2 ring-primary ring-inset"
+                          isCurrentDay && "ring-2 ring-primary ring-inset"
                         )}
                       >
                         <div className="flex items-center justify-between">
                           <span className={cn(
                             "text-xs font-medium",
-                            isToday && "text-primary font-bold"
+                            isCurrentDay && "text-primary font-bold"
                           )}>
                             {format(day, 'd')}
                           </span>
@@ -281,7 +460,7 @@ const MeasurementCalendar = () => {
                             <button
                               onClick={() => openAddDialog(day)}
                               className="opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                              title={t('add_measurement') || 'Opmeting toevoegen'}
+                              title={t('mc_add_measurement') || 'Opmeting toevoegen'}
                             >
                               <Plus className="h-3 w-3" />
                             </button>
@@ -289,25 +468,55 @@ const MeasurementCalendar = () => {
                         </div>
                         <div className="mt-1 space-y-0.5">
                           {dayMeasurements.map(m => (
-                            <button
+                            <div
                               key={m.id}
-                              onClick={() => navigate(createLocalizedPath(`/projects/${m.project_id}`))}
                               className={cn(
-                                "w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate cursor-pointer hover:opacity-80 transition-opacity",
+                                "w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item",
                                 statusColor(m.status)
                               )}
-                              title={`${m.project_name || m.project_id} — ${m.measurer_name || ''}\n${m.status === 'provisional' ? '(Voorlopig)' : ''}`}
                             >
-                              <div className="flex items-center gap-1">
-                                <Ruler className="h-2.5 w-2.5 shrink-0" />
-                                <span className="truncate font-medium">
-                                  {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
-                                </span>
+                              <button
+                                onClick={() => navigate(createLocalizedPath(`/projects/${m.project_id}`))}
+                                className="w-full text-left"
+                                title={`${m.project_name || m.project_id} — ${m.measurer_name || ''}`}
+                              >
+                                <div className="flex items-center gap-1">
+                                  <Ruler className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate font-medium">
+                                    {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
+                                  </span>
+                                </div>
+                                {m.measurer_name && (
+                                  <div className="truncate text-[9px] opacity-75 mt-0.5">{m.measurer_name}</div>
+                                )}
+                              </button>
+                              {/* Action buttons for provisional/all entries */}
+                              <div className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 flex gap-0.5 bg-background/80 rounded p-0.5">
+                                <button
+                                  onClick={(e) => openEditDialog(m, e)}
+                                  className="p-0.5 hover:bg-muted rounded"
+                                  title={t('mc_edit') || 'Bewerken'}
+                                >
+                                  <Edit3 className="h-2.5 w-2.5" />
+                                </button>
+                                {m.status === 'provisional' && (
+                                  <button
+                                    onClick={(e) => handleScheduleDefinitive(m, e)}
+                                    className="p-0.5 hover:bg-muted rounded text-blue-600"
+                                    title={t('mc_schedule_definitively') || 'Definitief inplannen'}
+                                  >
+                                    <CalendarCheck className="h-2.5 w-2.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => handleSendOutlookMail(m, e)}
+                                  className="p-0.5 hover:bg-muted rounded text-primary"
+                                  title={t('mc_send_mail') || 'Mail versturen via Outlook'}
+                                >
+                                  <Mail className="h-2.5 w-2.5" />
+                                </button>
                               </div>
-                              {m.measurer_name && (
-                                <div className="truncate text-[9px] opacity-75 mt-0.5">{m.measurer_name}</div>
-                              )}
-                            </button>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -324,79 +533,19 @@ const MeasurementCalendar = () => {
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('new_measurement') || 'Nieuwe opmeting'}</DialogTitle>
+            <DialogTitle>{t('mc_new_measurement') || 'Nieuwe opmeting'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>{t('project') || 'Project'}</Label>
-              <Select value={newProjectId} onValueChange={setNewProjectId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('select_project') || 'Selecteer project'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.project_number ? `${p.project_number} - ` : ''}{p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <MeasurementForm onSubmit={handleSave} submitLabel={t('save') || 'Opslaan'} />
+        </DialogContent>
+      </Dialog>
 
-            <div className="space-y-2">
-              <Label>{t('measurement_date') || 'Datum'}</Label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t('measurer') || 'Opmeter'}</Label>
-              <Select value={newMeasurerId} onValueChange={setNewMeasurerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('select_measurer') || 'Selecteer opmeter'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {measurers.map((e: any) => (
-                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t('status') || 'Status'}</Label>
-              <Select value={newStatus} onValueChange={setNewStatus}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="scheduled">{t('status_scheduled') || 'Gepland'}</SelectItem>
-                  <SelectItem value="provisional">{t('status_provisional') || 'Voorlopig'}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t('notes') || 'Notities'}</Label>
-              <Textarea
-                value={newNotes}
-                onChange={e => setNewNotes(e.target.value)}
-                placeholder={t('measurement_notes_placeholder') || 'Optionele notities...'}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-              {t('cancel') || 'Annuleren'}
-            </Button>
-            <Button onClick={handleSave} disabled={!newProjectId || !selectedDate || saving}>
-              {saving ? '...' : t('save') || 'Opslaan'}
-            </Button>
-          </DialogFooter>
+      {/* Edit Measurement Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('mc_edit_measurement') || 'Opmeting bewerken'}</DialogTitle>
+          </DialogHeader>
+          <MeasurementForm onSubmit={handleUpdate} submitLabel={t('mc_save_changes') || 'Wijzigingen opslaan'} showDelete />
         </DialogContent>
       </Dialog>
     </div>
