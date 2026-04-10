@@ -112,6 +112,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
   const [syncedData, setSyncedData] = useState<any>(null);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
   const [pendingTeamAssignment, setPendingTeamAssignment] = useState<any>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [allTasks, setAllTasks] = useState<TaskItem[]>([]);
   const [newTaskName, setNewTaskName] = useState('');
@@ -611,6 +612,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         address_number: data.address_number || null,
         address_postal_code: data.address_postal_code || null,
         address_city: data.address_city || null,
+        customer_id: selectedCustomerId || null,
       } as any);
       
       // Create a generic phase for these tasks
@@ -853,6 +855,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       setSyncedData(null);
       setPendingOrders([]);
       setPendingTeamAssignment(null);
+      setSelectedCustomerId(null);
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error: any) {
@@ -1034,9 +1037,10 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     <FormControl>
                       <CustomerSelector
                         value={field.value}
-                        onChange={field.onChange}
+                        onChange={(val) => { field.onChange(val); if (!val.trim()) setSelectedCustomerId(null); }}
                         onSelectCustomer={(customer) => {
                           field.onChange(customer.name);
+                          setSelectedCustomerId(customer.id);
                           // Auto-fill address from customer if empty
                           if (customer.address_street && !form.getValues('address_street')) {
                             form.setValue('address_street', customer.address_street);

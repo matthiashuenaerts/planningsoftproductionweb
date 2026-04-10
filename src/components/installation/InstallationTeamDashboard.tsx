@@ -550,8 +550,11 @@ const InstallationTeamDashboard: React.FC = () => {
         mapRef.current = map;
         setTimeout(() => map.invalidateSize(), 200);
 
-        // Calculate driving time from team's base address (single stop mode only)
-        if (!routeStartPoint && currentAssignment?.team_id) {
+        // Calculate driving time from team's base address
+        if (routeStartPoint && routeTotalDrivingMin != null) {
+          // Multi-stop: use already-computed total driving time
+          setDrivingTime(`~${Math.round(routeTotalDrivingMin)} min`);
+        } else if (!routeStartPoint && currentAssignment?.team_id) {
           const teamInfo = (currentAssignment as any).team_info;
           const teamAddress = teamInfo?.start_street
             ? [teamInfo.start_street, teamInfo.start_number, teamInfo.start_postal_code, teamInfo.start_city].filter(Boolean).join(' ')
