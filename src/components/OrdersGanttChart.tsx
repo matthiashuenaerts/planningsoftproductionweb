@@ -866,7 +866,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   }
 
   return (
-    <div className={cn('flex flex-col bg-background h-full', className)}>
+    <div className={cn('flex flex-col bg-background', className)}>
       {/* Header */}
       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} ${isMobile ? 'px-3 py-2' : 'px-6 py-4'} border-b bg-card sticky top-0 z-20`}>
         <div className={`flex items-center ${isMobile ? 'justify-between' : 'gap-4'}`}>
