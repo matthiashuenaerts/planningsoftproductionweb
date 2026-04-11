@@ -901,8 +901,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         if (error) throw error;
       }
 
+      const newDateStr = format(targetDate, 'yyyy-MM-dd');
+      const oldDateStr = assignment?.start_date || newDateStr;
       toast.success('Project toegewezen');
       fetchFullProjects();
+      checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
     } catch (error) {
       console.error('Error updating project assignment:', error);
       toast.error('Failed to move project');
