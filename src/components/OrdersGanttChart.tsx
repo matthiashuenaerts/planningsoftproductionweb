@@ -128,7 +128,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const fetchFullProjects = async () => {
     let projectsQuery = supabase
       .from('projects')
-      .select('id, name, client, installation_date, progress')
+      .select('id, name, client, installation_date, installation_week, description, progress')
       .not('installation_date', 'is', null)
       .order('installation_date');
     projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
@@ -335,6 +335,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             name,
             client,
             installation_date,
+            installation_week,
+            description,
             progress
           `)
           .not('installation_date', 'is', null)
