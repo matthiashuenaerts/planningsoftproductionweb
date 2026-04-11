@@ -13,6 +13,7 @@ import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
 import { recalculateTaskDueDates } from '@/services/taskDueDateService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { SameClientProjectsDialog } from './SameClientProjectsDialog';
 
 interface Employee {
   id: string;
@@ -92,6 +93,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
   const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
+  const [sameClientDialog, setSameClientDialog] = useState<{
+    movedProjectName: string;
+    clientName: string;
+    nearbyProjects: Array<{ id: string; name: string; start_date: string; duration: number; assignment_id: string }>;
+    newDate: string;
+    oldDate: string;
+  } | null>(null);
 
   // Default to 1 week on mobile once hook resolves
   useEffect(() => {
@@ -197,6 +205,113 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     setProjects(projectsWithEmployees);
   };
 
+  // Check for same-client projects within 14 days of a moved project
+  const checkSameClientProjects = useCallback(async (
+    movedProjectId: string,
+    movedProjectName: string,
+    clientName: string,
+    newDateStr: string,
+    oldDateStr: string
+  ) => {
+    if (!clientName || !clientName.trim()) return;
+
+    try {
+      // Find other projects with the same client
+      let query = supabase
+        .from('projects')
+        .select('id, name, client')
+        .eq('client', clientName)
+        .neq('id', movedProjectId);
+      query = applyTenantFilter(query, tenant?.id);
+      const { data: clientProjects } = await query;
+
+      if (!clientProjects || clientProjects.length === 0) return;
+
+      const projectIds = clientProjects.map(p => p.id);
+      const { data: assignments } = await supabase
+        .from('project_team_assignments')
+        .select('id, project_id, start_date, duration')
+        .in('project_id', projectIds)
+        .eq('is_service_ticket', false);
+
+      if (!assignments || assignments.length === 0) return;
+
+      const newDate = new Date(newDateStr);
+      const nearby = assignments
+        .filter(a => {
+          if (!a.start_date) return false;
+          const aDate = new Date(a.start_date);
+          const diffDays = Math.abs((aDate.getTime() - newDate.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays <= 14;
+        })
+        .map(a => {
+          const proj = clientProjects.find(p => p.id === a.project_id);
+          return {
+            id: a.project_id,
+            name: proj?.name || 'Unknown',
+            start_date: a.start_date,
+            duration: a.duration,
+            assignment_id: a.id,
+          };
+        });
+
+      if (nearby.length > 0) {
+        setSameClientDialog({
+          movedProjectName,
+          clientName,
+          nearbyProjects: nearby,
+          newDate: newDateStr,
+          oldDate: oldDateStr,
+        });
+      }
+    } catch (err) {
+      console.error('Error checking same-client projects:', err);
+    }
+  }, [tenant?.id]);
+
+  const handleSameClientMoveAll = useCallback(async () => {
+    if (!sameClientDialog) return;
+    try {
+      for (const p of sameClientDialog.nearbyProjects) {
+        await supabase
+          .from('project_team_assignments')
+          .update({ start_date: sameClientDialog.newDate })
+          .eq('id', p.assignment_id);
+        await recalculateTaskDueDates(p.id, sameClientDialog.newDate);
+      }
+      toast.success('Alle projecten verplaatst naar dezelfde datum');
+      fetchFullProjects();
+    } catch (err) {
+      console.error('Error moving all projects:', err);
+      toast.error('Fout bij verplaatsen');
+    }
+    setSameClientDialog(null);
+  }, [sameClientDialog]);
+
+  const handleSameClientMoveRelatively = useCallback(async () => {
+    if (!sameClientDialog) return;
+    const daysDiff = Math.round(
+      (new Date(sameClientDialog.newDate).getTime() - new Date(sameClientDialog.oldDate).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    try {
+      for (const p of sameClientDialog.nearbyProjects) {
+        const currentDate = new Date(p.start_date);
+        currentDate.setDate(currentDate.getDate() + daysDiff);
+        const newDateStr = format(currentDate, 'yyyy-MM-dd');
+        await supabase
+          .from('project_team_assignments')
+          .update({ start_date: newDateStr })
+          .eq('id', p.assignment_id);
+        await recalculateTaskDueDates(p.id, newDateStr);
+      }
+      toast.success('Alle projecten relatief verplaatst');
+      fetchFullProjects();
+    } catch (err) {
+      console.error('Error moving projects relatively:', err);
+      toast.error('Fout bij verplaatsen');
+    }
+    setSameClientDialog(null);
+  }, [sameClientDialog]);
 
   
   const handleResizeStart = (e: React.MouseEvent, project: Project, teamId: string, edge: 'left' | 'right') => {
@@ -258,19 +373,24 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       if (!assignmentId) return;
 
       try {
+        const newDateStr = format(newStartDate, 'yyyy-MM-dd');
+        const oldDateStr = format(originalStartDate, 'yyyy-MM-dd');
         const { error } = await supabase
           .from('project_team_assignments')
-          .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
+          .update({ start_date: newDateStr, duration: newDuration })
           .eq('id', assignmentId);
         if (error) throw error;
-        // Recalculate task due_dates based on the new start date
-        await recalculateTaskDueDates(project.id, format(newStartDate, 'yyyy-MM-dd'));
+        await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project duration updated');
         fetchFullProjects();
+        // Check for same-client projects when start date changed
+        if (edge === 'left' && daysMoved !== 0) {
+          checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
+        }
       } catch (error) {
         console.error('Error updating project duration:', error);
         toast.error('Failed to update project duration');
-        fetchFullProjects(); // revert
+        fetchFullProjects();
       }
     }
 
@@ -299,19 +419,20 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
       try {
         const newDateStr = format(newStartDate, 'yyyy-MM-dd');
+        const oldDateStr = assignment.start_date;
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: newDateStr })
           .eq('id', assignment.id);
         if (error) throw error;
-        // Recalculate task due_dates based on the new start date
         await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project moved successfully');
         fetchFullProjects();
+        checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
       } catch (error) {
         console.error('Error updating project position:', error);
         toast.error('Failed to move project');
-        fetchFullProjects(); // revert
+        fetchFullProjects();
       }
     }
   };
@@ -780,8 +901,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         if (error) throw error;
       }
 
+      const newDateStr = format(targetDate, 'yyyy-MM-dd');
+      const oldDateStr = assignment?.start_date || newDateStr;
       toast.success('Project toegewezen');
       fetchFullProjects();
+      checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
     } catch (error) {
       console.error('Error updating project assignment:', error);
       toast.error('Failed to move project');
@@ -866,7 +990,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   }
 
   return (
-    <div className={cn('flex flex-col bg-background h-full', className)}>
+    <div className={cn('flex flex-col bg-background', className)}>
       {/* Header */}
       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'} ${isMobile ? 'px-3 py-2' : 'px-6 py-4'} border-b bg-card sticky top-0 z-20`}>
         <div className={`flex items-center ${isMobile ? 'justify-between' : 'gap-4'}`}>
@@ -954,7 +1078,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         )}
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible flex-1 scrollbar-hide" ref={timelineRef}>
+      <div className="w-full" ref={timelineRef}>
         <div className="relative w-full">
           {/* Team rows */}
           <div className="relative">
@@ -1450,7 +1574,46 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           currentTeamId={selectedProject.teamId}
           currentStartDate={selectedProject.startDate}
           currentDuration={selectedProject.duration}
-          onUpdate={fetchFullProjects}
+          onUpdate={async () => {
+            await fetchFullProjects();
+            // After assignment dialog saves, check same-client proximity
+            const proj = projects.find(p => p.id === selectedProject.id);
+            if (proj?.client) {
+              // Fetch updated assignment to get new date
+              const { data: updatedAssignment } = await supabase
+                .from('project_team_assignments')
+                .select('start_date')
+                .eq('project_id', selectedProject.id)
+                .eq('is_service_ticket', false)
+                .limit(1)
+                .maybeSingle();
+              if (updatedAssignment?.start_date && updatedAssignment.start_date !== selectedProject.startDate) {
+                checkSameClientProjects(
+                  selectedProject.id,
+                  selectedProject.name,
+                  proj.client,
+                  updatedAssignment.start_date,
+                  selectedProject.startDate
+                );
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Same Client Projects Dialog */}
+      {sameClientDialog && (
+        <SameClientProjectsDialog
+          isOpen={!!sameClientDialog}
+          onClose={() => setSameClientDialog(null)}
+          movedProjectName={sameClientDialog.movedProjectName}
+          clientName={sameClientDialog.clientName}
+          nearbyProjects={sameClientDialog.nearbyProjects}
+          newDate={sameClientDialog.newDate}
+          oldDate={sameClientDialog.oldDate}
+          onMoveAllToSameDate={handleSameClientMoveAll}
+          onMoveRelatively={handleSameClientMoveRelatively}
+          onKeepOriginal={() => setSameClientDialog(null)}
         />
       )}
     </div>
