@@ -373,19 +373,24 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       if (!assignmentId) return;
 
       try {
+        const newDateStr = format(newStartDate, 'yyyy-MM-dd');
+        const oldDateStr = format(originalStartDate, 'yyyy-MM-dd');
         const { error } = await supabase
           .from('project_team_assignments')
-          .update({ start_date: format(newStartDate, 'yyyy-MM-dd'), duration: newDuration })
+          .update({ start_date: newDateStr, duration: newDuration })
           .eq('id', assignmentId);
         if (error) throw error;
-        // Recalculate task due_dates based on the new start date
-        await recalculateTaskDueDates(project.id, format(newStartDate, 'yyyy-MM-dd'));
+        await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project duration updated');
         fetchFullProjects();
+        // Check for same-client projects when start date changed
+        if (edge === 'left' && daysMoved !== 0) {
+          checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
+        }
       } catch (error) {
         console.error('Error updating project duration:', error);
         toast.error('Failed to update project duration');
-        fetchFullProjects(); // revert
+        fetchFullProjects();
       }
     }
 
@@ -414,19 +419,20 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
 
       try {
         const newDateStr = format(newStartDate, 'yyyy-MM-dd');
+        const oldDateStr = assignment.start_date;
         const { error } = await supabase
           .from('project_team_assignments')
           .update({ start_date: newDateStr })
           .eq('id', assignment.id);
         if (error) throw error;
-        // Recalculate task due_dates based on the new start date
         await recalculateTaskDueDates(project.id, newDateStr);
         toast.success('Project moved successfully');
         fetchFullProjects();
+        checkSameClientProjects(project.id, project.name, project.client, newDateStr, oldDateStr);
       } catch (error) {
         console.error('Error updating project position:', error);
         toast.error('Failed to move project');
-        fetchFullProjects(); // revert
+        fetchFullProjects();
       }
     }
   };
