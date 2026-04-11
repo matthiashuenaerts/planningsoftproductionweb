@@ -743,12 +743,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     const assignment = teamAssignments?.find(a => a.team_id === sourceTeamId) || 
                        (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
 
-    if (!assignment || !assignment.id) {
-      toast.error('No team assignment found for this project');
-      setDraggedProject(null);
-      return;
-    }
-
     // Find the target team name
     const targetTeam = teams.find(t => t.id === targetTeamId);
     if (!targetTeam) {
@@ -758,18 +752,35 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
 
     try {
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .update({
-          team: targetTeam.name,
-          team_id: targetTeam.id,
-          start_date: format(targetDate, 'yyyy-MM-dd'),
-        })
-        .eq('id', assignment.id);
+      if (assignment?.id) {
+        // Update existing assignment
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({
+            team: targetTeam.name,
+            team_id: targetTeam.id,
+            start_date: format(targetDate, 'yyyy-MM-dd'),
+          })
+          .eq('id', assignment.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Create new assignment for unnamed project dropped into calendar
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .insert({
+            project_id: project.id,
+            team: targetTeam.name,
+            team_id: targetTeam.id,
+            start_date: format(targetDate, 'yyyy-MM-dd'),
+            duration: 1,
+            is_service_ticket: false,
+          });
 
-      toast.success('Project moved successfully');
+        if (error) throw error;
+      }
+
+      toast.success('Project toegewezen');
       fetchFullProjects();
     } catch (error) {
       console.error('Error updating project assignment:', error);
