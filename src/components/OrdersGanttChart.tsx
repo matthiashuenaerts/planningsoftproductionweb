@@ -13,6 +13,7 @@ import { ProjectAssignmentDialog } from './ProjectAssignmentDialog';
 import { recalculateTaskDueDates } from '@/services/taskDueDateService';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
+import { SameClientProjectsDialog } from './SameClientProjectsDialog';
 
 interface Employee {
   id: string;
