@@ -1380,7 +1380,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               className="h-7 w-7"
                               onClick={() => handleSaveDescription(project.id)}
                             >
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 text-primary" />
                             </Button>
                             <Button
                               size="icon"
