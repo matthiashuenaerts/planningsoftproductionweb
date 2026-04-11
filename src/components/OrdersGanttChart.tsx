@@ -88,6 +88,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+  const [unnamedFilterMode, setUnnamedFilterMode] = useState<'all' | 'week' | 'month' | 'day'>('all');
+  const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
+  const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
 
   // Default to 1 week on mobile once hook resolves
   useEffect(() => {
