@@ -127,6 +127,9 @@ async function syncProject(
       console.error(`Query failed for project ${project.name}:`, queryResponse.status, queryError);
     }
 
+    // Store the raw installation week (e.g. "202611")
+    const installationWeek = rawPlacementDate && /^\d{6}$/.test(rawPlacementDate) ? rawPlacementDate : null;
+
     if (!planningStartRaw && !rawPlacementDate) {
       return { detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'no_date_found' }, synced: false };
     }
