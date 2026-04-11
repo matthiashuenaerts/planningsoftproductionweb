@@ -93,6 +93,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
   const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
+  const [sameClientDialog, setSameClientDialog] = useState<{
+    movedProjectName: string;
+    clientName: string;
+    nearbyProjects: Array<{ id: string; name: string; start_date: string; duration: number; assignment_id: string }>;
+    newDate: string;
+    oldDate: string;
+  } | null>(null);
 
   // Default to 1 week on mobile once hook resolves
   useEffect(() => {
