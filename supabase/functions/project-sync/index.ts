@@ -186,12 +186,15 @@ async function syncProject(
       ([key, val]) => (val || null) !== (project[key] || null)
     );
 
+    const installationWeekChanged = installationWeek && installationWeek !== (project.installation_week || null);
+
     const changes: string[] = [];
     if (dateChanged) changes.push('installation_date');
     if (teamChanged) changes.push('team');
     if (startDateChanged) changes.push('start_date');
     if (durationChanged) changes.push('duration');
     if (addressChanged) changes.push('address');
+    if (installationWeekChanged) changes.push('installation_week');
 
     // No changes at all → skip entirely
     if (changes.length === 0) {
@@ -203,6 +206,7 @@ async function syncProject(
     // --- Only update project table if project-level fields changed ---
     const projectUpdate: Record<string, any> = {};
     if (dateChanged) projectUpdate.installation_date = normalizedExternal;
+    if (installationWeekChanged) projectUpdate.installation_week = installationWeek;
     if (addressChanged) Object.assign(projectUpdate, addressFields);
 
     if (Object.keys(projectUpdate).length > 0) {
