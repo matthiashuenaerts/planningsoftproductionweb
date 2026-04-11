@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
