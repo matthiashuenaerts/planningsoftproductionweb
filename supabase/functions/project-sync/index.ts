@@ -127,6 +127,9 @@ async function syncProject(
       console.error(`Query failed for project ${project.name}:`, queryResponse.status, queryError);
     }
 
+    // Store the raw installation week (e.g. "202611")
+    const installationWeek = rawPlacementDate && /^\d{6}$/.test(rawPlacementDate) ? rawPlacementDate : null;
+
     if (!planningStartRaw && !rawPlacementDate) {
       return { detail: { project_name: project.name, project_link_id: project.project_link_id, status: 'no_date_found' }, synced: false };
     }
@@ -183,12 +186,15 @@ async function syncProject(
       ([key, val]) => (val || null) !== (project[key] || null)
     );
 
+    const installationWeekChanged = installationWeek && installationWeek !== (project.installation_week || null);
+
     const changes: string[] = [];
     if (dateChanged) changes.push('installation_date');
     if (teamChanged) changes.push('team');
     if (startDateChanged) changes.push('start_date');
     if (durationChanged) changes.push('duration');
     if (addressChanged) changes.push('address');
+    if (installationWeekChanged) changes.push('installation_week');
 
     // No changes at all → skip entirely
     if (changes.length === 0) {
@@ -200,6 +206,7 @@ async function syncProject(
     // --- Only update project table if project-level fields changed ---
     const projectUpdate: Record<string, any> = {};
     if (dateChanged) projectUpdate.installation_date = normalizedExternal;
+    if (installationWeekChanged) projectUpdate.installation_week = installationWeek;
     if (addressChanged) Object.assign(projectUpdate, addressFields);
 
     if (Object.keys(projectUpdate).length > 0) {
@@ -366,7 +373,7 @@ serve(async (req) => {
       // Get projects for this tenant — filter by specific IDs if provided (continuation)
       let query = supabase
         .from('projects')
-        .select('id, name, project_link_id, installation_date, address_street, address_number, address_postal_code, address_city')
+        .select('id, name, project_link_id, installation_date, installation_week, address_street, address_number, address_postal_code, address_city')
         .not('project_link_id', 'is', null)
         .not('project_link_id', 'eq', '');
 
