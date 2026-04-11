@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
+import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay, startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, GripVertical, Wrench } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronRight, Calendar, GripVertical, Wrench, Edit2, Check, X, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -30,6 +32,8 @@ interface Project {
   name: string;
   client: string;
   installation_date: string;
+  installation_week?: string | null;
+  description?: string | null;
   progress: number;
   project_team_assignments?: Array<{
     id?: string;
