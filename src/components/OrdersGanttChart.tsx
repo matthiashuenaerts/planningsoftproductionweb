@@ -897,7 +897,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               />
             )}
 
-            {teams.map((team) => {
+            {teams.filter(team => team.id !== 'unnamed' && team.name?.toLowerCase() !== 'unnamed').map((team) => {
               const teamProjects = projectsByTeam[team.id] || [];
               const isCollapsed = collapsedTeams.has(team.id);
 
