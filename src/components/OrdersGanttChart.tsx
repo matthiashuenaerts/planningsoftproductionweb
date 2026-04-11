@@ -796,6 +796,60 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     return ((todayIndex + 0.5) / dateRange.length) * 100;
   }, [dateRange]);
 
+  // Unnamed projects: projects in the 'unnamed' team bucket
+  const unnamedProjects = useMemo(() => {
+    return projectsByTeam['unnamed'] || [];
+  }, [projectsByTeam]);
+
+  // Filter unnamed projects based on filter mode
+  const filteredUnnamedProjects = useMemo(() => {
+    if (unnamedFilterMode === 'all') return unnamedProjects;
+
+    return unnamedProjects.filter(project => {
+      // Use start_date from assignment if available, else installation_date
+      const assignment = project.project_team_assignments?.[0];
+      const dateStr = assignment?.start_date || project.installation_date;
+      if (!dateStr) return true; // show projects without any date
+
+      const projectDate = parseYMD(dateStr);
+      if (isNaN(projectDate.getTime())) return true;
+
+      if (unnamedFilterMode === 'day') {
+        return isSameDay(projectDate, unnamedFilterDate);
+      } else if (unnamedFilterMode === 'week') {
+        const weekStart = startOfWeek(unnamedFilterDate, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(unnamedFilterDate, { weekStartsOn: 1 });
+        return projectDate >= weekStart && projectDate <= weekEnd;
+      } else if (unnamedFilterMode === 'month') {
+        const monthStart = startOfMonth(unnamedFilterDate);
+        const monthEnd = endOfMonth(unnamedFilterDate);
+        return projectDate >= monthStart && projectDate <= monthEnd;
+      }
+      return true;
+    });
+  }, [unnamedProjects, unnamedFilterMode, unnamedFilterDate]);
+
+  const handleSaveDescription = useCallback(async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ description: editingDescriptionValue, updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+      if (error) throw error;
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, description: editingDescriptionValue } : p));
+      toast.success('Beschrijving opgeslagen');
+    } catch (err) {
+      console.error('Error saving description:', err);
+      toast.error('Opslaan mislukt');
+    }
+    setEditingDescriptionId(null);
+  }, [editingDescriptionValue]);
+
+  const formatInstallationWeek = (week: string | null | undefined) => {
+    if (!week || !/^\d{6}$/.test(week)) return '—';
+    return `Week ${week.substring(4, 6)}, ${week.substring(0, 4)}`;
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-96">Loading...</div>;
   }
