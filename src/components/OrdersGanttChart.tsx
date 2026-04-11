@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, differenceInDays, getWeek, isSameDay } from 'date-fns';
 import { nl } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar, GripVertical, Wrench } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronRight, Calendar, GripVertical, Wrench, Edit2, Check, X, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -30,6 +32,8 @@ interface Project {
   name: string;
   client: string;
   installation_date: string;
+  installation_week?: string | null;
+  description?: string | null;
   progress: number;
   project_team_assignments?: Array<{
     id?: string;
@@ -84,6 +88,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [weeksToShow, setWeeksToShow] = useState(4);
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
+  const [unnamedFilterMode, setUnnamedFilterMode] = useState<'all' | 'week' | 'month' | 'day'>('all');
+  const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
+  const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
+  const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
 
   // Default to 1 week on mobile once hook resolves
   useEffect(() => {
@@ -124,7 +132,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const fetchFullProjects = async () => {
     let projectsQuery = supabase
       .from('projects')
-      .select('id, name, client, installation_date, progress')
+      .select('id, name, client, installation_date, installation_week, description, progress')
       .not('installation_date', 'is', null)
       .order('installation_date');
     projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
@@ -331,6 +339,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             name,
             client,
             installation_date,
+            installation_week,
+            description,
             progress
           `)
           .not('installation_date', 'is', null)
@@ -733,12 +743,6 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     const assignment = teamAssignments?.find(a => a.team_id === sourceTeamId) || 
                        (teamAssignments && teamAssignments.length > 0 ? teamAssignments[0] : null);
 
-    if (!assignment || !assignment.id) {
-      toast.error('No team assignment found for this project');
-      setDraggedProject(null);
-      return;
-    }
-
     // Find the target team name
     const targetTeam = teams.find(t => t.id === targetTeamId);
     if (!targetTeam) {
@@ -748,18 +752,35 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
 
     try {
-      const { error } = await supabase
-        .from('project_team_assignments')
-        .update({
-          team: targetTeam.name,
-          team_id: targetTeam.id,
-          start_date: format(targetDate, 'yyyy-MM-dd'),
-        })
-        .eq('id', assignment.id);
+      if (assignment?.id) {
+        // Update existing assignment
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .update({
+            team: targetTeam.name,
+            team_id: targetTeam.id,
+            start_date: format(targetDate, 'yyyy-MM-dd'),
+          })
+          .eq('id', assignment.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Create new assignment for unnamed project dropped into calendar
+        const { error } = await supabase
+          .from('project_team_assignments')
+          .insert({
+            project_id: project.id,
+            team: targetTeam.name,
+            team_id: targetTeam.id,
+            start_date: format(targetDate, 'yyyy-MM-dd'),
+            duration: 1,
+            is_service_ticket: false,
+          });
 
-      toast.success('Project moved successfully');
+        if (error) throw error;
+      }
+
+      toast.success('Project toegewezen');
       fetchFullProjects();
     } catch (error) {
       console.error('Error updating project assignment:', error);
@@ -785,6 +806,60 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     // Center the line in the middle of today's column
     return ((todayIndex + 0.5) / dateRange.length) * 100;
   }, [dateRange]);
+
+  // Unnamed projects: projects in the 'unnamed' team bucket
+  const unnamedProjects = useMemo(() => {
+    return projectsByTeam['unnamed'] || [];
+  }, [projectsByTeam]);
+
+  // Filter unnamed projects based on filter mode
+  const filteredUnnamedProjects = useMemo(() => {
+    if (unnamedFilterMode === 'all') return unnamedProjects;
+
+    return unnamedProjects.filter(project => {
+      // Use start_date from assignment if available, else installation_date
+      const assignment = project.project_team_assignments?.[0];
+      const dateStr = assignment?.start_date || project.installation_date;
+      if (!dateStr) return true; // show projects without any date
+
+      const projectDate = parseYMD(dateStr);
+      if (isNaN(projectDate.getTime())) return true;
+
+      if (unnamedFilterMode === 'day') {
+        return isSameDay(projectDate, unnamedFilterDate);
+      } else if (unnamedFilterMode === 'week') {
+        const weekStart = startOfWeek(unnamedFilterDate, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(unnamedFilterDate, { weekStartsOn: 1 });
+        return projectDate >= weekStart && projectDate <= weekEnd;
+      } else if (unnamedFilterMode === 'month') {
+        const monthStart = startOfMonth(unnamedFilterDate);
+        const monthEnd = endOfMonth(unnamedFilterDate);
+        return projectDate >= monthStart && projectDate <= monthEnd;
+      }
+      return true;
+    });
+  }, [unnamedProjects, unnamedFilterMode, unnamedFilterDate]);
+
+  const handleSaveDescription = useCallback(async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ description: editingDescriptionValue, updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+      if (error) throw error;
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, description: editingDescriptionValue } : p));
+      toast.success('Beschrijving opgeslagen');
+    } catch (err) {
+      console.error('Error saving description:', err);
+      toast.error('Opslaan mislukt');
+    }
+    setEditingDescriptionId(null);
+  }, [editingDescriptionValue]);
+
+  const formatInstallationWeek = (week: string | null | undefined) => {
+    if (!week || !/^\d{6}$/.test(week)) return '—';
+    return `Week ${week.substring(4, 6)}, ${week.substring(0, 4)}`;
+  };
 
   if (loading) {
     return <div className="flex items-center justify-center h-96">Loading...</div>;
@@ -891,7 +966,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
               />
             )}
 
-            {teams.map((team) => {
+            {teams.filter(team => team.id !== 'unnamed' && team.name?.toLowerCase() !== 'unnamed').map((team) => {
               const teamProjects = projectsByTeam[team.id] || [];
               const isCollapsed = collapsedTeams.has(team.id);
 
@@ -1208,6 +1283,162 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           </div>
         </div>
       </div>
+
+      {/* Unnamed Projects List */}
+      {unnamedProjects.length > 0 && (
+        <div className="border-t bg-card px-4 py-4 md:px-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <h3 className="text-base font-semibold text-foreground">
+              Niet-toegewezen projecten ({filteredUnnamedProjects.length})
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={unnamedFilterMode} onValueChange={(v) => setUnnamedFilterMode(v as any)}>
+                <SelectTrigger className="w-[120px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alles</SelectItem>
+                  <SelectItem value="day">Dag</SelectItem>
+                  <SelectItem value="week">Week</SelectItem>
+                  <SelectItem value="month">Maand</SelectItem>
+                </SelectContent>
+              </Select>
+              {unnamedFilterMode !== 'all' && (
+                <Input
+                  type="date"
+                  className="w-[160px] h-8 text-xs"
+                  value={format(unnamedFilterDate, 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    const d = new Date(e.target.value);
+                    if (!isNaN(d.getTime())) setUnnamedFilterDate(d);
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Startdatum</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground min-w-[200px]">Beschrijving</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[100px]">Acties</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUnnamedProjects.map((project) => {
+                  const assignment = project.project_team_assignments?.[0];
+                  const startDate = assignment?.start_date;
+                  const isEditing = editingDescriptionId === project.id;
+
+                  return (
+                    <tr
+                      key={project.id}
+                      className="border-t hover:bg-muted/30 transition-colors"
+                      draggable
+                      onDragStart={() => {
+                        setDraggedProject({
+                          project,
+                          teamId: 'unnamed',
+                        });
+                      }}
+                    >
+                      <td className="px-3 py-2 font-medium text-foreground cursor-grab">
+                        <div className="flex items-center gap-1.5">
+                          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
+                          {project.name}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{project.client || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {formatInstallationWeek(project.installation_week)}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {startDate ? format(parseYMD(startDate), 'd MMM yyyy', { locale: nl }) : '—'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingDescriptionValue}
+                              onChange={(e) => setEditingDescriptionValue(e.target.value)}
+                              className="h-7 text-xs"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveDescription(project.id);
+                                if (e.key === 'Escape') setEditingDescriptionId(null);
+                              }}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => handleSaveDescription(project.id)}
+                            >
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setEditingDescriptionId(null)}
+                            >
+                              <X className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-1 cursor-pointer group"
+                            onClick={() => {
+                              setEditingDescriptionId(project.id);
+                              setEditingDescriptionValue(project.description || '');
+                            }}
+                          >
+                            <span className="text-muted-foreground truncate max-w-[300px]">
+                              {project.description || '—'}
+                            </span>
+                            <Edit2 className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            setSelectedProject({
+                              id: project.id,
+                              name: project.name,
+                              teamId: null,
+                              startDate: startDate || (project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : ''),
+                              duration: assignment?.duration || 1,
+                            });
+                          }}
+                        >
+                          Toewijzen
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredUnnamedProjects.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                      Geen niet-toegewezen projecten gevonden
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       
       {/* Project Assignment Dialog */}
       {selectedProject && (
