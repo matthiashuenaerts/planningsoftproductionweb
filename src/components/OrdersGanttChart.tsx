@@ -1574,7 +1574,46 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           currentTeamId={selectedProject.teamId}
           currentStartDate={selectedProject.startDate}
           currentDuration={selectedProject.duration}
-          onUpdate={fetchFullProjects}
+          onUpdate={async () => {
+            await fetchFullProjects();
+            // After assignment dialog saves, check same-client proximity
+            const proj = projects.find(p => p.id === selectedProject.id);
+            if (proj?.client) {
+              // Fetch updated assignment to get new date
+              const { data: updatedAssignment } = await supabase
+                .from('project_team_assignments')
+                .select('start_date')
+                .eq('project_id', selectedProject.id)
+                .eq('is_service_ticket', false)
+                .limit(1)
+                .maybeSingle();
+              if (updatedAssignment?.start_date && updatedAssignment.start_date !== selectedProject.startDate) {
+                checkSameClientProjects(
+                  selectedProject.id,
+                  selectedProject.name,
+                  proj.client,
+                  updatedAssignment.start_date,
+                  selectedProject.startDate
+                );
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Same Client Projects Dialog */}
+      {sameClientDialog && (
+        <SameClientProjectsDialog
+          isOpen={!!sameClientDialog}
+          onClose={() => setSameClientDialog(null)}
+          movedProjectName={sameClientDialog.movedProjectName}
+          clientName={sameClientDialog.clientName}
+          nearbyProjects={sameClientDialog.nearbyProjects}
+          newDate={sameClientDialog.newDate}
+          oldDate={sameClientDialog.oldDate}
+          onMoveAllToSameDate={handleSameClientMoveAll}
+          onMoveRelatively={handleSameClientMoveRelatively}
+          onKeepOriginal={() => setSameClientDialog(null)}
         />
       )}
     </div>
