@@ -205,6 +205,113 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     setProjects(projectsWithEmployees);
   };
 
+  // Check for same-client projects within 14 days of a moved project
+  const checkSameClientProjects = useCallback(async (
+    movedProjectId: string,
+    movedProjectName: string,
+    clientName: string,
+    newDateStr: string,
+    oldDateStr: string
+  ) => {
+    if (!clientName || !clientName.trim()) return;
+
+    try {
+      // Find other projects with the same client
+      let query = supabase
+        .from('projects')
+        .select('id, name, client')
+        .eq('client', clientName)
+        .neq('id', movedProjectId);
+      query = applyTenantFilter(query, tenant?.id);
+      const { data: clientProjects } = await query;
+
+      if (!clientProjects || clientProjects.length === 0) return;
+
+      const projectIds = clientProjects.map(p => p.id);
+      const { data: assignments } = await supabase
+        .from('project_team_assignments')
+        .select('id, project_id, start_date, duration')
+        .in('project_id', projectIds)
+        .eq('is_service_ticket', false);
+
+      if (!assignments || assignments.length === 0) return;
+
+      const newDate = new Date(newDateStr);
+      const nearby = assignments
+        .filter(a => {
+          if (!a.start_date) return false;
+          const aDate = new Date(a.start_date);
+          const diffDays = Math.abs((aDate.getTime() - newDate.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays <= 14;
+        })
+        .map(a => {
+          const proj = clientProjects.find(p => p.id === a.project_id);
+          return {
+            id: a.project_id,
+            name: proj?.name || 'Unknown',
+            start_date: a.start_date,
+            duration: a.duration,
+            assignment_id: a.id,
+          };
+        });
+
+      if (nearby.length > 0) {
+        setSameClientDialog({
+          movedProjectName,
+          clientName,
+          nearbyProjects: nearby,
+          newDate: newDateStr,
+          oldDate: oldDateStr,
+        });
+      }
+    } catch (err) {
+      console.error('Error checking same-client projects:', err);
+    }
+  }, [tenant?.id]);
+
+  const handleSameClientMoveAll = useCallback(async () => {
+    if (!sameClientDialog) return;
+    try {
+      for (const p of sameClientDialog.nearbyProjects) {
+        await supabase
+          .from('project_team_assignments')
+          .update({ start_date: sameClientDialog.newDate })
+          .eq('id', p.assignment_id);
+        await recalculateTaskDueDates(p.id, sameClientDialog.newDate);
+      }
+      toast.success('Alle projecten verplaatst naar dezelfde datum');
+      fetchFullProjects();
+    } catch (err) {
+      console.error('Error moving all projects:', err);
+      toast.error('Fout bij verplaatsen');
+    }
+    setSameClientDialog(null);
+  }, [sameClientDialog]);
+
+  const handleSameClientMoveRelatively = useCallback(async () => {
+    if (!sameClientDialog) return;
+    const daysDiff = Math.round(
+      (new Date(sameClientDialog.newDate).getTime() - new Date(sameClientDialog.oldDate).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    try {
+      for (const p of sameClientDialog.nearbyProjects) {
+        const currentDate = new Date(p.start_date);
+        currentDate.setDate(currentDate.getDate() + daysDiff);
+        const newDateStr = format(currentDate, 'yyyy-MM-dd');
+        await supabase
+          .from('project_team_assignments')
+          .update({ start_date: newDateStr })
+          .eq('id', p.assignment_id);
+        await recalculateTaskDueDates(p.id, newDateStr);
+      }
+      toast.success('Alle projecten relatief verplaatst');
+      fetchFullProjects();
+    } catch (err) {
+      console.error('Error moving projects relatively:', err);
+      toast.error('Fout bij verplaatsen');
+    }
+    setSameClientDialog(null);
+  }, [sameClientDialog]);
 
   
   const handleResizeStart = (e: React.MouseEvent, project: Project, teamId: string, edge: 'left' | 'right') => {
