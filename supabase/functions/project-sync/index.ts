@@ -373,7 +373,7 @@ serve(async (req) => {
       // Get projects for this tenant — filter by specific IDs if provided (continuation)
       let query = supabase
         .from('projects')
-        .select('id, name, project_link_id, installation_date, address_street, address_number, address_postal_code, address_city')
+        .select('id, name, project_link_id, installation_date, installation_week, address_street, address_number, address_postal_code, address_city')
         .not('project_link_id', 'is', null)
         .not('project_link_id', 'eq', '');
 
