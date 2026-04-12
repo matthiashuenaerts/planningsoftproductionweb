@@ -91,7 +91,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
   const [unnamedFilterMode, setUnnamedFilterMode] = useState<'all' | 'week' | 'month' | 'day'>('all');
   const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
+  const [unnamedWeekFilter, setUnnamedWeekFilter] = useState('');
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
+  const [editingWeekId, setEditingWeekId] = useState<string | null>(null);
+  const [editingWeekValue, setEditingWeekValue] = useState('');
   const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
   const [sameClientDialog, setSameClientDialog] = useState<{
     movedProjectName: string;
@@ -936,15 +939,51 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     return projectsByTeam['unnamed'] || [];
   }, [projectsByTeam]);
 
-  // Filter unnamed projects based on filter mode
-  const filteredUnnamedProjects = useMemo(() => {
-    if (unnamedFilterMode === 'all') return unnamedProjects;
+  // Not-scheduled projects: projects assigned to a real team but without valid start_date/duration
+  const notScheduledProjects = useMemo(() => {
+    const result: Project[] = [];
+    teams.forEach(team => {
+      if (team.id === 'unnamed' || team.name?.toLowerCase() === 'unnamed') return;
+      const teamProjects = projectsByTeam[team.id] || [];
+      teamProjects.forEach(project => {
+        const position = getProjectPosition(project, team.name, team.id);
+        if (!position) {
+          // Avoid duplicates
+          if (!result.find(p => p.id === project.id)) {
+            result.push(project);
+          }
+        }
+      });
+    });
+    return result;
+  }, [projectsByTeam, teams, dateRange]);
 
-    return unnamedProjects.filter(project => {
-      // Use start_date from assignment if available, else installation_date
+  // Combined list: unnamed + not-scheduled
+  const allUnassignedProjects = useMemo(() => {
+    const combined = [...unnamedProjects];
+    notScheduledProjects.forEach(p => {
+      if (!combined.find(c => c.id === p.id)) {
+        combined.push(p);
+      }
+    });
+    return combined;
+  }, [unnamedProjects, notScheduledProjects]);
+
+  // Filter unnamed projects based on filter mode and installation_week
+  const filteredUnnamedProjects = useMemo(() => {
+    let filtered = allUnassignedProjects;
+
+    // Filter by installation_week if set
+    if (unnamedWeekFilter) {
+      filtered = filtered.filter(project => project.installation_week === unnamedWeekFilter);
+    }
+
+    if (unnamedFilterMode === 'all') return filtered;
+
+    return filtered.filter(project => {
       const assignment = project.project_team_assignments?.[0];
       const dateStr = assignment?.start_date || project.installation_date;
-      if (!dateStr) return true; // show projects without any date
+      if (!dateStr) return true;
 
       const projectDate = parseYMD(dateStr);
       if (isNaN(projectDate.getTime())) return true;
@@ -962,7 +1001,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       }
       return true;
     });
-  }, [unnamedProjects, unnamedFilterMode, unnamedFilterDate]);
+  }, [allUnassignedProjects, unnamedFilterMode, unnamedFilterDate, unnamedWeekFilter]);
 
   const handleSaveDescription = useCallback(async (projectId: string) => {
     try {
@@ -979,6 +1018,33 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     }
     setEditingDescriptionId(null);
   }, [editingDescriptionValue]);
+
+  const handleSaveWeek = useCallback(async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ installation_week: editingWeekValue || null, updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+      if (error) throw error;
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, installation_week: editingWeekValue || null } : p));
+      toast.success('Plaatsingsweek opgeslagen');
+    } catch (err) {
+      console.error('Error saving installation week:', err);
+      toast.error('Opslaan mislukt');
+    }
+    setEditingWeekId(null);
+  }, [editingWeekValue]);
+
+  // Unique installation weeks for filter dropdown
+  const availableWeeks = useMemo(() => {
+    const weeks = new Set<string>();
+    allUnassignedProjects.forEach(p => {
+      if (p.installation_week && /^\d{6}$/.test(p.installation_week)) {
+        weeks.add(p.installation_week);
+      }
+    });
+    return Array.from(weeks).sort();
+  }, [allUnassignedProjects]);
 
   const formatInstallationWeek = (week: string | null | undefined) => {
     if (!week || !/^\d{6}$/.test(week)) return '—';
@@ -1091,7 +1157,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             )}
 
             {teams.filter(team => team.id !== 'unnamed' && team.name?.toLowerCase() !== 'unnamed').map((team) => {
-              const teamProjects = projectsByTeam[team.id] || [];
+              const allTeamProjects = projectsByTeam[team.id] || [];
+              // Filter out not-scheduled projects (no valid position) — they go to the table below
+              const teamProjects = allTeamProjects.filter(p => getProjectPosition(p, team.name, team.id) !== null);
               const isCollapsed = collapsedTeams.has(team.id);
 
               return (
@@ -1200,45 +1268,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       <div className={`absolute ${isMobile ? 'left-32' : 'left-64'} right-0 top-0 z-10 py-2 pointer-events-none`}>
                           {teamProjects.map((project, idx) => {
                             const position = getProjectPosition(project, team.name, team.id);
-                            
-                            // For unassigned projects, show a placeholder indicator
-                            if (!position) {
-                              return (
-                                <div
-                                  key={project.id}
-                                  className="absolute pointer-events-auto"
-                                  style={{
-                                    left: '8px',
-                                    top: `${8 + idx * 32}px`,
-                                    height: '28px',
-                                  }}
-                                >
-                                  {(() => {
-                                    const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
-                                    return (
-                                      <div
-                                        className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
-                                        onClick={() => {
-                                          setSelectedProject({
-                                            id: project.id,
-                                            name: project.name,
-                                            teamId: null,
-                                            startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
-                                            duration: 1,
-                                          });
-                                        }}
-                                        title={`${project.name} - Not scheduled${isServiceTicket ? ' (Service)' : ''}`}
-                                      >
-                                        {isServiceTicket && <Wrench className="h-3 w-3 text-destructive flex-shrink-0" />}
-                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                                          {project.name} - Not scheduled
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              );
-                            }
+                            if (!position) return null;
 
                             const teamAssignment = position.assignment;
                             const projectLabel = `${project.name} - ${project.progress || 0}%`;
@@ -1408,8 +1438,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         </div>
       </div>
 
-      {/* Unnamed Projects List */}
-      {unnamedProjects.length > 0 && (
+      {/* Unnamed & Not-Scheduled Projects List */}
+      {allUnassignedProjects.length > 0 && (
         <div className="border-t bg-card px-4 py-4 md:px-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <h3 className="text-base font-semibold text-foreground">
@@ -1439,6 +1469,17 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   }}
                 />
               )}
+              <Select value={unnamedWeekFilter || '__all__'} onValueChange={(v) => setUnnamedWeekFilter(v === '__all__' ? '' : v)}>
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue placeholder="Plaatsingsweek" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle weken</SelectItem>
+                  {availableWeeks.map(w => (
+                    <SelectItem key={w} value={w}>{formatInstallationWeek(w)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -1446,6 +1487,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
@@ -1459,19 +1501,34 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   const assignment = project.project_team_assignments?.[0];
                   const startDate = assignment?.start_date;
                   const isEditing = editingDescriptionId === project.id;
+                  const isEditingWeek = editingWeekId === project.id;
+                  const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
 
                   return (
                     <tr
                       key={project.id}
-                      className="border-t hover:bg-muted/30 transition-colors"
+                      className={cn(
+                        "border-t hover:bg-muted/30 transition-colors",
+                        isServiceTicket && "border-l-[3px] border-l-destructive"
+                      )}
                       draggable
                       onDragStart={() => {
                         setDraggedProject({
                           project,
-                          teamId: 'unnamed',
+                          teamId: assignment?.team_id || 'unnamed',
                         });
                       }}
                     >
+                      <td className="px-3 py-2">
+                        {isServiceTicket ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded">
+                            <Wrench className="h-3 w-3" />
+                            Service
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Project</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 font-medium text-foreground cursor-grab">
                         <div className="flex items-center gap-1.5">
                           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
@@ -1479,8 +1536,51 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                         </div>
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{project.client || '—'}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {formatInstallationWeek(project.installation_week)}
+                      <td className="px-3 py-2">
+                        {isEditingWeek ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingWeekValue}
+                              onChange={(e) => setEditingWeekValue(e.target.value)}
+                              className="h-7 text-xs w-[90px]"
+                              placeholder="202611"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveWeek(project.id);
+                                if (e.key === 'Escape') setEditingWeekId(null);
+                              }}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => handleSaveWeek(project.id)}
+                            >
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setEditingWeekId(null)}
+                            >
+                              <X className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-1 cursor-pointer group"
+                            onClick={() => {
+                              setEditingWeekId(project.id);
+                              setEditingWeekValue(project.installation_week || '');
+                            }}
+                          >
+                            <span className="text-muted-foreground">
+                              {formatInstallationWeek(project.installation_week)}
+                            </span>
+                            <Edit2 className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {startDate ? format(parseYMD(startDate), 'd MMM yyyy', { locale: nl }) : '—'}
@@ -1539,7 +1639,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             setSelectedProject({
                               id: project.id,
                               name: project.name,
-                              teamId: null,
+                              teamId: assignment?.team_id || null,
                               startDate: startDate || (project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : ''),
                               duration: assignment?.duration || 1,
                             });
@@ -1553,7 +1653,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                 })}
                 {filteredUnnamedProjects.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
                       Geen niet-toegewezen projecten gevonden
                     </td>
                   </tr>
