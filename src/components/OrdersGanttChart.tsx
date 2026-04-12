@@ -1268,45 +1268,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                       <div className={`absolute ${isMobile ? 'left-32' : 'left-64'} right-0 top-0 z-10 py-2 pointer-events-none`}>
                           {teamProjects.map((project, idx) => {
                             const position = getProjectPosition(project, team.name, team.id);
-                            
-                            // For unassigned projects, show a placeholder indicator
-                            if (!position) {
-                              return (
-                                <div
-                                  key={project.id}
-                                  className="absolute pointer-events-auto"
-                                  style={{
-                                    left: '8px',
-                                    top: `${8 + idx * 32}px`,
-                                    height: '28px',
-                                  }}
-                                >
-                                  {(() => {
-                                    const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
-                                    return (
-                                      <div
-                                        className={cn("h-7 px-3 rounded flex items-center gap-1.5 bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors", isServiceTicket && "border-l-[3px] border-l-destructive")}
-                                        onClick={() => {
-                                          setSelectedProject({
-                                            id: project.id,
-                                            name: project.name,
-                                            teamId: null,
-                                            startDate: project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : '',
-                                            duration: 1,
-                                          });
-                                        }}
-                                        title={`${project.name} - Not scheduled${isServiceTicket ? ' (Service)' : ''}`}
-                                      >
-                                        {isServiceTicket && <Wrench className="h-3 w-3 text-destructive flex-shrink-0" />}
-                                        <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                                          {project.name} - Not scheduled
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              );
-                            }
+                            if (!position) return null;
 
                             const teamAssignment = position.assignment;
                             const projectLabel = `${project.name} - ${project.progress || 0}%`;
