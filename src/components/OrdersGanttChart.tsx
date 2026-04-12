@@ -1623,7 +1623,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                               setEditingDescriptionValue(project.description || '');
                             }}
                           >
-                            <span className="text-muted-foreground truncate max-w-[300px]">
+                            <span className="text-muted-foreground truncate block">
                               {project.description || '—'}
                             </span>
                             <Edit2 className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
