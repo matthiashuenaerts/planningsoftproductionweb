@@ -1487,13 +1487,13 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground">Startdatum</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground min-w-[200px]">Beschrijving</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[100px]">Acties</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[70px]">Type</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[20%]">Project</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[12%]">Klant</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[120px]">Plaatsingsweek</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[110px]">Startdatum</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Beschrijving</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground w-[90px]">Acties</th>
                 </tr>
               </thead>
               <tbody>
