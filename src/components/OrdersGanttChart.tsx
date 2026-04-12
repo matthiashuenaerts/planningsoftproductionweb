@@ -1484,7 +1484,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
           </div>
 
           <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="bg-muted/50 text-left">
                   <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
