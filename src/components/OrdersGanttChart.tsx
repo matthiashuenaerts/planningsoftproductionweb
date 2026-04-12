@@ -939,15 +939,51 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     return projectsByTeam['unnamed'] || [];
   }, [projectsByTeam]);
 
-  // Filter unnamed projects based on filter mode
-  const filteredUnnamedProjects = useMemo(() => {
-    if (unnamedFilterMode === 'all') return unnamedProjects;
+  // Not-scheduled projects: projects assigned to a real team but without valid start_date/duration
+  const notScheduledProjects = useMemo(() => {
+    const result: Project[] = [];
+    teams.forEach(team => {
+      if (team.id === 'unnamed' || team.name?.toLowerCase() === 'unnamed') return;
+      const teamProjects = projectsByTeam[team.id] || [];
+      teamProjects.forEach(project => {
+        const position = getProjectPosition(project, team.name, team.id);
+        if (!position) {
+          // Avoid duplicates
+          if (!result.find(p => p.id === project.id)) {
+            result.push(project);
+          }
+        }
+      });
+    });
+    return result;
+  }, [projectsByTeam, teams, dateRange]);
 
-    return unnamedProjects.filter(project => {
-      // Use start_date from assignment if available, else installation_date
+  // Combined list: unnamed + not-scheduled
+  const allUnassignedProjects = useMemo(() => {
+    const combined = [...unnamedProjects];
+    notScheduledProjects.forEach(p => {
+      if (!combined.find(c => c.id === p.id)) {
+        combined.push(p);
+      }
+    });
+    return combined;
+  }, [unnamedProjects, notScheduledProjects]);
+
+  // Filter unnamed projects based on filter mode and installation_week
+  const filteredUnnamedProjects = useMemo(() => {
+    let filtered = allUnassignedProjects;
+
+    // Filter by installation_week if set
+    if (unnamedWeekFilter) {
+      filtered = filtered.filter(project => project.installation_week === unnamedWeekFilter);
+    }
+
+    if (unnamedFilterMode === 'all') return filtered;
+
+    return filtered.filter(project => {
       const assignment = project.project_team_assignments?.[0];
       const dateStr = assignment?.start_date || project.installation_date;
-      if (!dateStr) return true; // show projects without any date
+      if (!dateStr) return true;
 
       const projectDate = parseYMD(dateStr);
       if (isNaN(projectDate.getTime())) return true;
@@ -965,7 +1001,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
       }
       return true;
     });
-  }, [unnamedProjects, unnamedFilterMode, unnamedFilterDate]);
+  }, [allUnassignedProjects, unnamedFilterMode, unnamedFilterDate, unnamedWeekFilter]);
 
   const handleSaveDescription = useCallback(async (projectId: string) => {
     try {
