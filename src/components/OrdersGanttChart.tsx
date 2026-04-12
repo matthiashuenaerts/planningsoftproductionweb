@@ -1438,8 +1438,8 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
         </div>
       </div>
 
-      {/* Unnamed Projects List */}
-      {unnamedProjects.length > 0 && (
+      {/* Unnamed & Not-Scheduled Projects List */}
+      {allUnassignedProjects.length > 0 && (
         <div className="border-t bg-card px-4 py-4 md:px-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <h3 className="text-base font-semibold text-foreground">
@@ -1469,6 +1469,17 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   }}
                 />
               )}
+              <Select value={unnamedWeekFilter || '__all__'} onValueChange={(v) => setUnnamedWeekFilter(v === '__all__' ? '' : v)}>
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue placeholder="Plaatsingsweek" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Alle weken</SelectItem>
+                  {availableWeeks.map(w => (
+                    <SelectItem key={w} value={w}>{formatInstallationWeek(w)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -1476,6 +1487,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
@@ -1489,19 +1501,34 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   const assignment = project.project_team_assignments?.[0];
                   const startDate = assignment?.start_date;
                   const isEditing = editingDescriptionId === project.id;
+                  const isEditingWeek = editingWeekId === project.id;
+                  const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
 
                   return (
                     <tr
                       key={project.id}
-                      className="border-t hover:bg-muted/30 transition-colors"
+                      className={cn(
+                        "border-t hover:bg-muted/30 transition-colors",
+                        isServiceTicket && "border-l-[3px] border-l-destructive"
+                      )}
                       draggable
                       onDragStart={() => {
                         setDraggedProject({
                           project,
-                          teamId: 'unnamed',
+                          teamId: assignment?.team_id || 'unnamed',
                         });
                       }}
                     >
+                      <td className="px-3 py-2">
+                        {isServiceTicket ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded">
+                            <Wrench className="h-3 w-3" />
+                            Service
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Project</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 font-medium text-foreground cursor-grab">
                         <div className="flex items-center gap-1.5">
                           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
@@ -1509,8 +1536,51 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                         </div>
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{project.client || '—'}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {formatInstallationWeek(project.installation_week)}
+                      <td className="px-3 py-2">
+                        {isEditingWeek ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingWeekValue}
+                              onChange={(e) => setEditingWeekValue(e.target.value)}
+                              className="h-7 text-xs w-[90px]"
+                              placeholder="202611"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveWeek(project.id);
+                                if (e.key === 'Escape') setEditingWeekId(null);
+                              }}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => handleSaveWeek(project.id)}
+                            >
+                              <Check className="h-3.5 w-3.5 text-primary" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setEditingWeekId(null)}
+                            >
+                              <X className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-1 cursor-pointer group"
+                            onClick={() => {
+                              setEditingWeekId(project.id);
+                              setEditingWeekValue(project.installation_week || '');
+                            }}
+                          >
+                            <span className="text-muted-foreground">
+                              {formatInstallationWeek(project.installation_week)}
+                            </span>
+                            <Edit2 className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {startDate ? format(parseYMD(startDate), 'd MMM yyyy', { locale: nl }) : '—'}
@@ -1569,7 +1639,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                             setSelectedProject({
                               id: project.id,
                               name: project.name,
-                              teamId: null,
+                              teamId: assignment?.team_id || null,
                               startDate: startDate || (project.installation_date ? format(parseYMD(project.installation_date), 'yyyy-MM-dd') : ''),
                               duration: assignment?.duration || 1,
                             });
@@ -1583,7 +1653,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                 })}
                 {filteredUnnamedProjects.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
                       Geen niet-toegewezen projecten gevonden
                     </td>
                   </tr>
