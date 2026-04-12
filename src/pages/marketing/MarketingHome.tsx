@@ -95,7 +95,89 @@ const MarketingHome: React.FC = () => {
 
   return (
     <>
-      <SEOHead title={seo.title} description={seo.desc} path="/site" lang={lang} />
+      <SEOHead
+        title={seo.title}
+        description={seo.desc}
+        path="/site"
+        lang={lang}
+        keywords={lang === "nl"
+          ? "productieplanning, meubelfabrikant, planningssoftware, werkstationbeheer, Gantt chart, productie software, ERP meubelindustrie, tijdsregistratie, spoedbestellingen, logistiek software"
+          : lang === "fr"
+          ? "planification production, fabricant meubles, logiciel planification, gestion postes travail, Gantt, logiciel production, ERP meubles, enregistrement temps"
+          : "production planning, furniture manufacturer, planning software, workstation management, Gantt chart, production software, ERP furniture, time registration, rush orders, logistics software"
+        }
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": lang === "nl" ? "Wat is AutoMattiOn Compass?" : lang === "fr" ? "Qu'est-ce qu'AutoMattiOn Compass ?" : "What is AutoMattiOn Compass?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": lang === "nl"
+                    ? "AutoMattiOn Compass is een alles-in-één productieplanningsplatform specifiek ontworpen voor meubelfabrikanten. Het combineert werkstationbeheer, Gantt-planning, logistiek, tijdsregistratie en teamcoördinatie."
+                    : lang === "fr"
+                    ? "AutoMattiOn Compass est une plateforme de planification de production tout-en-un conçue pour les fabricants de meubles, combinant gestion des postes de travail, planification Gantt, logistique et coordination d'équipe."
+                    : "AutoMattiOn Compass is an all-in-one production planning platform designed for furniture manufacturers, combining workstation management, Gantt planning, logistics, time registration and team coordination.",
+                },
+              },
+              {
+                "@type": "Question",
+                "name": lang === "nl" ? "Voor welke bedrijven is het geschikt?" : lang === "fr" ? "Pour quelles entreprises est-il adapté ?" : "What companies is it suitable for?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": lang === "nl"
+                    ? "AutoMattiOn Compass is ontworpen voor meubelfabrikanten, interieurafwerkers en productiebedrijven in de houtindustrie die hun planning, logistiek en teamwerk willen digitaliseren."
+                    : lang === "fr"
+                    ? "AutoMattiOn Compass est conçu pour les fabricants de meubles, les aménageurs d'intérieur et les entreprises de production du secteur du bois."
+                    : "AutoMattiOn Compass is designed for furniture manufacturers, interior finishers, and wood industry production companies looking to digitalize their planning, logistics and teamwork.",
+                },
+              },
+              {
+                "@type": "Question",
+                "name": lang === "nl" ? "Hoe werkt de implementatie?" : lang === "fr" ? "Comment fonctionne l'implémentation ?" : "How does implementation work?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": lang === "nl"
+                    ? "De implementatie verloopt in drie stappen: inventarisatie en configuratie, data-import en integratie (inclusief CrownBase Pro koppeling), en training met livegang. Binnen enkele dagen is uw productie volledig digitaal."
+                    : lang === "fr"
+                    ? "L'implémentation se déroule en trois étapes : inventaire et configuration, import de données et intégration (y compris CrownBase Pro), puis formation et mise en production."
+                    : "Implementation follows three steps: inventory & configuration, data import & integration (including CrownBase Pro), and training with go-live. Within days your production runs fully digital.",
+                },
+              },
+              {
+                "@type": "Question",
+                "name": lang === "nl" ? "Is er een gratis demo beschikbaar?" : lang === "fr" ? "Une démo gratuite est-elle disponible ?" : "Is a free demo available?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": lang === "nl"
+                    ? "Ja! Neem contact op via info@automattion-compass.com om een gratis demo aan te vragen. We tonen u het platform in uw eigen productiecontext."
+                    : lang === "fr"
+                    ? "Oui ! Contactez-nous à info@automattion-compass.com pour demander une démo gratuite."
+                    : "Yes! Contact us at info@automattion-compass.com to request a free demo. We'll showcase the platform in your own production context.",
+                },
+              },
+            ],
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "AutoMattiOn",
+            "url": "https://www.automattion-compass.com",
+            "logo": "https://static.wixstatic.com/media/99c033_5bb79e52130d4fa6bbae75d9a22b198d~mv2.png",
+            "contactPoint": {
+              "@type": "ContactPoint",
+              "email": "info@automattion-compass.com",
+              "contactType": "sales",
+              "areaServed": ["BE", "NL", "FR", "DE"],
+              "availableLanguage": ["Dutch", "English", "French"],
+            },
+            "sameAs": [],
+          },
+        ]}
+      />
       {/* ── HERO ── */}
       <section className="relative overflow-hidden min-h-[92vh] flex items-center">
         <div className="absolute inset-0">
