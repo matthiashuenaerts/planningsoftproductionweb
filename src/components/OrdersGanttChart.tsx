@@ -1483,17 +1483,26 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm table-fixed">
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+              <colgroup>
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '100px' }} />
+                <col />
+                <col style={{ width: '85px' }} />
+              </colgroup>
               <thead>
                 <tr className="bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[70px]">Type</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[20%]">Project</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[12%]">Klant</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[120px]">Plaatsingsweek</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[110px]">Startdatum</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Startdatum</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Beschrijving</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[90px]">Acties</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Acties</th>
                 </tr>
               </thead>
               <tbody>
@@ -1529,13 +1538,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                           <span className="text-xs text-muted-foreground">Project</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-medium text-foreground cursor-grab">
+                      <td className="px-3 py-2 font-medium text-foreground cursor-grab max-w-0">
                         <div className="flex items-center gap-1.5">
                           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
-                          {project.name}
+                          <span className="truncate" title={project.name}>{project.name}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">{project.client || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground max-w-0">
+                        <span className="truncate block" title={project.client || ''}>{project.client || '—'}</span>
+                      </td>
                       <td className="px-3 py-2">
                         {isEditingWeek ? (
                           <div className="flex items-center gap-1">
