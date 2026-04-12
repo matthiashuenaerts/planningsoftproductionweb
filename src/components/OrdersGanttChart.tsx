@@ -1483,17 +1483,26 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             </div>
           </div>
 
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm table-fixed">
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+              <colgroup>
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '100px' }} />
+                <col />
+                <col style={{ width: '85px' }} />
+              </colgroup>
               <thead>
                 <tr className="bg-muted/50 text-left">
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[70px]">Type</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[20%]">Project</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[12%]">Klant</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[120px]">Plaatsingsweek</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[110px]">Startdatum</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Type</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Project</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Klant</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Plaatsingsweek</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Startdatum</th>
                   <th className="px-3 py-2 font-medium text-muted-foreground">Beschrijving</th>
-                  <th className="px-3 py-2 font-medium text-muted-foreground w-[90px]">Acties</th>
+                  <th className="px-3 py-2 font-medium text-muted-foreground">Acties</th>
                 </tr>
               </thead>
               <tbody>
