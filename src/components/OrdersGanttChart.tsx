@@ -1538,13 +1538,15 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                           <span className="text-xs text-muted-foreground">Project</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-medium text-foreground cursor-grab">
+                      <td className="px-3 py-2 font-medium text-foreground cursor-grab max-w-0">
                         <div className="flex items-center gap-1.5">
                           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
-                          {project.name}
+                          <span className="truncate" title={project.name}>{project.name}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">{project.client || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground max-w-0">
+                        <span className="truncate block" title={project.client || ''}>{project.client || '—'}</span>
+                      </td>
                       <td className="px-3 py-2">
                         {isEditingWeek ? (
                           <div className="flex items-center gap-1">
