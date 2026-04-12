@@ -1157,7 +1157,9 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
             )}
 
             {teams.filter(team => team.id !== 'unnamed' && team.name?.toLowerCase() !== 'unnamed').map((team) => {
-              const teamProjects = projectsByTeam[team.id] || [];
+              const allTeamProjects = projectsByTeam[team.id] || [];
+              // Filter out not-scheduled projects (no valid position) — they go to the table below
+              const teamProjects = allTeamProjects.filter(p => getProjectPosition(p, team.name, team.id) !== null);
               const isCollapsed = collapsedTeams.has(team.id);
 
               return (
