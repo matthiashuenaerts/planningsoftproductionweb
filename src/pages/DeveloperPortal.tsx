@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Building2, Users, Globe, Plus, Trash2, ExternalLink,
   ChevronDown, ChevronRight, LogOut, Shield, Rocket, UserPlus,
-  FileText, LifeBuoy, Activity, Upload, HelpCircle, Megaphone,
+  FileText, LifeBuoy, Activity, Upload, HelpCircle, Megaphone, Search,
 } from "lucide-react";
 import TenantOnboardingWizard from "@/components/developer/TenantOnboardingWizard";
 import DevTenantDetail from "@/components/developer/DevTenantDetail";
@@ -22,6 +22,7 @@ import DevDashboard from "@/components/developer/DevDashboard";
 import DevSupportManagement from "@/components/developer/DevSupportManagement";
 import DevHelpManagement from "@/components/developer/DevHelpManagement";
 import DevGeneralMessages from "@/components/developer/DevGeneralMessages";
+import DevSEOManagement from "@/components/developer/DevSEOManagement";
 
 type TenantRow = {
   id: string;
@@ -131,6 +132,9 @@ const DeveloperPortal: React.FC = () => {
               </TabsTrigger>
               <TabsTrigger value="messages" className="data-[state=active]:bg-white/20 text-white text-xs sm:text-sm px-2.5 sm:px-3">
                 <Megaphone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" /> <span className="whitespace-nowrap">Messages</span>
+              </TabsTrigger>
+              <TabsTrigger value="seo" className="data-[state=active]:bg-white/20 text-white text-xs sm:text-sm px-2.5 sm:px-3">
+                <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" /> <span className="whitespace-nowrap">SEO</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -248,6 +252,9 @@ const DeveloperPortal: React.FC = () => {
           {/* Messages Tab */}
           <TabsContent value="messages">
             <DevGeneralMessages />
+          </TabsContent>
+          <TabsContent value="seo">
+            <DevSEOManagement />
           </TabsContent>
         </Tabs>
       </div>
