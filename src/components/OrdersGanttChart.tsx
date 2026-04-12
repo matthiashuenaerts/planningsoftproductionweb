@@ -1019,6 +1019,33 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
     setEditingDescriptionId(null);
   }, [editingDescriptionValue]);
 
+  const handleSaveWeek = useCallback(async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ installation_week: editingWeekValue || null, updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+      if (error) throw error;
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, installation_week: editingWeekValue || null } : p));
+      toast.success('Plaatsingsweek opgeslagen');
+    } catch (err) {
+      console.error('Error saving installation week:', err);
+      toast.error('Opslaan mislukt');
+    }
+    setEditingWeekId(null);
+  }, [editingWeekValue]);
+
+  // Unique installation weeks for filter dropdown
+  const availableWeeks = useMemo(() => {
+    const weeks = new Set<string>();
+    allUnassignedProjects.forEach(p => {
+      if (p.installation_week && /^\d{6}$/.test(p.installation_week)) {
+        weeks.add(p.installation_week);
+      }
+    });
+    return Array.from(weeks).sort();
+  }, [allUnassignedProjects]);
+
   const formatInstallationWeek = (week: string | null | undefined) => {
     if (!week || !/^\d{6}$/.test(week)) return '—';
     return `Week ${week.substring(4, 6)}, ${week.substring(0, 4)}`;
