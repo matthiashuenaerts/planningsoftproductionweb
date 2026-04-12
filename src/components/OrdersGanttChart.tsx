@@ -91,7 +91,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
   const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
   const [unnamedFilterMode, setUnnamedFilterMode] = useState<'all' | 'week' | 'month' | 'day'>('all');
   const [unnamedFilterDate, setUnnamedFilterDate] = useState(new Date());
+  const [unnamedWeekFilter, setUnnamedWeekFilter] = useState('');
   const [editingDescriptionId, setEditingDescriptionId] = useState<string | null>(null);
+  const [editingWeekId, setEditingWeekId] = useState<string | null>(null);
+  const [editingWeekValue, setEditingWeekValue] = useState('');
   const [editingDescriptionValue, setEditingDescriptionValue] = useState('');
   const [sameClientDialog, setSameClientDialog] = useState<{
     movedProjectName: string;
