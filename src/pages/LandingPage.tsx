@@ -119,7 +119,7 @@ const LandingPage: React.FC = () => {
           </h1>
 
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            The all-in-one production planning platform for furniture manufacturers.
+            AutoMattiOn Compass — the all-in-one production planning platform for furniture manufacturers.
             Manage workstations, orders, logistics, and teams — all from one place.
           </p>
 
@@ -206,7 +206,7 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <img
               src="https://static.wixstatic.com/media/99c033_5bb79e52130d4fa6bbae75d9a22b198d~mv2.png"
-              alt="Logo"
+              alt="AutoMattiOn Compass logo - production planning software"
               className="h-6 w-auto rounded"
             />
             <span className="text-sm text-slate-400">
@@ -220,6 +220,8 @@ const LandingPage: React.FC = () => {
             Developer Access
           </Link>
         </div>
+        {/* SEO: alternate spelling for search engines */}
+        <p className="sr-only">AutoMattiOn Compass, also known as Automation Compass, is a production planning platform at automattion-compass.com</p>
       </footer>
     </div>
   );
