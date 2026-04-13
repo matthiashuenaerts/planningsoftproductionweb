@@ -66,22 +66,28 @@ serve(async (req) => {
     console.log(`Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}`);
 
     if (action === 'authenticate') {
-      console.log('Authenticating with FileMaker API...')
+      const sessionUrl = `${baseUrl}/sessions`;
+      console.log(`Authenticating with FileMaker API at: ${sessionUrl}`);
+      console.log(`Username: ${username}`);
       
-      // Add a 15-second timeout to prevent hanging on unresponsive APIs
+      // Increase timeout to 25 seconds for slow remote servers
       const fetchController = new AbortController();
-      const fetchTimeout = setTimeout(() => fetchController.abort(), 15000);
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 25000);
 
-      const response = await fetch(`${baseUrl}/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${btoa(`${username}:${password}`)}`
-        },
-        signal: fetchController.signal
-      })
+      try {
+        // FileMaker Data API supports both Basic Auth header and JSON body credentials
+        // Try JSON body method first as it's more compatible with some proxy configurations
+        const response = await fetch(sessionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+          },
+          body: JSON.stringify({}),
+          signal: fetchController.signal
+        });
 
-      clearTimeout(fetchTimeout);
+        clearTimeout(fetchTimeout);
 
       const data = await response.json()
       
