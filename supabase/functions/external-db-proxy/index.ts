@@ -89,21 +89,34 @@ serve(async (req) => {
 
         clearTimeout(fetchTimeout);
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        console.error('Authentication failed:', data)
-        return new Response(
-          JSON.stringify({ error: `Authentication failed: ${response.status} ${response.statusText}` }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+        console.log(`Auth response status: ${response.status}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('Authentication failed:', JSON.stringify(data));
+          return new Response(
+            JSON.stringify({ error: `Authentication failed: ${response.status} ${response.statusText}`, details: data }),
+            { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      console.log('Authentication successful')
-      return new Response(
-        JSON.stringify(data),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        console.log('Authentication successful, token received');
+        return new Response(
+          JSON.stringify(data),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (fetchError) {
+        clearTimeout(fetchTimeout);
+        const isAbort = fetchError instanceof DOMException && fetchError.name === 'AbortError';
+        const errMsg = isAbort 
+          ? `Connection timed out after 25s trying to reach ${sessionUrl}. The FileMaker server may have firewall/IP restrictions blocking Supabase servers.`
+          : `Network error connecting to ${sessionUrl}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
+        console.error('Auth fetch error:', errMsg);
+        return new Response(
+          JSON.stringify({ error: errMsg }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     if (action === 'query') {
