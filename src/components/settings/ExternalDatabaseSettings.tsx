@@ -172,12 +172,19 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Username:', config.username);
     
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('external-db-proxy', {
+      // Add a 30-second client-side timeout to prevent infinite spinning
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timed out after 30 seconds. The external API may be unreachable.')), 30000)
+      );
+
+      const invokePromise = supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'authenticate',
           tenant_id: tenant?.id
         }
       });
+
+      const { data, error: invokeError } = await Promise.race([invokePromise, timeoutPromise]);
 
       if (invokeError) {
         console.error('Edge function error:', invokeError);

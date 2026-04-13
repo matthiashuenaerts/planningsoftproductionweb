@@ -64,13 +64,20 @@ serve(async (req) => {
     if (action === 'authenticate') {
       console.log('Authenticating with FileMaker API...')
       
+      // Add a 15-second timeout to prevent hanging on unresponsive APIs
+      const fetchController = new AbortController();
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 15000);
+
       const response = await fetch(`${baseUrl}/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${btoa(`${username}:${password}`)}`
-        }
+        },
+        signal: fetchController.signal
       })
+
+      clearTimeout(fetchTimeout);
 
       const data = await response.json()
       
@@ -92,6 +99,9 @@ serve(async (req) => {
     if (action === 'query') {
       console.log('Querying FileMaker API for order:', orderNumber)
       
+      const queryController = new AbortController();
+      const queryTimeout = setTimeout(() => queryController.abort(), 15000);
+
       const response = await fetch(
         `${baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${encodeURIComponent(String(orderNumber))}`,
         {
@@ -99,9 +109,12 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          signal: queryController.signal
         }
       )
+
+      clearTimeout(queryTimeout);
 
       const data = await response.json()
       
@@ -127,9 +140,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Edge function error:', error)
+    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
     return new Response(
-      JSON.stringify({ error: 'An internal error occurred.' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: isTimeout ? 'Connection timed out. The external API did not respond within 15 seconds.' : 'An internal error occurred.' }),
+      { status: isTimeout ? 504 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
