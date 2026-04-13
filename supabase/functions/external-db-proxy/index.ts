@@ -99,6 +99,9 @@ serve(async (req) => {
     if (action === 'query') {
       console.log('Querying FileMaker API for order:', orderNumber)
       
+      const queryController = new AbortController();
+      const queryTimeout = setTimeout(() => queryController.abort(), 15000);
+
       const response = await fetch(
         `${baseUrl}/layouts/API_order/script/FindOrderNumber?script.param=${encodeURIComponent(String(orderNumber))}`,
         {
@@ -106,7 +109,8 @@ serve(async (req) => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          signal: queryController.signal
         }
       )
 
