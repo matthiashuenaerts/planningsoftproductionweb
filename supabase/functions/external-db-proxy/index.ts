@@ -59,7 +59,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'External API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { base_url: baseUrl, username, password } = configData;
+    // Remove trailing slashes from base URL to prevent double-slash issues
+    const baseUrl = configData.base_url.replace(/\/+$/, '');
+    const { username, password } = configData;
+
+    console.log(`Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}`);
 
     if (action === 'authenticate') {
       console.log('Authenticating with FileMaker API...')
@@ -140,10 +144,22 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Edge function error:', error)
-    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+    const isAbort = error instanceof DOMException && error.name === 'AbortError';
+    const isConnectionError = error instanceof TypeError && (error.message?.includes('tcp connect error') || error.message?.includes('ETIMEDOUT'));
+    
+    let errorMsg = 'An internal error occurred.';
+    let status = 500;
+    
+    if (isAbort || isConnectionError) {
+      errorMsg = 'Connection timed out. The external FileMaker server is not reachable from this server. Please check if the FileMaker server allows external connections or has IP restrictions.';
+      status = 504;
+    } else if (error instanceof Error) {
+      errorMsg = error.message;
+    }
+    
     return new Response(
-      JSON.stringify({ error: isTimeout ? 'Connection timed out. The external API did not respond within 15 seconds.' : 'An internal error occurred.' }),
-      { status: isTimeout ? 504 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: errorMsg }),
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

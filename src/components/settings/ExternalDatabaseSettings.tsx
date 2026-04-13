@@ -188,10 +188,16 @@ const ExternalDatabaseSettings: React.FC = () => {
 
       if (invokeError) {
         console.error('Edge function error:', invokeError);
+        // Try to extract detailed error from response
         throw new Error(invokeError.message || 'Edge function invocation failed');
       }
 
       console.log('Edge function response data:', data);
+
+      // Check if the response contains an error message (non-2xx responses)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
       if (data?.response && data.response.token) {
         setToken(data.response.token);
