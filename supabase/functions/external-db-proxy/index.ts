@@ -59,7 +59,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'External API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { base_url: baseUrl, username, password } = configData;
+    // Remove trailing slashes from base URL to prevent double-slash issues
+    const baseUrl = configData.base_url.replace(/\/+$/, '');
+    const { username, password } = configData;
+
+    console.log(`Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}`);
 
     if (action === 'authenticate') {
       console.log('Authenticating with FileMaker API...')
