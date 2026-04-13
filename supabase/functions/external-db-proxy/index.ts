@@ -114,6 +114,8 @@ serve(async (req) => {
         }
       )
 
+      clearTimeout(queryTimeout);
+
       const data = await response.json()
       
       if (!response.ok) {
@@ -138,9 +140,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Edge function error:', error)
+    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
     return new Response(
-      JSON.stringify({ error: 'An internal error occurred.' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: isTimeout ? 'Connection timed out. The external API did not respond within 15 seconds.' : 'An internal error occurred.' }),
+      { status: isTimeout ? 504 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
