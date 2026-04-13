@@ -64,13 +64,20 @@ serve(async (req) => {
     if (action === 'authenticate') {
       console.log('Authenticating with FileMaker API...')
       
+      // Add a 15-second timeout to prevent hanging on unresponsive APIs
+      const fetchController = new AbortController();
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 15000);
+
       const response = await fetch(`${baseUrl}/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Basic ${btoa(`${username}:${password}`)}`
-        }
+        },
+        signal: fetchController.signal
       })
+
+      clearTimeout(fetchTimeout);
 
       const data = await response.json()
       
