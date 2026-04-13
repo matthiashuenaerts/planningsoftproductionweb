@@ -172,9 +172,9 @@ const ExternalDatabaseSettings: React.FC = () => {
     console.log('Username:', config.username);
     
     try {
-      // Add a 30-second client-side timeout to prevent infinite spinning
+      // Add a 35-second client-side timeout (server has 25s timeout)
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timed out after 30 seconds. The external API may be unreachable.')), 30000)
+        setTimeout(() => reject(new Error('Connection timed out after 35 seconds. The external API may be unreachable from Supabase servers. Check firewall/IP whitelist settings.')), 35000)
       );
 
       const invokePromise = supabase.functions.invoke('external-db-proxy', {

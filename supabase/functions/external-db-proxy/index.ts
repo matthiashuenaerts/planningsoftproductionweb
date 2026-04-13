@@ -66,38 +66,57 @@ serve(async (req) => {
     console.log(`Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}`);
 
     if (action === 'authenticate') {
-      console.log('Authenticating with FileMaker API...')
+      const sessionUrl = `${baseUrl}/sessions`;
+      console.log(`Authenticating with FileMaker API at: ${sessionUrl}`);
+      console.log(`Username: ${username}`);
       
-      // Add a 15-second timeout to prevent hanging on unresponsive APIs
+      // Increase timeout to 25 seconds for slow remote servers
       const fetchController = new AbortController();
-      const fetchTimeout = setTimeout(() => fetchController.abort(), 15000);
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 25000);
 
-      const response = await fetch(`${baseUrl}/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${btoa(`${username}:${password}`)}`
-        },
-        signal: fetchController.signal
-      })
+      try {
+        // FileMaker Data API supports both Basic Auth header and JSON body credentials
+        // Try JSON body method first as it's more compatible with some proxy configurations
+        const response = await fetch(sessionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+          },
+          body: JSON.stringify({}),
+          signal: fetchController.signal
+        });
 
-      clearTimeout(fetchTimeout);
+        clearTimeout(fetchTimeout);
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        console.error('Authentication failed:', data)
+        console.log(`Auth response status: ${response.status}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('Authentication failed:', JSON.stringify(data));
+          return new Response(
+            JSON.stringify({ error: `Authentication failed: ${response.status} ${response.statusText}`, details: data }),
+            { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log('Authentication successful, token received');
         return new Response(
-          JSON.stringify({ error: `Authentication failed: ${response.status} ${response.statusText}` }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+          JSON.stringify(data),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (fetchError) {
+        clearTimeout(fetchTimeout);
+        const isAbort = fetchError instanceof DOMException && fetchError.name === 'AbortError';
+        const errMsg = isAbort 
+          ? `Connection timed out after 25s trying to reach ${sessionUrl}. The FileMaker server may have firewall/IP restrictions blocking Supabase servers.`
+          : `Network error connecting to ${sessionUrl}: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
+        console.error('Auth fetch error:', errMsg);
+        return new Response(
+          JSON.stringify({ error: errMsg }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-
-      console.log('Authentication successful')
-      return new Response(
-        JSON.stringify(data),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
     if (action === 'query') {
