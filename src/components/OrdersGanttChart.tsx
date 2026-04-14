@@ -1512,8 +1512,10 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                   const isEditing = editingDescriptionId === project.id;
                   const isEditingWeek = editingWeekId === project.id;
                   const isServiceTicket = project.project_team_assignments?.some(a => (a as any).is_service_ticket === true);
+                  const serviceAssignment = project.project_team_assignments?.find(a => (a as any).is_service_ticket === true);
 
                   return (
+                    <React.Fragment key={project.id}>
                     <tr
                       key={project.id}
                       className={cn(
