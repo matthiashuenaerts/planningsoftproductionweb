@@ -79,6 +79,60 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
   return matchedTeam ? matchedTeam.name : 'unnamed';
 };
 
+// Sub-component to show service ticket items for an assignment
+const ServiceTicketDetailsRow: React.FC<{ assignmentId: string }> = ({ assignmentId }) => {
+  const [items, setItems] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      const { data } = await supabase
+        .from('service_ticket_items')
+        .select('id, item_type, title, description, status, order_article_code, order_supplier, order_quantity')
+        .eq('assignment_id', assignmentId);
+      setItems(data || []);
+      setLoaded(true);
+    };
+    fetchItems();
+  }, [assignmentId]);
+
+  if (!loaded || items.length === 0) return null;
+
+  const typeLabel = (t: string) => {
+    switch (t) {
+      case 'todo': return 'To-do';
+      case 'order_request': return 'Bestelling';
+      case 'production_task': return 'Productie';
+      case 'office_task': return 'Kantoor';
+      default: return t;
+    }
+  };
+
+  return (
+    <tr className="bg-destructive/5 border-l-[3px] border-l-destructive">
+      <td colSpan={7} className="px-3 py-2">
+        <div className="flex flex-wrap gap-2">
+          {items.map(item => (
+            <div key={item.id} className="inline-flex items-center gap-1.5 text-xs bg-background border rounded px-2 py-1">
+              <span className="font-medium text-muted-foreground">{typeLabel(item.item_type)}:</span>
+              <span className="text-foreground">{item.title || item.description || '—'}</span>
+              {item.item_type === 'order_request' && item.order_article_code && (
+                <span className="text-muted-foreground">({item.order_article_code} ×{item.order_quantity || 1})</span>
+              )}
+              <span className={cn(
+                "px-1 py-0.5 rounded text-[10px]",
+                item.status === 'done' ? 'bg-green-100 text-green-800' :
+                item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                'bg-muted text-muted-foreground'
+              )}>{item.status}</span>
+            </div>
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
+};
+
 const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React.ReactNode => {
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
