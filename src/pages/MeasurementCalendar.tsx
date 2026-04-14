@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { nl, fr, enUS } from 'date-fns/locale';
 import Navbar from '@/components/Navbar';
@@ -13,13 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Ruler, Plus, Edit3, CalendarCheck, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useDrawerLayout } from '@/hooks/useDrawerLayout';
 import { useToast } from '@/hooks/use-toast';
 import { measurementService } from '@/services/measurementService';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 interface MeasurementEntry {
   id: string;
@@ -30,39 +31,72 @@ interface MeasurementEntry {
   notes: string | null;
   customer_email: string | null;
   project_name?: string;
-  project_number?: string;
+  project_link_id?: string | null;
   measurer_name?: string;
 }
 
-// Sub-component: list of projects without a measurement assigned
+interface ProjectOption {
+  id: string;
+  name: string;
+  project_link_id: string | null;
+  client?: string | null;
+  installation_date?: string | null;
+  installation_status?: string | null;
+}
+
+const getProjectDisplayLabel = ({
+  name,
+  project_name,
+  project_link_id,
+  project_id,
+}: {
+  name?: string | null;
+  project_name?: string | null;
+  project_link_id?: string | null;
+  project_id?: string;
+}) => {
+  const resolvedName = name ?? project_name ?? project_id ?? 'Unknown project';
+  return project_link_id ? `${project_link_id} - ${resolvedName}` : resolvedName;
+};
+
 const UnassignedProjectsList: React.FC<{
   tenant: any;
   t: (key: string) => string;
   navigate: any;
   createLocalizedPath: (p: string) => string;
   measurements: MeasurementEntry[];
-  openAddDialog: (date?: Date) => void;
+  openAddDialog: (date?: Date, projectId?: string) => void;
 }> = ({ tenant, t, navigate, createLocalizedPath, measurements, openAddDialog }) => {
+  const measurementProjectIdsKey = useMemo(
+    () => [...new Set(measurements.map((measurement) => measurement.project_id).filter(Boolean))].sort().join('|'),
+    [measurements]
+  );
+
   const { data: unassignedProjects = [], isLoading } = useQuery({
-    queryKey: ['unassigned-measurement-projects', tenant?.id, measurements.length],
+    queryKey: ['unassigned-measurement-projects', tenant?.id, measurementProjectIdsKey],
     queryFn: async () => {
       if (!tenant?.id) return [];
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('projects')
-        .select('id, name, project_number, client, installation_date, installation_status')
-        .eq('tenant_id', tenant.id)
+        .select('id, name, project_link_id, client, installation_date, installation_status')
         .order('name');
+      query = applyTenantFilter(query, tenant?.id);
+
+      const { data, error } = await query;
       if (error) throw error;
-      const projectsWithMeasurement = new Set(measurements.map(m => m.project_id));
-      return ((data ?? []) as any[]).filter(p =>
-        p.installation_status !== 'completed' && !projectsWithMeasurement.has(p.id)
+
+      const projectsWithMeasurement = new Set(measurements.map((measurement) => measurement.project_id));
+
+      return ((data ?? []) as ProjectOption[]).filter(
+        (project) => project.installation_status !== 'completed' && !projectsWithMeasurement.has(project.id)
       );
     },
     enabled: !!tenant?.id,
   });
 
   return (
-    <Card className="w-80 flex-shrink-0 self-start sticky top-0">
+    <Card className="w-full xl:w-80 xl:flex-shrink-0 self-start xl:sticky xl:top-0">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold">
           {t('mc_unassigned_projects') || 'Zonder opmeting'} ({unassignedProjects.length})
@@ -72,24 +106,33 @@ const UnassignedProjectsList: React.FC<{
         {isLoading ? (
           <div className="p-4 text-sm text-muted-foreground">{t('loading') || 'Laden...'}</div>
         ) : unassignedProjects.length === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground">{t('mc_all_projects_assigned') || 'Alle projecten hebben een opmeting'}</div>
+          <div className="p-4 text-sm text-muted-foreground">
+            {t('mc_all_projects_assigned') || 'Alle projecten hebben een opmeting'}
+          </div>
         ) : (
           <div className="max-h-[calc(100vh-280px)] overflow-y-auto divide-y">
-            {unassignedProjects.map((p: any) => (
-              <div key={p.id} className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2">
+            {unassignedProjects.map((project) => (
+              <div
+                key={project.id}
+                className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
+              >
                 <button
-                  onClick={() => navigate(createLocalizedPath(`/projects/${p.id}`))}
+                  onClick={() => navigate(createLocalizedPath(`/projects/${project.id}`))}
                   className="text-left min-w-0 flex-1"
                 >
                   <div className="text-xs font-medium text-foreground truncate">
-                    {p.project_number ? `${p.project_number} - ` : ''}{p.name}
+                    {getProjectDisplayLabel({
+                      name: project.name,
+                      project_link_id: project.project_link_id,
+                      project_id: project.id,
+                    })}
                   </div>
-                  {p.client && (
-                    <div className="text-[10px] text-muted-foreground truncate">{p.client}</div>
+                  {project.client && (
+                    <div className="text-[10px] text-muted-foreground truncate">{project.client}</div>
                   )}
                 </button>
                 <button
-                  onClick={() => openAddDialog()}
+                  onClick={() => openAddDialog(undefined, project.id)}
                   className="shrink-0 h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
                   title={t('mc_add_measurement') || 'Opmeting toevoegen'}
                 >
@@ -126,46 +169,66 @@ const MeasurementCalendar = () => {
 
   const dateLocale = lang === 'nl' ? nl : lang === 'fr' ? fr : enUS;
 
+  const refreshMeasurementQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] }),
+      queryClient.invalidateQueries({ queryKey: ['unassigned-measurement-projects'] }),
+    ]);
+  };
+
   const { data: measurements = [], isLoading } = useQuery({
     queryKey: ['measurement-calendar', tenant?.id],
     queryFn: async () => {
       if (!tenant?.id) return [];
-      const { data, error } = await supabase
+
+      let measurementsQuery = supabase
         .from('project_measurements' as any)
         .select('*')
-        .eq('tenant_id', tenant.id)
-        .not('measurement_date', 'is', null);
+        .not('measurement_date', 'is', null)
+        .order('measurement_date', { ascending: true });
+      measurementsQuery = applyTenantFilter(measurementsQuery, tenant?.id);
+
+      const { data, error } = await measurementsQuery;
       if (error) throw error;
 
-      const entries = (data ?? []) as unknown as MeasurementEntry[];
+      const entries = ((data ?? []) as unknown as MeasurementEntry[]).map((entry) => ({ ...entry }));
+      const projectIds = [...new Set(entries.map((entry) => entry.project_id).filter(Boolean))];
 
-      // Fetch project names from the projects table
-      const projectIds = [...new Set(entries.map(e => e.project_id))];
       if (projectIds.length > 0) {
-        const { data: projects } = await supabase
+        let projectsQuery = supabase
           .from('projects')
-          .select('id, name, project_number')
+          .select('id, name, project_link_id')
           .in('id', projectIds);
-        const projectMap = new Map((projects ?? []).map((p: any) => [p.id, p]));
-        entries.forEach(e => {
-          const proj = projectMap.get(e.project_id);
-          if (proj) {
-            e.project_name = proj.name;
-            e.project_number = proj.project_number;
-          }
+        projectsQuery = applyTenantFilter(projectsQuery, tenant?.id);
+
+        const { data: projectsData, error: projectsError } = await projectsQuery;
+        if (projectsError) throw projectsError;
+
+        const projectMap = new Map((projectsData ?? []).map((project: any) => [project.id, project]));
+
+        entries.forEach((entry) => {
+          const project = projectMap.get(entry.project_id);
+          entry.project_name = project?.name || entry.project_id;
+          entry.project_link_id = project?.project_link_id ?? null;
         });
       }
 
-      // Fetch measurer names
-      const measurerIds = [...new Set(entries.filter(e => e.measurer_id).map(e => e.measurer_id!))];
+      const measurerIds = [...new Set(entries.filter((entry) => entry.measurer_id).map((entry) => entry.measurer_id!))];
       if (measurerIds.length > 0) {
-        const { data: employees } = await supabase
+        let employeesQuery = supabase
           .from('employees')
           .select('id, name')
           .in('id', measurerIds);
-        const empMap = new Map((employees ?? []).map((e: any) => [e.id, e.name]));
-        entries.forEach(e => {
-          if (e.measurer_id) e.measurer_name = empMap.get(e.measurer_id);
+        employeesQuery = applyTenantFilter(employeesQuery, tenant?.id);
+
+        const { data: employees, error: employeesError } = await employeesQuery;
+        if (employeesError) throw employeesError;
+
+        const employeeMap = new Map((employees ?? []).map((employee: any) => [employee.id, employee.name]));
+        entries.forEach((entry) => {
+          if (entry.measurer_id) {
+            entry.measurer_name = employeeMap.get(entry.measurer_id);
+          }
         });
       }
 
@@ -174,31 +237,39 @@ const MeasurementCalendar = () => {
     enabled: !!tenant?.id,
   });
 
-  // Projects list for the "add" dialog
   const { data: projects = [] } = useQuery({
     queryKey: ['projects-for-measurement', tenant?.id],
     queryFn: async () => {
       if (!tenant?.id) return [];
-      const { data } = await supabase
+
+      let query = supabase
         .from('projects')
-        .select('id, name, project_number')
-        .eq('tenant_id', tenant.id)
+        .select('id, name, project_link_id')
         .order('name');
-      return (data ?? []) as unknown as { id: string; name: string; project_number: string | null }[];
+      query = applyTenantFilter(query, tenant?.id);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return (data ?? []) as ProjectOption[];
     },
     enabled: !!tenant?.id && (addDialogOpen || editDialogOpen),
   });
 
-  // Employees who can measure
   const { data: measurers = [] } = useQuery({
     queryKey: ['measurers', tenant?.id],
     queryFn: async () => {
       if (!tenant?.id) return [];
-      const { data } = await supabase
+
+      let query = supabase
         .from('employees')
-        .select('id, name, role')
-        .eq('tenant_id', tenant.id);
-      return ((data ?? []) as any[]).filter(e => ['admin', 'manager', 'measurer'].includes(e.role));
+        .select('id, name, role');
+      query = applyTenantFilter(query, tenant?.id);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return ((data ?? []) as any[]).filter((employee) => ['admin', 'manager', 'measurer'].includes(employee.role));
     },
     enabled: !!tenant?.id && (addDialogOpen || editDialogOpen),
   });
@@ -210,27 +281,33 @@ const MeasurementCalendar = () => {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const getMeasurementsForDay = (day: Date) =>
-    measurements.filter(m => m.measurement_date && isSameDay(new Date(m.measurement_date), day));
+    measurements.filter((measurement) => measurement.measurement_date && isSameDay(new Date(measurement.measurement_date), day));
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'provisional': return 'bg-amber-100 text-amber-800 border-amber-300 border-dashed';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-muted text-muted-foreground';
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'provisional':
+        return 'bg-amber-100 text-amber-800 border-amber-300 border-dashed';
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
 
-  const localizedWeekDays = lang === 'nl'
-    ? ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
-    : lang === 'fr'
-    ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const localizedWeekDays =
+    lang === 'nl'
+      ? ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+      : lang === 'fr'
+        ? ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  const openAddDialog = (date?: Date) => {
+  const openAddDialog = (date?: Date, projectId?: string) => {
     setSelectedDate(date ? format(date, 'yyyy-MM-dd') : '');
-    setNewProjectId('');
+    setNewProjectId(projectId ?? '');
     setNewMeasurerId('');
     setNewStatus('scheduled');
     setNewNotes('');
@@ -238,48 +315,54 @@ const MeasurementCalendar = () => {
     setAddDialogOpen(true);
   };
 
-  const openEditDialog = (m: MeasurementEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingMeasurement(m);
-    setNewProjectId(m.project_id);
-    setSelectedDate(m.measurement_date || '');
-    setNewMeasurerId(m.measurer_id || '');
-    setNewStatus(m.status);
-    setNewNotes(m.notes || '');
-    setNewCustomerEmail(m.customer_email || '');
+  const openEditDialog = (measurement: MeasurementEntry, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setEditingMeasurement(measurement);
+    setNewProjectId(measurement.project_id);
+    setSelectedDate(measurement.measurement_date || '');
+    setNewMeasurerId(measurement.measurer_id || '');
+    setNewStatus(measurement.status);
+    setNewNotes(measurement.notes || '');
+    setNewCustomerEmail(measurement.customer_email || '');
     setEditDialogOpen(true);
   };
 
-  const handleScheduleDefinitive = async (m: MeasurementEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleScheduleDefinitive = async (measurement: MeasurementEntry, event: React.MouseEvent) => {
+    event.stopPropagation();
     try {
-      await measurementService.update(m.id, { status: 'scheduled' });
-      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      await measurementService.update(measurement.id, { status: 'scheduled' });
+      await refreshMeasurementQueries();
       toast({ title: t('mc_scheduled_definitively') || 'Definitief ingepland' });
     } catch (err: any) {
       toast({ title: t('error') || 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
-  const handleSendOutlookMail = (m: MeasurementEntry, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const projectName = m.project_name || m.project_id;
-    const dateStr = m.measurement_date ? format(new Date(m.measurement_date), 'dd/MM/yyyy') : '';
-    const measurerName = m.measurer_name || '';
-    
+  const handleSendOutlookMail = (measurement: MeasurementEntry, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const projectName = getProjectDisplayLabel({
+      project_name: measurement.project_name,
+      project_link_id: measurement.project_link_id,
+      project_id: measurement.project_id,
+    });
+    const dateStr = measurement.measurement_date ? format(new Date(measurement.measurement_date), 'dd/MM/yyyy') : '';
+    const measurerName = measurement.measurer_name || '';
+
     const subject = encodeURIComponent(
-      lang === 'nl' ? `Opmeting ${projectName} - ${dateStr}` :
-      lang === 'fr' ? `Mesurage ${projectName} - ${dateStr}` :
-      `Measurement ${projectName} - ${dateStr}`
+      lang === 'nl'
+        ? `Opmeting ${projectName} - ${dateStr}`
+        : lang === 'fr'
+          ? `Mesurage ${projectName} - ${dateStr}`
+          : `Measurement ${projectName} - ${dateStr}`
     );
     const body = encodeURIComponent(
       lang === 'nl'
         ? `Beste klant,\n\nHierbij bevestigen wij de opmeting voor project "${projectName}" op ${dateStr}.\n${measurerName ? `Opmeter: ${measurerName}\n` : ''}\nMet vriendelijke groeten`
         : lang === 'fr'
-        ? `Cher client,\n\nNous confirmons le mesurage pour le projet "${projectName}" le ${dateStr}.\n${measurerName ? `Mesureur: ${measurerName}\n` : ''}\nCordialement`
-        : `Dear customer,\n\nWe confirm the measurement for project "${projectName}" on ${dateStr}.\n${measurerName ? `Measurer: ${measurerName}\n` : ''}\nBest regards`
+          ? `Cher client,\n\nNous confirmons le mesurage pour le projet "${projectName}" le ${dateStr}.\n${measurerName ? `Mesureur: ${measurerName}\n` : ''}\nCordialement`
+          : `Dear customer,\n\nWe confirm the measurement for project "${projectName}" on ${dateStr}.\n${measurerName ? `Measurer: ${measurerName}\n` : ''}\nBest regards`
     );
-    const email = m.customer_email || '';
+    const email = measurement.customer_email || '';
     window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank');
   };
 
@@ -296,7 +379,7 @@ const MeasurementCalendar = () => {
         customer_email: newCustomerEmail || null,
         tenant_id: tenant.id,
       });
-      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      await refreshMeasurementQueries();
       setAddDialogOpen(false);
       toast({ title: t('mc_measurement_added') || 'Opmeting toegevoegd' });
     } catch (err: any) {
@@ -318,7 +401,7 @@ const MeasurementCalendar = () => {
         notes: newNotes || null,
         customer_email: newCustomerEmail || null,
       });
-      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      await refreshMeasurementQueries();
       setEditDialogOpen(false);
       setEditingMeasurement(null);
       toast({ title: t('mc_measurement_updated') || 'Opmeting bijgewerkt' });
@@ -333,7 +416,7 @@ const MeasurementCalendar = () => {
     if (!editingMeasurement) return;
     try {
       await measurementService.delete(editingMeasurement.id);
-      queryClient.invalidateQueries({ queryKey: ['measurement-calendar'] });
+      await refreshMeasurementQueries();
       setEditDialogOpen(false);
       setEditingMeasurement(null);
       toast({ title: t('mc_measurement_deleted') || 'Opmeting verwijderd' });
@@ -342,7 +425,15 @@ const MeasurementCalendar = () => {
     }
   };
 
-  const MeasurementForm = ({ onSubmit, submitLabel, showDelete }: { onSubmit: () => void; submitLabel: string; showDelete?: boolean }) => (
+  const MeasurementForm = ({
+    onSubmit,
+    submitLabel,
+    showDelete,
+  }: {
+    onSubmit: () => void;
+    submitLabel: string;
+    showDelete?: boolean;
+  }) => (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>{t('project') || 'Project'}</Label>
@@ -351,9 +442,13 @@ const MeasurementCalendar = () => {
             <SelectValue placeholder={t('mc_select_project') || 'Selecteer project'} />
           </SelectTrigger>
           <SelectContent>
-            {projects.map(p => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.project_number ? `${p.project_number} - ` : ''}{p.name}
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {getProjectDisplayLabel({
+                  name: project.name,
+                  project_link_id: project.project_link_id,
+                  project_id: project.id,
+                })}
               </SelectItem>
             ))}
           </SelectContent>
@@ -362,11 +457,7 @@ const MeasurementCalendar = () => {
 
       <div className="space-y-2">
         <Label>{t('mc_measurement_date') || 'Datum'}</Label>
-        <Input
-          type="date"
-          value={selectedDate}
-          onChange={e => setSelectedDate(e.target.value)}
-        />
+        <Input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
       </div>
 
       <div className="space-y-2">
@@ -376,8 +467,10 @@ const MeasurementCalendar = () => {
             <SelectValue placeholder={t('mc_select_measurer') || 'Selecteer opmeter'} />
           </SelectTrigger>
           <SelectContent>
-            {measurers.map((e: any) => (
-              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+            {measurers.map((employee: any) => (
+              <SelectItem key={employee.id} value={employee.id}>
+                {employee.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -388,7 +481,7 @@ const MeasurementCalendar = () => {
         <Input
           type="email"
           value={newCustomerEmail}
-          onChange={e => setNewCustomerEmail(e.target.value)}
+          onChange={(event) => setNewCustomerEmail(event.target.value)}
           placeholder={t('mc_customer_email_placeholder') || 'klant@voorbeeld.be'}
         />
       </div>
@@ -412,7 +505,7 @@ const MeasurementCalendar = () => {
         <Label>{t('notes') || 'Notities'}</Label>
         <Textarea
           value={newNotes}
-          onChange={e => setNewNotes(e.target.value)}
+          onChange={(event) => setNewNotes(event.target.value)}
           placeholder={t('mc_notes_placeholder') || 'Optionele notities...'}
           rows={3}
         />
@@ -441,7 +534,6 @@ const MeasurementCalendar = () => {
       {drawerLayout && <Navbar />}
       <div className={`w-full ${!drawerLayout ? 'ml-64 p-6' : 'px-3 pt-16 pb-4'}`}>
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className={`font-bold tracking-tight ${isMobile ? 'text-xl' : 'text-3xl'}`}>
@@ -457,7 +549,6 @@ const MeasurementCalendar = () => {
             </Button>
           </div>
 
-          {/* Legend */}
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
@@ -477,9 +568,7 @@ const MeasurementCalendar = () => {
             </div>
           </div>
 
-          {/* Main layout: calendar + unassigned list */}
-          <div className="flex gap-4">
-            {/* Calendar */}
+          <div className="flex flex-col xl:flex-row gap-4">
             <div className="flex-1 min-w-0">
               <Card>
                 <CardHeader className="pb-2">
@@ -497,18 +586,18 @@ const MeasurementCalendar = () => {
                 </CardHeader>
                 <CardContent>
                   {isLoading ? (
-                    <div className="flex items-center justify-center py-20 text-muted-foreground">{t('loading') || 'Laden...'}</div>
+                    <div className="flex items-center justify-center py-20 text-muted-foreground">
+                      {t('loading') || 'Laden...'}
+                    </div>
                   ) : (
                     <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                      {/* Week day headers */}
-                      {localizedWeekDays.map(day => (
+                      {localizedWeekDays.map((day) => (
                         <div key={day} className="bg-muted px-2 py-2 text-center text-xs font-medium text-muted-foreground">
                           {day}
                         </div>
                       ))}
 
-                      {/* Calendar cells */}
-                      {calendarDays.map(day => {
+                      {calendarDays.map((day) => {
                         const dayMeasurements = getMeasurementsForDay(day);
                         const isCurrentDay = isSameDay(day, new Date());
                         const isCurrentMonth = isSameMonth(day, currentMonth);
@@ -517,16 +606,13 @@ const MeasurementCalendar = () => {
                           <div
                             key={day.toISOString()}
                             className={cn(
-                              "bg-background min-h-[100px] p-1.5 transition-colors group relative",
-                              !isCurrentMonth && "opacity-40",
-                              isCurrentDay && "ring-2 ring-primary ring-inset"
+                              'bg-background min-h-[100px] p-1.5 transition-colors group relative',
+                              !isCurrentMonth && 'opacity-40',
+                              isCurrentDay && 'ring-2 ring-primary ring-inset'
                             )}
                           >
                             <div className="flex items-center justify-between">
-                              <span className={cn(
-                                "text-xs font-medium",
-                                isCurrentDay && "text-primary font-bold"
-                              )}>
+                              <span className={cn('text-xs font-medium', isCurrentDay && 'text-primary font-bold')}>
                                 {format(day, 'd')}
                               </span>
                               {isCurrentMonth && (
@@ -540,41 +626,44 @@ const MeasurementCalendar = () => {
                               )}
                             </div>
                             <div className="mt-1 space-y-0.5">
-                              {dayMeasurements.map(m => (
+                              {dayMeasurements.map((measurement) => (
                                 <div
-                                  key={m.id}
+                                  key={measurement.id}
                                   className={cn(
-                                    "w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item",
-                                    statusColor(m.status)
+                                    'w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item',
+                                    statusColor(measurement.status)
                                   )}
                                 >
                                   <button
-                                    onClick={() => navigate(createLocalizedPath(`/projects/${m.project_id}`))}
+                                    onClick={() => navigate(createLocalizedPath(`/projects/${measurement.project_id}`))}
                                     className="w-full text-left"
-                                    title={`${m.project_name || m.project_id} — ${m.measurer_name || ''}`}
+                                    title={`${measurement.project_name || measurement.project_id} — ${measurement.measurer_name || ''}`}
                                   >
                                     <div className="flex items-center gap-1">
                                       <Ruler className="h-2.5 w-2.5 shrink-0" />
                                       <span className="truncate font-medium">
-                                        {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
+                                        {getProjectDisplayLabel({
+                                          project_name: measurement.project_name,
+                                          project_link_id: measurement.project_link_id,
+                                          project_id: measurement.project_id,
+                                        })}
                                       </span>
                                     </div>
-                                    {m.measurer_name && (
-                                      <div className="truncate text-[9px] opacity-75 mt-0.5">{m.measurer_name}</div>
+                                    {measurement.measurer_name && (
+                                      <div className="truncate text-[9px] opacity-75 mt-0.5">{measurement.measurer_name}</div>
                                     )}
                                   </button>
-                                  {/* Action buttons for provisional/all entries */}
                                   <div className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 flex gap-0.5 bg-background/80 rounded p-0.5">
                                     <button
-                                      onClick={(e) => openEditDialog(m, e)}
+                                      onClick={(event) => openEditDialog(measurement, event)}
                                       className="p-0.5 hover:bg-muted rounded"
                                       title={t('mc_edit') || 'Bewerken'}
                                     >
                                       <Edit3 className="h-2.5 w-2.5" />
                                     </button>
-                                    {m.status === 'provisional' && (
+                                    {measurement.status === 'provisional' && (
                                       <button
-                                        onClick={(e) => handleScheduleDefinitive(m, e)}
+                                        onClick={(event) => handleScheduleDefinitive(measurement, event)}
                                         className="p-0.5 hover:bg-muted rounded text-blue-600"
                                         title={t('mc_schedule_definitively') || 'Definitief inplannen'}
                                       >
@@ -582,7 +671,7 @@ const MeasurementCalendar = () => {
                                       </button>
                                     )}
                                     <button
-                                      onClick={(e) => handleSendOutlookMail(m, e)}
+                                      onClick={(event) => handleSendOutlookMail(measurement, event)}
                                       className="p-0.5 hover:bg-muted rounded text-primary"
                                       title={t('mc_send_mail') || 'Mail versturen via Outlook'}
                                     >
@@ -601,13 +690,18 @@ const MeasurementCalendar = () => {
               </Card>
             </div>
 
-            {/* Unassigned projects list (right side) */}
-            <UnassignedProjectsList tenant={tenant} t={t} navigate={navigate} createLocalizedPath={createLocalizedPath} measurements={measurements} openAddDialog={openAddDialog} />
+            <UnassignedProjectsList
+              tenant={tenant}
+              t={t}
+              navigate={navigate}
+              createLocalizedPath={createLocalizedPath}
+              measurements={measurements}
+              openAddDialog={openAddDialog}
+            />
           </div>
         </div>
       </div>
 
-      {/* Add Measurement Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -617,7 +711,6 @@ const MeasurementCalendar = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Measurement Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
