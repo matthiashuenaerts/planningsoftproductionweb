@@ -34,6 +34,76 @@ interface MeasurementEntry {
   measurer_name?: string;
 }
 
+// Sub-component: list of projects without a measurement assigned
+const UnassignedProjectsList: React.FC<{
+  tenant: any;
+  t: (key: string) => string;
+  navigate: any;
+  createLocalizedPath: (p: string) => string;
+  measurements: MeasurementEntry[];
+  openAddDialog: (date?: Date) => void;
+}> = ({ tenant, t, navigate, createLocalizedPath, measurements, openAddDialog }) => {
+  const { data: unassignedProjects = [], isLoading } = useQuery({
+    queryKey: ['unassigned-measurement-projects', tenant?.id, measurements.length],
+    queryFn: async () => {
+      if (!tenant?.id) return [];
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, project_number, client, installation_date, installation_status')
+        .eq('tenant_id', tenant.id)
+        .order('name');
+      if (error) throw error;
+      const projectsWithMeasurement = new Set(measurements.map(m => m.project_id));
+      return ((data ?? []) as any[]).filter(p =>
+        p.installation_status !== 'completed' && !projectsWithMeasurement.has(p.id)
+      );
+    },
+    enabled: !!tenant?.id,
+  });
+
+  return (
+    <Card className="w-80 flex-shrink-0 self-start sticky top-0">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold">
+          {t('mc_unassigned_projects') || 'Zonder opmeting'} ({unassignedProjects.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-4 text-sm text-muted-foreground">{t('loading') || 'Laden...'}</div>
+        ) : unassignedProjects.length === 0 ? (
+          <div className="p-4 text-sm text-muted-foreground">{t('mc_all_projects_assigned') || 'Alle projecten hebben een opmeting'}</div>
+        ) : (
+          <div className="max-h-[calc(100vh-280px)] overflow-y-auto divide-y">
+            {unassignedProjects.map((p: any) => (
+              <div key={p.id} className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2">
+                <button
+                  onClick={() => navigate(createLocalizedPath(`/projects/${p.id}`))}
+                  className="text-left min-w-0 flex-1"
+                >
+                  <div className="text-xs font-medium text-foreground truncate">
+                    {p.project_number ? `${p.project_number} - ` : ''}{p.name}
+                  </div>
+                  {p.client && (
+                    <div className="text-[10px] text-muted-foreground truncate">{p.client}</div>
+                  )}
+                </button>
+                <button
+                  onClick={() => openAddDialog()}
+                  className="shrink-0 h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                  title={t('mc_add_measurement') || 'Opmeting toevoegen'}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const MeasurementCalendar = () => {
   const { t, lang, createLocalizedPath } = useLanguage();
   const { tenant } = useTenant();
