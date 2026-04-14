@@ -34,6 +34,76 @@ interface MeasurementEntry {
   measurer_name?: string;
 }
 
+// Sub-component: list of projects without a measurement assigned
+const UnassignedProjectsList: React.FC<{
+  tenant: any;
+  t: (key: string) => string;
+  navigate: any;
+  createLocalizedPath: (p: string) => string;
+  measurements: MeasurementEntry[];
+  openAddDialog: (date?: Date) => void;
+}> = ({ tenant, t, navigate, createLocalizedPath, measurements, openAddDialog }) => {
+  const { data: unassignedProjects = [], isLoading } = useQuery({
+    queryKey: ['unassigned-measurement-projects', tenant?.id, measurements.length],
+    queryFn: async () => {
+      if (!tenant?.id) return [];
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, project_number, client, installation_date, installation_status')
+        .eq('tenant_id', tenant.id)
+        .order('name');
+      if (error) throw error;
+      const projectsWithMeasurement = new Set(measurements.map(m => m.project_id));
+      return ((data ?? []) as any[]).filter(p =>
+        p.installation_status !== 'completed' && !projectsWithMeasurement.has(p.id)
+      );
+    },
+    enabled: !!tenant?.id,
+  });
+
+  return (
+    <Card className="w-80 flex-shrink-0 self-start sticky top-0">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold">
+          {t('mc_unassigned_projects') || 'Zonder opmeting'} ({unassignedProjects.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-4 text-sm text-muted-foreground">{t('loading') || 'Laden...'}</div>
+        ) : unassignedProjects.length === 0 ? (
+          <div className="p-4 text-sm text-muted-foreground">{t('mc_all_projects_assigned') || 'Alle projecten hebben een opmeting'}</div>
+        ) : (
+          <div className="max-h-[calc(100vh-280px)] overflow-y-auto divide-y">
+            {unassignedProjects.map((p: any) => (
+              <div key={p.id} className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2">
+                <button
+                  onClick={() => navigate(createLocalizedPath(`/projects/${p.id}`))}
+                  className="text-left min-w-0 flex-1"
+                >
+                  <div className="text-xs font-medium text-foreground truncate">
+                    {p.project_number ? `${p.project_number} - ` : ''}{p.name}
+                  </div>
+                  {p.client && (
+                    <div className="text-[10px] text-muted-foreground truncate">{p.client}</div>
+                  )}
+                </button>
+                <button
+                  onClick={() => openAddDialog()}
+                  className="shrink-0 h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                  title={t('mc_add_measurement') || 'Opmeting toevoegen'}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const MeasurementCalendar = () => {
   const { t, lang, createLocalizedPath } = useLanguage();
   const { tenant } = useTenant();
@@ -407,125 +477,133 @@ const MeasurementCalendar = () => {
             </div>
           </div>
 
-          {/* Month navigation */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <CardTitle className="text-lg capitalize">
-                  {format(currentMonth, 'MMMM yyyy', { locale: dateLocale })}
-                </CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-20 text-muted-foreground">{t('loading') || 'Laden...'}</div>
-              ) : (
-                <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                  {/* Week day headers */}
-                  {localizedWeekDays.map(day => (
-                    <div key={day} className="bg-muted px-2 py-2 text-center text-xs font-medium text-muted-foreground">
-                      {day}
-                    </div>
-                  ))}
-
-                  {/* Calendar cells */}
-                  {calendarDays.map(day => {
-                    const dayMeasurements = getMeasurementsForDay(day);
-                    const isCurrentDay = isSameDay(day, new Date());
-                    const isCurrentMonth = isSameMonth(day, currentMonth);
-
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        className={cn(
-                          "bg-background min-h-[100px] p-1.5 transition-colors group relative",
-                          !isCurrentMonth && "opacity-40",
-                          isCurrentDay && "ring-2 ring-primary ring-inset"
-                        )}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-xs font-medium",
-                            isCurrentDay && "text-primary font-bold"
-                          )}>
-                            {format(day, 'd')}
-                          </span>
-                          {isCurrentMonth && (
-                            <button
-                              onClick={() => openAddDialog(day)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                              title={t('mc_add_measurement') || 'Opmeting toevoegen'}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          )}
+          {/* Main layout: calendar + unassigned list */}
+          <div className="flex gap-4">
+            {/* Calendar */}
+            <div className="flex-1 min-w-0">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <CardTitle className="text-lg capitalize">
+                      {format(currentMonth, 'MMMM yyyy', { locale: dateLocale })}
+                    </CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-20 text-muted-foreground">{t('loading') || 'Laden...'}</div>
+                  ) : (
+                    <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+                      {/* Week day headers */}
+                      {localizedWeekDays.map(day => (
+                        <div key={day} className="bg-muted px-2 py-2 text-center text-xs font-medium text-muted-foreground">
+                          {day}
                         </div>
-                        <div className="mt-1 space-y-0.5">
-                          {dayMeasurements.map(m => (
-                            <div
-                              key={m.id}
-                              className={cn(
-                                "w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item",
-                                statusColor(m.status)
+                      ))}
+
+                      {/* Calendar cells */}
+                      {calendarDays.map(day => {
+                        const dayMeasurements = getMeasurementsForDay(day);
+                        const isCurrentDay = isSameDay(day, new Date());
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={cn(
+                              "bg-background min-h-[100px] p-1.5 transition-colors group relative",
+                              !isCurrentMonth && "opacity-40",
+                              isCurrentDay && "ring-2 ring-primary ring-inset"
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isCurrentDay && "text-primary font-bold"
+                              )}>
+                                {format(day, 'd')}
+                              </span>
+                              {isCurrentMonth && (
+                                <button
+                                  onClick={() => openAddDialog(day)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity h-4 w-4 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                                  title={t('mc_add_measurement') || 'Opmeting toevoegen'}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
                               )}
-                            >
-                              <button
-                                onClick={() => navigate(createLocalizedPath(`/projects/${m.project_id}`))}
-                                className="w-full text-left"
-                                title={`${m.project_name || m.project_id} — ${m.measurer_name || ''}`}
-                              >
-                                <div className="flex items-center gap-1">
-                                  <Ruler className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="truncate font-medium">
-                                    {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
-                                  </span>
-                                </div>
-                                {m.measurer_name && (
-                                  <div className="truncate text-[9px] opacity-75 mt-0.5">{m.measurer_name}</div>
-                                )}
-                              </button>
-                              {/* Action buttons for provisional/all entries */}
-                              <div className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 flex gap-0.5 bg-background/80 rounded p-0.5">
-                                <button
-                                  onClick={(e) => openEditDialog(m, e)}
-                                  className="p-0.5 hover:bg-muted rounded"
-                                  title={t('mc_edit') || 'Bewerken'}
-                                >
-                                  <Edit3 className="h-2.5 w-2.5" />
-                                </button>
-                                {m.status === 'provisional' && (
-                                  <button
-                                    onClick={(e) => handleScheduleDefinitive(m, e)}
-                                    className="p-0.5 hover:bg-muted rounded text-blue-600"
-                                    title={t('mc_schedule_definitively') || 'Definitief inplannen'}
-                                  >
-                                    <CalendarCheck className="h-2.5 w-2.5" />
-                                  </button>
-                                )}
-                                <button
-                                  onClick={(e) => handleSendOutlookMail(m, e)}
-                                  className="p-0.5 hover:bg-muted rounded text-primary"
-                                  title={t('mc_send_mail') || 'Mail versturen via Outlook'}
-                                >
-                                  <Mail className="h-2.5 w-2.5" />
-                                </button>
-                              </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                            <div className="mt-1 space-y-0.5">
+                              {dayMeasurements.map(m => (
+                                <div
+                                  key={m.id}
+                                  className={cn(
+                                    "w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item",
+                                    statusColor(m.status)
+                                  )}
+                                >
+                                  <button
+                                    onClick={() => navigate(createLocalizedPath(`/projects/${m.project_id}`))}
+                                    className="w-full text-left"
+                                    title={`${m.project_name || m.project_id} — ${m.measurer_name || ''}`}
+                                  >
+                                    <div className="flex items-center gap-1">
+                                      <Ruler className="h-2.5 w-2.5 shrink-0" />
+                                      <span className="truncate font-medium">
+                                        {m.project_number ? `${m.project_number} - ` : ''}{m.project_name || '...'}
+                                      </span>
+                                    </div>
+                                    {m.measurer_name && (
+                                      <div className="truncate text-[9px] opacity-75 mt-0.5">{m.measurer_name}</div>
+                                    )}
+                                  </button>
+                                  {/* Action buttons for provisional/all entries */}
+                                  <div className="absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 flex gap-0.5 bg-background/80 rounded p-0.5">
+                                    <button
+                                      onClick={(e) => openEditDialog(m, e)}
+                                      className="p-0.5 hover:bg-muted rounded"
+                                      title={t('mc_edit') || 'Bewerken'}
+                                    >
+                                      <Edit3 className="h-2.5 w-2.5" />
+                                    </button>
+                                    {m.status === 'provisional' && (
+                                      <button
+                                        onClick={(e) => handleScheduleDefinitive(m, e)}
+                                        className="p-0.5 hover:bg-muted rounded text-blue-600"
+                                        title={t('mc_schedule_definitively') || 'Definitief inplannen'}
+                                      >
+                                        <CalendarCheck className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => handleSendOutlookMail(m, e)}
+                                      className="p-0.5 hover:bg-muted rounded text-primary"
+                                      title={t('mc_send_mail') || 'Mail versturen via Outlook'}
+                                    >
+                                      <Mail className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Unassigned projects list (right side) */}
+            <UnassignedProjectsList tenant={tenant} t={t} navigate={navigate} createLocalizedPath={createLocalizedPath} measurements={measurements} openAddDialog={openAddDialog} />
+          </div>
         </div>
       </div>
 
