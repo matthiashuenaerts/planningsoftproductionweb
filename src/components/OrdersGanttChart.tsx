@@ -1662,6 +1662,11 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                         </Button>
                       </td>
                     </tr>
+                    {/* Service ticket details row */}
+                    {isServiceTicket && serviceAssignment && (
+                      <ServiceTicketDetailsRow assignmentId={(serviceAssignment as any).id} />
+                    )}
+                    </React.Fragment>
                   );
                 })}
                 {filteredUnnamedProjects.length === 0 && (
