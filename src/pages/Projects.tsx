@@ -784,7 +784,7 @@ const Projects = () => {
           </DialogHeader>
           <div className="space-y-3">
             <Input
-              placeholder={t('search') || 'Zoeken...'}
+              placeholder={t('search')}
               value={externalSearch}
               onChange={(e) => setExternalSearch(e.target.value)}
               className="h-9"
@@ -792,11 +792,11 @@ const Projects = () => {
             {externalLoading ? (
               <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                {t('loading') || 'Laden...'}
+                {t('loading')}
               </div>
             ) : externalProjects.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
-                {t('no_external_projects') || 'Geen niet-toegewezen projecten gevonden'}
+                {t('no_external_projects')}
               </div>
             ) : (
               <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
@@ -833,7 +833,7 @@ const Projects = () => {
               </div>
             )}
             <div className="text-xs text-muted-foreground text-right">
-              {externalProjects.length} {t('results') || 'resultaten'}
+              {externalProjects.length} {t('results')}
             </div>
           </div>
         </DialogContent>
