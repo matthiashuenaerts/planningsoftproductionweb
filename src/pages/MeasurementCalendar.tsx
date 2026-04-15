@@ -95,6 +95,11 @@ const UnassignedProjectsList: React.FC<{
     enabled: !!tenant?.id,
   });
 
+  const handleDragStart = (e: React.DragEvent, project: ProjectOption) => {
+    e.dataTransfer.setData('application/measurement-project', JSON.stringify({ id: project.id, name: project.name }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
   return (
     <Card className="w-full xl:w-80 xl:flex-shrink-0 self-start xl:sticky xl:top-0">
       <CardHeader className="pb-2">
@@ -114,7 +119,9 @@ const UnassignedProjectsList: React.FC<{
             {unassignedProjects.map((project) => (
               <div
                 key={project.id}
-                className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2"
+                draggable
+                onDragStart={(e) => handleDragStart(e, project)}
+                className="px-3 py-2 hover:bg-muted/50 transition-colors flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing"
               >
                 <button
                   onClick={() => navigate(createLocalizedPath(`/projects/${project.id}`))}
@@ -602,9 +609,28 @@ const MeasurementCalendar = () => {
                         const isCurrentDay = isSameDay(day, new Date());
                         const isCurrentMonth = isSameMonth(day, currentMonth);
 
+                        const handleDragOver = (e: React.DragEvent) => {
+                          if (e.dataTransfer.types.includes('application/measurement-project')) {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                          }
+                        };
+
+                        const handleDrop = (e: React.DragEvent) => {
+                          e.preventDefault();
+                          const data = e.dataTransfer.getData('application/measurement-project');
+                          if (!data) return;
+                          try {
+                            const project = JSON.parse(data);
+                            openAddDialog(day, project.id);
+                          } catch {}
+                        };
+
                         return (
                           <div
                             key={day.toISOString()}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
                             className={cn(
                               'bg-background min-h-[100px] p-1.5 transition-colors group relative',
                               !isCurrentMonth && 'opacity-40',
