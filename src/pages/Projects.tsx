@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2, Users } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2, Users, Database, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
 import { workstationService, Workstation } from '@/services/workstationService';
@@ -21,6 +22,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTenant } from '@/context/TenantContext';
 import { oneDriveService } from '@/services/oneDriveService';
 import { useDrawerLayout } from '@/hooks/useDrawerLayout';
+import { applyTenantFilter } from '@/lib/tenantQuery';
 
 
 const Projects = () => {
@@ -45,6 +47,46 @@ const Projects = () => {
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
   const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
+  const [externalDialogOpen, setExternalDialogOpen] = useState(false);
+  const [externalProjects, setExternalProjects] = useState<any[]>([]);
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [hasExternalConfig, setHasExternalConfig] = useState(false);
+  const [externalSearch, setExternalSearch] = useState('');
+
+  // Check if tenant has external database configured
+  useEffect(() => {
+    const checkExternalConfig = async () => {
+      if (!tenant?.id) return;
+      let query = supabase
+        .from('external_api_configs')
+        .select('id')
+        .eq('api_type', 'projects');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data } = await query;
+      setHasExternalConfig(!!(data && data.length > 0));
+    };
+    checkExternalConfig();
+  }, [tenant?.id]);
+
+  const loadExternalUnassigned = async () => {
+    if (!tenant?.id) return;
+    setExternalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('external-unassigned-projects', {
+        body: { tenant_id: tenant.id },
+      });
+      if (error) throw error;
+      setExternalProjects(data?.projects || []);
+    } catch (err: any) {
+      toast({
+        title: t('error'),
+        description: err.message || 'Failed to load external projects',
+        variant: 'destructive',
+      });
+    } finally {
+      setExternalLoading(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -472,6 +514,19 @@ const Projects = () => {
                   <Users className="mr-2 h-4 w-4" /> Customer Portfolio
                 </Button>
               )}
+              {isAdmin && hasExternalConfig && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setExternalDialogOpen(true);
+                    loadExternalUnassigned();
+                  }}
+                  className="rounded-xl"
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  {t('external_unassigned') || 'Externe projecten'}
+                </Button>
+              )}
               {isAdmin && (
                 <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -716,6 +771,72 @@ const Projects = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* External Unassigned Projects Dialog */}
+      <Dialog open={externalDialogOpen} onOpenChange={setExternalDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              {t('external_unassigned') || 'Niet-toegewezen externe projecten'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder={t('search') || 'Zoeken...'}
+              value={externalSearch}
+              onChange={(e) => setExternalSearch(e.target.value)}
+              className="h-9"
+            />
+            {externalLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                {t('loading') || 'Laden...'}
+              </div>
+            ) : externalProjects.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                {t('no_external_projects') || 'Geen niet-toegewezen projecten gevonden'}
+              </div>
+            ) : (
+              <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
+                {externalProjects
+                  .filter(p => {
+                    if (!externalSearch) return true;
+                    const q = externalSearch.toLowerCase();
+                    return (
+                      String(p.ordernummer).toLowerCase().includes(q) ||
+                      String(p.klant || '').toLowerCase().includes(q) ||
+                      String(p.beschrijving || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((project, idx) => (
+                    <div key={idx} className="px-4 py-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-foreground">
+                            {project.ordernummer}
+                          </div>
+                          {project.klant && (
+                            <div className="text-xs text-muted-foreground truncate">{project.klant}</div>
+                          )}
+                          {project.beschrijving && (
+                            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.beschrijving}</div>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground whitespace-nowrap">
+                          {project.orderdatum || '—'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground text-right">
+              {externalProjects.length} {t('results') || 'resultaten'}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

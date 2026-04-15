@@ -80,7 +80,7 @@ const mapTeamToCategory = (teamName: string, placementTeams: any[]): string => {
 };
 
 // Sub-component to show service ticket items for an assignment
-const ServiceTicketDetailsRow: React.FC<{ assignmentId: string }> = ({ assignmentId }) => {
+const ServiceTicketDetailsRow: React.FC<{ assignmentId: string; serviceNotes?: string | null }> = ({ assignmentId, serviceNotes }) => {
   const [items, setItems] = useState<any[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -96,7 +96,10 @@ const ServiceTicketDetailsRow: React.FC<{ assignmentId: string }> = ({ assignmen
     fetchItems();
   }, [assignmentId]);
 
-  if (!loaded || items.length === 0) return null;
+  if (!loaded) return null;
+  
+  // Show row even if no items but there are service notes
+  if (items.length === 0 && !serviceNotes) return null;
 
   const typeLabel = (t: string) => {
     switch (t) {
@@ -111,23 +114,33 @@ const ServiceTicketDetailsRow: React.FC<{ assignmentId: string }> = ({ assignmen
   return (
     <tr className="bg-destructive/5 border-l-[3px] border-l-destructive">
       <td colSpan={7} className="px-3 py-2">
-        <div className="flex flex-wrap gap-2">
-          {items.map(item => (
-            <div key={item.id} className="inline-flex items-center gap-1.5 text-xs bg-background border rounded px-2 py-1">
-              <span className="font-medium text-muted-foreground">{typeLabel(item.item_type)}:</span>
-              <span className="text-foreground">{item.title || item.description || '—'}</span>
-              {item.item_type === 'order_request' && item.order_article_code && (
-                <span className="text-muted-foreground">({item.order_article_code} ×{item.order_quantity || 1})</span>
-              )}
-              <span className={cn(
-                "px-1 py-0.5 rounded text-[10px]",
-                item.status === 'done' ? 'bg-green-100 text-green-800' :
-                item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                'bg-muted text-muted-foreground'
-              )}>{item.status}</span>
-            </div>
-          ))}
-        </div>
+        {serviceNotes && (
+          <div className="text-xs text-muted-foreground mb-1.5 italic">
+            <span className="font-medium not-italic text-foreground">Beschrijving: </span>{serviceNotes}
+          </div>
+        )}
+        {items.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {items.map(item => (
+              <div key={item.id} className="inline-flex items-center gap-1.5 text-xs bg-background border rounded px-2 py-1">
+                <span className="font-medium text-muted-foreground">{typeLabel(item.item_type)}:</span>
+                <span className="text-foreground">{item.title || item.description || '—'}</span>
+                {item.item_type === 'order_request' && item.order_article_code && (
+                  <span className="text-muted-foreground">({item.order_article_code}{item.order_supplier ? ` - ${item.order_supplier}` : ''} ×{item.order_quantity || 1})</span>
+                )}
+                <span className={cn(
+                  "px-1 py-0.5 rounded text-[10px]",
+                  item.status === 'done' ? 'bg-green-100 text-green-800' :
+                  item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                  'bg-muted text-muted-foreground'
+                )}>{item.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {items.length === 0 && serviceNotes && (
+          <div className="text-xs text-muted-foreground/60 italic">Geen items</div>
+        )}
       </td>
     </tr>
   );
@@ -1718,7 +1731,7 @@ const OrdersGanttChart: React.FC<OrdersGanttChartProps> = ({ className }): React
                     </tr>
                     {/* Service ticket details row */}
                     {isServiceTicket && serviceAssignment && (
-                      <ServiceTicketDetailsRow assignmentId={(serviceAssignment as any).id} />
+                      <ServiceTicketDetailsRow assignmentId={(serviceAssignment as any).id} serviceNotes={serviceAssignment.service_notes} />
                     )}
                     </React.Fragment>
                   );
