@@ -778,8 +778,9 @@ const Projects = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              {t('external_unassigned') || 'Niet-toegewezen externe projecten'}
+              {t('external_unassigned')}
             </DialogTitle>
+            <DialogDescription>{t('external_unassigned_description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
