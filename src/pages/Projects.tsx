@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Search, Settings, MoreVertical, Trash2, Package, CalendarDays, Clock, Download, Cog, Wrench, Hammer, Scissors, PaintBucket, Truck, Drill, ChevronDown, ChevronUp, Archive, CheckCircle2, Users, Database, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { projectService, taskService, Project, Task } from '@/services/dataService';
@@ -778,12 +778,13 @@ const Projects = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              {t('external_unassigned') || 'Niet-toegewezen externe projecten'}
+              {t('external_unassigned')}
             </DialogTitle>
+            <DialogDescription>{t('external_unassigned_description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
-              placeholder={t('search') || 'Zoeken...'}
+              placeholder={t('search')}
               value={externalSearch}
               onChange={(e) => setExternalSearch(e.target.value)}
               className="h-9"
@@ -791,11 +792,11 @@ const Projects = () => {
             {externalLoading ? (
               <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                {t('loading') || 'Laden...'}
+                {t('loading')}
               </div>
             ) : externalProjects.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground text-sm">
-                {t('no_external_projects') || 'Geen niet-toegewezen projecten gevonden'}
+                {t('no_external_projects')}
               </div>
             ) : (
               <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
@@ -832,7 +833,7 @@ const Projects = () => {
               </div>
             )}
             <div className="text-xs text-muted-foreground text-right">
-              {externalProjects.length} {t('results') || 'resultaten'}
+              {externalProjects.length} {t('results')}
             </div>
           </div>
         </DialogContent>

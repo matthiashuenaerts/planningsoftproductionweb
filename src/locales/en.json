@@ -1371,5 +1371,11 @@
   "cp_delete_confirm": "Delete this customer?",
   "cp_edit_customer": "Edit Customer",
   "cp_no_projects": "No projects linked to this customer",
-  "cp_no_date": "No date"
+  "cp_no_date": "No date",
+  "external_unassigned": "External Projects",
+  "external_unassigned_description": "Projects from the external database that are not yet assigned",
+  "no_external_projects": "No unassigned external projects found",
+  "external_order_number": "Order number",
+  "external_customer": "Customer",
+  "external_order_date": "Order date"
 }

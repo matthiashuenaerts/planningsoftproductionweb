@@ -1802,5 +1802,11 @@
   "cp_delete_confirm": "Supprimer ce client ?",
   "cp_edit_customer": "Modifier le client",
   "cp_no_projects": "Aucun projet lié à ce client",
-  "cp_no_date": "Pas de date"
+  "cp_no_date": "Pas de date",
+  "external_unassigned": "Projets Externes",
+  "external_unassigned_description": "Projets de la base de données externe non encore attribués",
+  "no_external_projects": "Aucun projet externe non attribué trouvé",
+  "external_order_number": "Numéro de commande",
+  "external_customer": "Client",
+  "external_order_date": "Date de commande"
 }

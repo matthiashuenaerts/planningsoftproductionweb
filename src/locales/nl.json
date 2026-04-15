@@ -1804,5 +1804,11 @@
   "cp_delete_confirm": "Deze klant verwijderen?",
   "cp_edit_customer": "Klant bewerken",
   "cp_no_projects": "Geen projecten gekoppeld aan deze klant",
-  "cp_no_date": "Geen datum"
+  "cp_no_date": "Geen datum",
+  "external_unassigned": "Externe Projecten",
+  "external_unassigned_description": "Projecten uit de externe database die nog niet zijn toegewezen",
+  "no_external_projects": "Geen niet-toegewezen projecten gevonden",
+  "external_order_number": "Ordernummer",
+  "external_customer": "Klant",
+  "external_order_date": "Orderdatum"
 }
