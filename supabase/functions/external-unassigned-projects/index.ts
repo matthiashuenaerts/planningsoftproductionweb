@@ -94,60 +94,97 @@ serve(async (req) => {
     }
 
     try {
-      // Calculate date range: start of current year to 1 year ahead
-      const now = new Date();
-      const startOfYear = `${now.getFullYear()}/01/01`;
-      const oneYearAhead = new Date(now);
-      oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
-      const endDate = `${oneYearAhead.getMonth() + 1}/${oneYearAhead.getDate()}/${oneYearAhead.getFullYear()}`;
+      // Use the records endpoint instead of _find to avoid "Field is missing" errors.
+      // Fetch records in batches using offset pagination.
+      const allRecords: any[] = [];
+      let offset = 1; // FileMaker uses 1-based offset
+      const batchSize = 1000;
+      let hasMore = true;
 
-      // Query FileMaker for orders within date range using a find request
-      const findUrl = `${baseUrl}/layouts/API_order/_find`;
-      const findBody = {
-        query: [
-          {
-            orderdatum: `${startOfYear}...${oneYearAhead.getFullYear()}/${String(oneYearAhead.getMonth() + 1).padStart(2, '0')}/${String(oneYearAhead.getDate()).padStart(2, '0')}`
+      while (hasMore) {
+        const recordsUrl = `${baseUrl}/layouts/API_order/records?_offset=${offset}&_limit=${batchSize}`;
+        console.log(`Fetching records offset=${offset} limit=${batchSize}`);
+
+        const recordsResponse = await fetchWithTimeout(recordsUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+        }, 25000);
+
+        const recordsData = await recordsResponse.json();
+
+        if (!recordsResponse.ok) {
+          // FileMaker code 401 = no records found
+          if (recordsData?.messages?.[0]?.code === '401') {
+            break;
           }
-        ],
-        limit: "5000"
-      };
-
-      console.log('Searching external DB with find body:', JSON.stringify(findBody));
-
-      const queryResponse = await fetchWithTimeout(findUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(findBody),
-      }, 25000);
-
-      const queryData = await queryResponse.json();
-
-      if (!queryResponse.ok) {
-        // FileMaker returns 401 for "no records found" sometimes
-        if (queryData?.messages?.[0]?.code === '401') {
-          return new Response(JSON.stringify({ projects: [] }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+          throw new Error(`Query failed: ${recordsResponse.status} - ${JSON.stringify(recordsData)}`);
         }
-        throw new Error(`Query failed: ${queryResponse.status} - ${JSON.stringify(queryData)}`);
+
+        const batch = recordsData?.response?.data || [];
+        allRecords.push(...batch);
+
+        // If we got fewer than batchSize, we've reached the end
+        if (batch.length < batchSize) {
+          hasMore = false;
+        } else {
+          offset += batchSize;
+          // Safety limit: max 5000 records
+          if (allRecords.length >= 5000) {
+            hasMore = false;
+          }
+        }
       }
 
-      // Extract order numbers from FileMaker response
-      const records = queryData?.response?.data || [];
-      console.log(`Found ${records.length} records in external DB`);
+      console.log(`Fetched ${allRecords.length} total records from external DB`);
 
-      const externalProjects = records.map((record: any) => {
-        const fd = record.fieldData || {};
-        return {
-          ordernummer: fd.ordernummer || fd.Ordernummer || fd.OrderNumber || '',
-          klant: fd.klant || fd.Klant || fd.klantnaam || fd.Klantnaam || '',
-          orderdatum: fd.orderdatum || fd.Orderdatum || '',
-          beschrijving: fd.beschrijving || fd.Beschrijving || fd.omschrijving || fd.Omschrijving || '',
-        };
-      }).filter((p: any) => p.ordernummer && String(p.ordernummer).trim() !== '');
+      // Calculate date range filter: start of current year to 1 year ahead
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const oneYearAhead = new Date(now);
+      oneYearAhead.setFullYear(oneYearAhead.getFullYear() + 1);
+
+      // Parse a FileMaker date (dd/MM/yyyy or MM/dd/yyyy or yyyy-MM-dd) into a Date
+      const parseDate = (raw: string): Date | null => {
+        if (!raw) return null;
+        const trimmed = String(raw).trim();
+        // Try dd/MM/yyyy
+        const m1 = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m1) {
+          const [, d, mth, y] = m1;
+          return new Date(parseInt(y), parseInt(mth) - 1, parseInt(d));
+        }
+        // Try yyyy-MM-dd
+        const m2 = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m2) {
+          return new Date(parseInt(m2[1]), parseInt(m2[2]) - 1, parseInt(m2[3]));
+        }
+        try {
+          const d = new Date(trimmed);
+          if (!isNaN(d.getTime())) return d;
+        } catch (_) {}
+        return null;
+      };
+
+      const externalProjects = allRecords
+        .map((record: any) => {
+          const fd = record.fieldData || {};
+          return {
+            ordernummer: fd.ordernummer || fd.Ordernummer || fd.OrderNumber || '',
+            klant: fd.klant || fd.Klant || fd.klantnaam || fd.Klantnaam || '',
+            orderdatum: fd.orderdatum || fd.Orderdatum || '',
+            beschrijving: fd.beschrijving || fd.Beschrijving || fd.omschrijving || fd.Omschrijving || '',
+          };
+        })
+        .filter((p: any) => {
+          if (!p.ordernummer || String(p.ordernummer).trim() === '') return false;
+          // Filter by date range
+          const date = parseDate(p.orderdatum);
+          if (!date) return true; // Include records without a parseable date
+          return date >= startOfYear && date <= oneYearAhead;
+        });
 
       // Get existing project_link_ids from our database
       const { data: existingProjects } = await supabase
@@ -165,7 +202,7 @@ serve(async (req) => {
         (p: any) => !existingLinkIds.has(String(p.ordernummer).trim())
       );
 
-      console.log(`${unassigned.length} unassigned projects out of ${externalProjects.length} total`);
+      console.log(`${unassigned.length} unassigned projects out of ${externalProjects.length} total (date-filtered)`);
 
       return new Response(JSON.stringify({ projects: unassigned }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
