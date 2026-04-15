@@ -772,6 +772,72 @@ const Projects = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* External Unassigned Projects Dialog */}
+      <Dialog open={externalDialogOpen} onOpenChange={setExternalDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              {t('external_unassigned') || 'Niet-toegewezen externe projecten'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder={t('search') || 'Zoeken...'}
+              value={externalSearch}
+              onChange={(e) => setExternalSearch(e.target.value)}
+              className="h-9"
+            />
+            {externalLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                {t('loading') || 'Laden...'}
+              </div>
+            ) : externalProjects.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                {t('no_external_projects') || 'Geen niet-toegewezen projecten gevonden'}
+              </div>
+            ) : (
+              <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
+                {externalProjects
+                  .filter(p => {
+                    if (!externalSearch) return true;
+                    const q = externalSearch.toLowerCase();
+                    return (
+                      String(p.ordernummer).toLowerCase().includes(q) ||
+                      String(p.klant || '').toLowerCase().includes(q) ||
+                      String(p.beschrijving || '').toLowerCase().includes(q)
+                    );
+                  })
+                  .map((project, idx) => (
+                    <div key={idx} className="px-4 py-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-foreground">
+                            {project.ordernummer}
+                          </div>
+                          {project.klant && (
+                            <div className="text-xs text-muted-foreground truncate">{project.klant}</div>
+                          )}
+                          {project.beschrijving && (
+                            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.beschrijving}</div>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground whitespace-nowrap">
+                          {project.orderdatum || '—'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground text-right">
+              {externalProjects.length} {t('results') || 'resultaten'}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };
