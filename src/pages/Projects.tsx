@@ -47,6 +47,46 @@ const Projects = () => {
   const isAdmin = ['admin', 'teamleader', 'preparater', 'manager'].includes(currentEmployee?.role);
   const { tenant } = useTenant();
   const [serviceDates, setServiceDates] = useState<Record<string, string[]>>({});
+  const [externalDialogOpen, setExternalDialogOpen] = useState(false);
+  const [externalProjects, setExternalProjects] = useState<any[]>([]);
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [hasExternalConfig, setHasExternalConfig] = useState(false);
+  const [externalSearch, setExternalSearch] = useState('');
+
+  // Check if tenant has external database configured
+  useEffect(() => {
+    const checkExternalConfig = async () => {
+      if (!tenant?.id) return;
+      let query = supabase
+        .from('external_api_configs')
+        .select('id')
+        .eq('api_type', 'projects');
+      query = applyTenantFilter(query, tenant?.id);
+      const { data } = await query;
+      setHasExternalConfig(!!(data && data.length > 0));
+    };
+    checkExternalConfig();
+  }, [tenant?.id]);
+
+  const loadExternalUnassigned = async () => {
+    if (!tenant?.id) return;
+    setExternalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('external-unassigned-projects', {
+        body: { tenant_id: tenant.id },
+      });
+      if (error) throw error;
+      setExternalProjects(data?.projects || []);
+    } catch (err: any) {
+      toast({
+        title: t('error'),
+        description: err.message || 'Failed to load external projects',
+        variant: 'destructive',
+      });
+    } finally {
+      setExternalLoading(false);
+    }
+  };
 
 
   useEffect(() => {
