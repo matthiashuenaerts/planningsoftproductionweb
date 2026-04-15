@@ -514,6 +514,19 @@ const Projects = () => {
                   <Users className="mr-2 h-4 w-4" /> Customer Portfolio
                 </Button>
               )}
+              {isAdmin && hasExternalConfig && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setExternalDialogOpen(true);
+                    loadExternalUnassigned();
+                  }}
+                  className="rounded-xl"
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  {t('external_unassigned') || 'Externe projecten'}
+                </Button>
+              )}
               {isAdmin && (
                 <Button onClick={() => setIsNewProjectModalOpen(true)} className={`rounded-xl ${isMobile ? 'w-full' : ''}`}>
                   <Plus className="mr-2 h-4 w-4" />
