@@ -75,7 +75,7 @@ const ExternalDatabaseSettings: React.FC = () => {
     baseUrl: '',
     username: '',
     password: '',
-    testOrderNumber: ''
+    testOrderNumber: '2737'
   });
 
   // Orders API state
@@ -739,7 +739,7 @@ const ExternalDatabaseSettings: React.FC = () => {
                     id="projects-testOrderNumber"
                     value={config.testOrderNumber}
                     onChange={(e) => handleConfigChange('testOrderNumber', e.target.value)}
-                    placeholder="24000079"
+                    placeholder="2737"
                   />
                 </div>
               </div>
