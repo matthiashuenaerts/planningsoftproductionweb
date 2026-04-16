@@ -11,6 +11,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/context/TenantContext';
 import { applyTenantFilter } from '@/lib/tenantQuery';
 
+const DEFAULT_PROJECTS_CONFIG = {
+  baseUrl: '',
+  username: '',
+  password: '',
+  testOrderNumber: '2737'
+};
+
+const DEFAULT_ORDERS_CONFIG = {
+  baseUrl: '',
+  username: '',
+  password: '',
+  testOrderNumber: '',
+  enableDeliveryConfirmation: true
+};
+
+const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
+const normalizeUsername = (value: string) => value.trim();
+
 const ExternalDatabaseSettings: React.FC = () => {
   const { tenant } = useTenant();
   // Helper function to convert week number to date
@@ -71,12 +89,7 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [queryResult, setQueryResult] = useState<string>('');
   const [syncResult, setSyncResult] = useState<string>('');
   
-  const [config, setConfig] = useState({
-    baseUrl: '',
-    username: '',
-    password: '',
-    testOrderNumber: '2737'
-  });
+  const [config, setConfig] = useState(DEFAULT_PROJECTS_CONFIG);
 
   // Orders API state
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -90,32 +103,35 @@ const ExternalDatabaseSettings: React.FC = () => {
   const [ordersImportResult, setOrdersImportResult] = useState<string>('');
   const [ordersSyncResult, setOrdersSyncResult] = useState<string>('');
   
-  const [ordersConfig, setOrdersConfig] = useState({
-    baseUrl: '',
-    username: '',
-    password: '',
-    testOrderNumber: '',
-    enableDeliveryConfirmation: true
-  });
+  const [ordersConfig, setOrdersConfig] = useState(DEFAULT_ORDERS_CONFIG);
 
   // Load saved configurations when tenant becomes available
   useEffect(() => {
-    loadConfigurations();
+    if (!tenant?.id) {
+      setConfig({ ...DEFAULT_PROJECTS_CONFIG });
+      setOrdersConfig({ ...DEFAULT_ORDERS_CONFIG });
+      setLoadingConfig(false);
+      return;
+    }
+
+    void loadConfigurations(tenant.id);
   }, [tenant?.id]);
 
-  const loadConfigurations = async () => {
+  const loadConfigurations = async (tenantId: string) => {
     setLoadingConfig(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('external_api_configs')
-        .select('*');
-      query = applyTenantFilter(query, tenant?.id);
-      const { data, error } = await query;
+        .select('*')
+        .eq('tenant_id', tenantId);
 
       if (error) {
         console.error('Error loading API configs:', error);
         return;
       }
+
+      setConfig({ ...DEFAULT_PROJECTS_CONFIG });
+      setOrdersConfig({ ...DEFAULT_ORDERS_CONFIG });
 
       if (data) {
         const projectsConfig = data.find(c => c.api_type === 'projects');
@@ -124,8 +140,8 @@ const ExternalDatabaseSettings: React.FC = () => {
         if (projectsConfig) {
           setConfig(prev => ({
             ...prev,
-            baseUrl: projectsConfig.base_url || '',
-            username: projectsConfig.username || '',
+            baseUrl: normalizeBaseUrl(projectsConfig.base_url || ''),
+            username: normalizeUsername(projectsConfig.username || ''),
             password: projectsConfig.password || ''
           }));
         }
@@ -133,8 +149,8 @@ const ExternalDatabaseSettings: React.FC = () => {
         if (ordersConfigData) {
           setOrdersConfig(prev => ({
             ...prev,
-            baseUrl: ordersConfigData.base_url || '',
-            username: ordersConfigData.username || '',
+            baseUrl: normalizeBaseUrl(ordersConfigData.base_url || ''),
+            username: normalizeUsername(ordersConfigData.username || ''),
             password: ordersConfigData.password || ''
           }));
         }
@@ -155,10 +171,25 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const testConnection = async () => {
-    if (!config.username || !config.password) {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before testing the connection",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const requestConfig = {
+      baseUrl: normalizeBaseUrl(config.baseUrl),
+      username: normalizeUsername(config.username),
+      password: config.password,
+    };
+
+    if (!requestConfig.baseUrl || !requestConfig.username || !requestConfig.password) {
       toast({
         title: "Configuration Required",
-        description: "Please enter username and password first",
+        description: "Please enter URL, username and password first",
         variant: "destructive"
       });
       return;
@@ -180,7 +211,10 @@ const ExternalDatabaseSettings: React.FC = () => {
       const invokePromise = supabase.functions.invoke('external-db-proxy', {
         body: {
           action: 'authenticate',
-          tenant_id: tenant?.id
+          tenant_id: tenant.id,
+          baseUrl: requestConfig.baseUrl,
+          username: requestConfig.username,
+          password: requestConfig.password,
         }
       });
 
@@ -235,6 +269,15 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const testQuery = async () => {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before testing the query",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!token) {
       toast({
         title: "No Token",
@@ -265,7 +308,8 @@ const ExternalDatabaseSettings: React.FC = () => {
           action: 'query',
           token: token,
           orderNumber: config.testOrderNumber,
-          tenant_id: tenant?.id
+          tenant_id: tenant.id,
+          baseUrl: normalizeBaseUrl(config.baseUrl),
         }
       });
 
@@ -334,7 +378,22 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const saveConfiguration = async () => {
-    if (!config.baseUrl || !config.username || !config.password) {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before saving the configuration",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const normalizedConfig = {
+      baseUrl: normalizeBaseUrl(config.baseUrl),
+      username: normalizeUsername(config.username),
+      password: config.password,
+    };
+
+    if (!normalizedConfig.baseUrl || !normalizedConfig.username || !normalizedConfig.password) {
       toast({
         title: "Configuration Required",
         description: "Please fill in all required fields (URL, username, password)",
@@ -348,12 +407,12 @@ const ExternalDatabaseSettings: React.FC = () => {
     try {
       const upsertData: any = {
         api_type: 'projects',
-        base_url: config.baseUrl,
-        username: config.username,
-        password: config.password,
+        base_url: normalizedConfig.baseUrl,
+        username: normalizedConfig.username,
+        password: normalizedConfig.password,
         updated_at: new Date().toISOString()
       };
-      if (tenant?.id) upsertData.tenant_id = tenant.id;
+      upsertData.tenant_id = tenant.id;
 
       const { error } = await supabase
         .from('external_api_configs')
@@ -379,10 +438,25 @@ const ExternalDatabaseSettings: React.FC = () => {
 
   // Orders API functions
   const testOrdersConnection = async () => {
-    if (!ordersConfig.username || !ordersConfig.password) {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before testing the orders connection",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const requestConfig = {
+      baseUrl: normalizeBaseUrl(ordersConfig.baseUrl),
+      username: normalizeUsername(ordersConfig.username),
+      password: ordersConfig.password,
+    };
+
+    if (!requestConfig.baseUrl || !requestConfig.username || !requestConfig.password) {
       toast({
         title: "Configuration Required",
-        description: "Please enter username and password first",
+        description: "Please enter URL, username and password first",
         variant: "destructive"
       });
       return;
@@ -399,7 +473,10 @@ const ExternalDatabaseSettings: React.FC = () => {
       const { data, error: invokeError } = await supabase.functions.invoke('orders-api-proxy', {
         body: {
           action: 'authenticate',
-          tenant_id: tenant?.id
+          tenant_id: tenant.id,
+          baseUrl: requestConfig.baseUrl,
+          username: requestConfig.username,
+          password: requestConfig.password,
         }
       });
 
@@ -450,6 +527,15 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const testOrdersQuery = async () => {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before testing the orders query",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!ordersToken) {
       toast({
         title: "No Token",
@@ -480,7 +566,8 @@ const ExternalDatabaseSettings: React.FC = () => {
           action: 'query',
           token: ordersToken,
           projectLinkId: ordersConfig.testOrderNumber,
-          tenant_id: tenant?.id
+          tenant_id: tenant.id,
+          baseUrl: normalizeBaseUrl(ordersConfig.baseUrl),
         }
       });
 
@@ -510,7 +597,22 @@ const ExternalDatabaseSettings: React.FC = () => {
   };
 
   const saveOrdersConfiguration = async () => {
-    if (!ordersConfig.baseUrl || !ordersConfig.username || !ordersConfig.password) {
+    if (!tenant?.id) {
+      toast({
+        title: "Tenant Required",
+        description: "Wait for the active tenant to load before saving the orders configuration",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const normalizedConfig = {
+      baseUrl: normalizeBaseUrl(ordersConfig.baseUrl),
+      username: normalizeUsername(ordersConfig.username),
+      password: ordersConfig.password,
+    };
+
+    if (!normalizedConfig.baseUrl || !normalizedConfig.username || !normalizedConfig.password) {
       toast({
         title: "Configuration Required",
         description: "Please fill in all required fields (URL, username, password)",
@@ -524,12 +626,12 @@ const ExternalDatabaseSettings: React.FC = () => {
     try {
       const upsertData: any = {
         api_type: 'orders',
-        base_url: ordersConfig.baseUrl,
-        username: ordersConfig.username,
-        password: ordersConfig.password,
+        base_url: normalizedConfig.baseUrl,
+        username: normalizedConfig.username,
+        password: normalizedConfig.password,
         updated_at: new Date().toISOString()
       };
-      if (tenant?.id) upsertData.tenant_id = tenant.id;
+      upsertData.tenant_id = tenant.id;
 
       const { error } = await supabase
         .from('external_api_configs')
@@ -747,7 +849,7 @@ const ExternalDatabaseSettings: React.FC = () => {
               <div className="flex gap-3 pt-4">
                 <Button 
                   onClick={testConnection} 
-                  disabled={testingConnection}
+                  disabled={testingConnection || loadingConfig || !tenant?.id}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -765,7 +867,7 @@ const ExternalDatabaseSettings: React.FC = () => {
 
                 <Button 
                   onClick={testQuery} 
-                  disabled={testingQuery || !token}
+                  disabled={testingQuery || !token || loadingConfig || !tenant?.id}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -779,7 +881,7 @@ const ExternalDatabaseSettings: React.FC = () => {
 
                 <Button 
                   onClick={saveConfiguration} 
-                  disabled={loading}
+                  disabled={loading || loadingConfig || !tenant?.id}
                   className="flex items-center gap-2"
                 >
                   {loading ? (
@@ -1065,7 +1167,7 @@ const ExternalDatabaseSettings: React.FC = () => {
               <div className="flex gap-3 pt-4">
                 <Button 
                   onClick={testOrdersConnection} 
-                  disabled={ordersTestingConnection}
+                  disabled={ordersTestingConnection || loadingConfig || !tenant?.id}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -1083,7 +1185,7 @@ const ExternalDatabaseSettings: React.FC = () => {
 
                 <Button 
                   onClick={testOrdersQuery} 
-                  disabled={ordersTestingQuery || !ordersToken}
+                  disabled={ordersTestingQuery || !ordersToken || loadingConfig || !tenant?.id}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -1097,7 +1199,7 @@ const ExternalDatabaseSettings: React.FC = () => {
 
                 <Button 
                   onClick={saveOrdersConfiguration} 
-                  disabled={ordersLoading}
+                  disabled={ordersLoading || loadingConfig || !tenant?.id}
                   className="flex items-center gap-2"
                 >
                   {ordersLoading ? (

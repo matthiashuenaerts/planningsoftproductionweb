@@ -6,6 +6,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+type CredentialVariant = {
+  label: 'provided' | 'trimmed-whitespace';
+  username: string;
+  password: string;
+}
+
+function encodeBasicAuth(username: string, password: string): string {
+  const bytes = new TextEncoder().encode(`${username}:${password}`);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function buildCredentialVariants(username: string, password: string): CredentialVariant[] {
+  const trimmedUsername = username.trim();
+  const trimmedPassword = password.trim();
+  const variants: CredentialVariant[] = [{ label: 'provided', username, password }];
+
+  if (trimmedUsername !== username || trimmedPassword !== password) {
+    variants.push({ label: 'trimmed-whitespace', username: trimmedUsername, password: trimmedPassword });
+  }
+
+  return variants;
+}
+
+async function attemptAuthVariants(sessionUrl: string, variants: CredentialVariant[], timeoutMs = 15000) {
+  const attempts: Array<{ label: CredentialVariant['label']; ok: boolean; status: number; error: string | null }> = [];
+  let lastResult = await attemptAuth(sessionUrl, variants[0].username, variants[0].password, timeoutMs);
+  let lastLabel = variants[0].label;
+
+  attempts.push({ label: variants[0].label, ok: lastResult.ok, status: lastResult.status, error: lastResult.error });
+  if (lastResult.ok || lastResult.error || variants.length === 1) {
+    return { result: lastResult, credentialVariant: lastLabel, attempts };
+  }
+
+  for (const variant of variants.slice(1)) {
+    lastResult = await attemptAuth(sessionUrl, variant.username, variant.password, timeoutMs);
+    lastLabel = variant.label;
+    attempts.push({ label: variant.label, ok: lastResult.ok, status: lastResult.status, error: lastResult.error });
+
+    if (lastResult.ok || lastResult.error) {
+      break;
+    }
+  }
+
+  return { result: lastResult, credentialVariant: lastLabel, attempts };
+}
+
+function getOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim().length > 0 ? value : undefined;
+}
+
+function getOptionalBaseUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().replace(/\/+$/, '');
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 /** Try to authenticate against a FileMaker Data API session endpoint. */
 async function attemptAuth(sessionUrl: string, username: string, password: string, timeoutMs = 15000) {
   const controller = new AbortController();
@@ -16,7 +75,7 @@ async function attemptAuth(sessionUrl: string, username: string, password: strin
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+        'Authorization': `Basic ${encodeBasicAuth(username, password)}`,
       },
       body: JSON.stringify({}),
       signal: controller.signal,
@@ -80,7 +139,10 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, token, orderNumber, tenant_id } = body;
+    const { action, token, orderNumber, tenant_id, baseUrl: inputBaseUrl, username: inputUsername, password: inputPassword } = body;
+    const providedBaseUrl = getOptionalBaseUrl(inputBaseUrl);
+    const providedUsername = getOptionalString(inputUsername);
+    const providedPassword = typeof inputPassword === 'string' ? inputPassword : undefined;
 
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -100,20 +162,35 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Could not determine tenant' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Load config from database
-    const { data: configData, error: configError } = await serviceClient
-      .from('external_api_configs')
-      .select('base_url, username, password')
-      .eq('api_type', 'projects')
-      .eq('tenant_id', effectiveTenantId)
-      .single();
+    const needsSavedConfig = !providedBaseUrl || (action === 'authenticate' && (providedUsername === undefined || providedPassword === undefined));
+    let configData: { base_url: string; username: string; password: string } | null = null;
 
-    if (configError || !configData) {
-      return new Response(JSON.stringify({ error: 'External API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (needsSavedConfig) {
+      const { data, error: configError } = await serviceClient
+        .from('external_api_configs')
+        .select('base_url, username, password')
+        .eq('api_type', 'projects')
+        .eq('tenant_id', effectiveTenantId)
+        .single();
+
+      if (configError || !data) {
+        return new Response(JSON.stringify({ error: 'External API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      configData = data;
     }
 
-    const baseUrl = configData.base_url.replace(/\/+$/, '');
-    const { username, password } = configData;
+    const baseUrl = providedBaseUrl ?? configData?.base_url?.replace(/\/+$/, '') ?? '';
+    const username = providedUsername ?? configData?.username ?? '';
+    const password = providedPassword ?? configData?.password ?? '';
+
+    if (!baseUrl) {
+      return new Response(JSON.stringify({ error: 'Base URL is required.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'authenticate' && (!username || !password)) {
+      return new Response(JSON.stringify({ error: 'Username and password are required.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // Check if port is explicitly set in the saved URL
     let parsedUrl: URL;
@@ -125,21 +202,39 @@ serve(async (req) => {
     console.log(`Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}, ExplicitPort: ${hasExplicitPort}`);
 
     if (action === 'authenticate') {
+      const credentialVariants = buildCredentialVariants(username, password);
       const sessionUrl = buildSessionUrl(baseUrl);
       console.log(`Authenticating with FileMaker API at: ${sessionUrl}`);
 
-      const result = await attemptAuth(sessionUrl, username, password, 20000);
+      const authAttempt = await attemptAuthVariants(sessionUrl, credentialVariants, 20000);
+      let result = authAttempt.result;
+      let credentialVariant = authAttempt.credentialVariant;
 
       // If first attempt failed with timeout/network and no explicit port, try :5003
       if (!result.ok && result.error && !hasExplicitPort) {
         console.log('Primary attempt failed, trying fallback port 5003...');
         const fallbackUrl = buildSessionUrl(baseUrl, '5003');
-        const fallbackResult = await attemptAuth(fallbackUrl, username, password, 20000);
+        const fallbackAttempt = await attemptAuthVariants(fallbackUrl, credentialVariants, 20000);
+        const fallbackResult = fallbackAttempt.result;
 
         if (fallbackResult.ok) {
           console.log('Fallback to port 5003 succeeded');
           return new Response(
-            JSON.stringify({ ...fallbackResult.data, diagnostics: { attempted_url: fallbackUrl, fallback: true, processing_ms: Date.now() - startTime } }),
+            JSON.stringify({
+              ...fallbackResult.data,
+              diagnostics: {
+                attempted_url: fallbackUrl,
+                fallback: true,
+                credential_variant: fallbackAttempt.credentialVariant,
+                credential_attempts: fallbackAttempt.attempts,
+                using_runtime_overrides: {
+                  baseUrl: !!providedBaseUrl,
+                  username: !!providedUsername,
+                  password: providedPassword !== undefined,
+                },
+                processing_ms: Date.now() - startTime,
+              }
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -148,7 +243,18 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             error: `Connection failed on default port and fallback :5003. Primary: ${result.error}. Fallback: ${fallbackResult.error || `HTTP ${fallbackResult.status}`}`,
-            diagnostics: { primary_url: result.url, fallback_url: fallbackResult.url, processing_ms: Date.now() - startTime }
+            diagnostics: {
+              primary_url: result.url,
+              fallback_url: fallbackResult.url,
+              primary_credential_attempts: authAttempt.attempts,
+              fallback_credential_attempts: fallbackAttempt.attempts,
+              using_runtime_overrides: {
+                baseUrl: !!providedBaseUrl,
+                username: !!providedUsername,
+                password: providedPassword !== undefined,
+              },
+              processing_ms: Date.now() - startTime,
+            }
           }),
           { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -157,14 +263,41 @@ serve(async (req) => {
       if (!result.ok) {
         const errMsg = result.error || `HTTP ${result.status}: ${JSON.stringify(result.data)}`;
         return new Response(
-          JSON.stringify({ error: `Authentication failed: ${errMsg}`, diagnostics: { attempted_url: result.url, processing_ms: Date.now() - startTime } }),
+          JSON.stringify({
+            error: `Authentication failed: ${errMsg}`,
+            diagnostics: {
+              attempted_url: result.url,
+              credential_variant: credentialVariant,
+              credential_attempts: authAttempt.attempts,
+              using_runtime_overrides: {
+                baseUrl: !!providedBaseUrl,
+                username: !!providedUsername,
+                password: providedPassword !== undefined,
+              },
+              processing_ms: Date.now() - startTime,
+            }
+          }),
           { status: result.status || 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       console.log('Authentication successful, token received');
       return new Response(
-        JSON.stringify({ ...result.data, diagnostics: { attempted_url: result.url, fallback: false, processing_ms: Date.now() - startTime } }),
+        JSON.stringify({
+          ...result.data,
+          diagnostics: {
+            attempted_url: result.url,
+            fallback: false,
+            credential_variant: credentialVariant,
+            credential_attempts: authAttempt.attempts,
+            using_runtime_overrides: {
+              baseUrl: !!providedBaseUrl,
+              username: !!providedUsername,
+              password: providedPassword !== undefined,
+            },
+            processing_ms: Date.now() - startTime,
+          }
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
