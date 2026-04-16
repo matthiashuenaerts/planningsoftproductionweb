@@ -6,10 +6,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Try to authenticate against a FileMaker Data API session endpoint. */
+async function attemptAuth(sessionUrl: string, username: string, password: string, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
+      },
+      body: JSON.stringify({}),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    const text = await response.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    return { ok: response.ok, status: response.status, data, url: sessionUrl, error: null };
+  } catch (err) {
+    clearTimeout(timer);
+    const isAbort = err instanceof DOMException && err.name === 'AbortError';
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      url: sessionUrl,
+      error: isAbort
+        ? `Timeout after ${timeoutMs}ms reaching ${sessionUrl}`
+        : `Network error: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/** Build the sessions URL, optionally overriding the port. */
+function buildSessionUrl(baseUrl: string, overridePort?: string): string {
+  const parsed = new URL(baseUrl.replace(/\/+$/, ''));
+  if (overridePort) parsed.port = overridePort;
+  return `${parsed.origin}${parsed.pathname}/sessions`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
 
   try {
     // Authenticate the caller
@@ -28,7 +75,6 @@ serve(async (req) => {
     const body = await req.json();
     const { action, token, orderNumber, projectLinkId, tenant_id } = body;
 
-    // Always load credentials from the database using service role
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -59,40 +105,74 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Orders API configuration not found. Please save the configuration in Settings first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { base_url: baseUrl, username, password } = configData;
-    
-    console.log(`Orders API Proxy - Action: ${action}`);
+    const baseUrl = configData.base_url.replace(/\/+$/, '');
+    const { username, password } = configData;
+
+    // Check if port is explicitly set
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(baseUrl); } catch {
+      return new Response(JSON.stringify({ error: `Invalid base_url: ${baseUrl}` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const hasExplicitPort = !!parsedUrl.port;
+
+    console.log(`Orders API Proxy - Action: ${action}, Tenant: ${effectiveTenantId}, BaseURL: ${baseUrl}, ExplicitPort: ${hasExplicitPort}`);
     
     if (action === 'authenticate') {
-      console.log(`Authenticating with baseUrl: ${baseUrl}`);
-      
-      const authResponse = await fetch(`${baseUrl}/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${btoa(`${username}:${password}`)}`,
-        },
-        body: JSON.stringify({})
-      });
+      const sessionUrl = buildSessionUrl(baseUrl);
+      console.log(`Authenticating with baseUrl: ${sessionUrl}`);
 
-      console.log(`Auth response status: ${authResponse.status}`);
-      
-      if (!authResponse.ok) {
-        const errorText = await authResponse.text();
-        console.error(`Auth error: ${errorText}`);
-        throw new Error(`Authentication failed: ${authResponse.status} ${authResponse.statusText}`);
+      const result = await attemptAuth(sessionUrl, username, password, 20000);
+
+      // If first attempt failed and no explicit port, try :5003 fallback
+      if (!result.ok && result.error && !hasExplicitPort) {
+        console.log('Primary attempt failed, trying fallback port 5003...');
+        const fallbackUrl = buildSessionUrl(baseUrl, '5003');
+        const fallbackResult = await attemptAuth(fallbackUrl, username, password, 20000);
+
+        if (fallbackResult.ok) {
+          const sessionToken = fallbackResult.data?.response?.token;
+          if (!sessionToken) {
+            return new Response(
+              JSON.stringify({ error: 'No token in response from fallback', diagnostics: { attempted_url: fallbackUrl, fallback: true } }),
+              { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          console.log('Fallback to port 5003 succeeded');
+          return new Response(
+            JSON.stringify({ response: { token: sessionToken }, diagnostics: { attempted_url: fallbackUrl, fallback: true, processing_ms: Date.now() - startTime } }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            error: `Connection failed on default port and fallback :5003. Primary: ${result.error}. Fallback: ${fallbackResult.error || `HTTP ${fallbackResult.status}`}`,
+            diagnostics: { primary_url: result.url, fallback_url: fallbackResult.url, processing_ms: Date.now() - startTime }
+          }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      const authData = await authResponse.json();
-      const sessionToken = authData?.response?.token;
+      if (!result.ok) {
+        const errMsg = result.error || `HTTP ${result.status}: ${JSON.stringify(result.data)}`;
+        return new Response(
+          JSON.stringify({ error: `Authentication failed: ${errMsg}`, diagnostics: { attempted_url: result.url, processing_ms: Date.now() - startTime } }),
+          { status: result.status || 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const sessionToken = result.data?.response?.token;
       if (!sessionToken) {
-        console.error('No token in Orders auth response:', authData);
-        throw new Error('No token received from Orders API');
+        console.error('No token in Orders auth response:', result.data);
+        return new Response(
+          JSON.stringify({ error: 'No token received from Orders API', diagnostics: { attempted_url: result.url } }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
+
       console.log('Orders authentication successful, token received');
-      
       return new Response(
-        JSON.stringify({ response: { token: sessionToken } }),
+        JSON.stringify({ response: { token: sessionToken }, diagnostics: { attempted_url: result.url, fallback: false, processing_ms: Date.now() - startTime } }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
       
@@ -103,7 +183,12 @@ serve(async (req) => {
       const scriptName = encodeURIComponent('FindSupplierOrderByOrderNumber');
       const param = encodeURIComponent(String(projectLinkId ?? orderNumber));
 
-      const queryUrl = `${baseUrl}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
+      // Use parsed URL to build query URL respecting port
+      const parsed = new URL(baseUrl);
+      const queryUrl = `${parsed.origin}${parsed.pathname}/layouts/${layout}/script/${scriptName}?script.param=${param}`;
+
+      const queryController = new AbortController();
+      const queryTimeout = setTimeout(() => queryController.abort(), 15000);
 
       const queryResponse = await fetch(queryUrl, {
         method: 'GET',
@@ -111,8 +196,11 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
-        }
+        },
+        signal: queryController.signal,
       });
+
+      clearTimeout(queryTimeout);
 
       console.log(`Query response status (GET): ${queryResponse.status}`);
       
@@ -147,7 +235,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Orders API Proxy error:', error);
     return new Response(
-      JSON.stringify({ error: 'An internal error occurred.' }),
+      JSON.stringify({ error: 'An internal error occurred.', diagnostics: { processing_ms: Date.now() - startTime } }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

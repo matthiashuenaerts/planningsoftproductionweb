@@ -98,10 +98,10 @@ const ExternalDatabaseSettings: React.FC = () => {
     enableDeliveryConfirmation: true
   });
 
-  // Load saved configurations on mount
+  // Load saved configurations when tenant becomes available
   useEffect(() => {
     loadConfigurations();
-  }, []);
+  }, [tenant?.id]);
 
   const loadConfigurations = async () => {
     setLoadingConfig(true);
