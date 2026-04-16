@@ -98,10 +98,10 @@ const ExternalDatabaseSettings: React.FC = () => {
     enableDeliveryConfirmation: true
   });
 
-  // Load saved configurations on mount
+  // Load saved configurations when tenant becomes available
   useEffect(() => {
     loadConfigurations();
-  }, []);
+  }, [tenant?.id]);
 
   const loadConfigurations = async () => {
     setLoadingConfig(true);
@@ -196,16 +196,19 @@ const ExternalDatabaseSettings: React.FC = () => {
 
       // Check if the response contains an error message (non-2xx responses)
       if (data?.error) {
-        throw new Error(data.error);
+        const diagInfo = data?.diagnostics ? ` [URL: ${data.diagnostics.attempted_url || data.diagnostics.primary_url}]` : '';
+        throw new Error(data.error + diagInfo);
       }
 
       if (data?.response && data.response.token) {
         setToken(data.response.token);
         setConnectionStatus('success');
+        const diagMsg = data?.diagnostics?.fallback ? ' (via fallback port)' : '';
+        const urlMsg = data?.diagnostics?.attempted_url ? ` → ${data.diagnostics.attempted_url}` : '';
         console.log('Token received via edge function:', data.response.token);
         toast({
           title: "Connection Successful",
-          description: "Successfully authenticated via edge function and received token",
+          description: `Authenticated successfully${diagMsg}${urlMsg}`,
         });
       } else {
         console.error('No token in edge function response:', data);
@@ -343,15 +346,18 @@ const ExternalDatabaseSettings: React.FC = () => {
     setLoading(true);
     
     try {
+      const upsertData: any = {
+        api_type: 'projects',
+        base_url: config.baseUrl,
+        username: config.username,
+        password: config.password,
+        updated_at: new Date().toISOString()
+      };
+      if (tenant?.id) upsertData.tenant_id = tenant.id;
+
       const { error } = await supabase
         .from('external_api_configs')
-        .upsert({
-          api_type: 'projects',
-          base_url: config.baseUrl,
-          username: config.username,
-          password: config.password,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'tenant_id,api_type' });
+        .upsert(upsertData, { onConflict: 'tenant_id,api_type' });
 
       if (error) throw error;
       
@@ -404,13 +410,20 @@ const ExternalDatabaseSettings: React.FC = () => {
 
       console.log('Orders edge function response data:', data);
       
+      if (data?.error) {
+        const diagInfo = data?.diagnostics ? ` [URL: ${data.diagnostics.attempted_url || data.diagnostics.primary_url}]` : '';
+        throw new Error(data.error + diagInfo);
+      }
+
       if (data?.response && data.response.token) {
         setOrdersToken(data.response.token);
         setOrdersConnectionStatus('success');
+        const diagMsg = data?.diagnostics?.fallback ? ' (via fallback port)' : '';
+        const urlMsg = data?.diagnostics?.attempted_url ? ` → ${data.diagnostics.attempted_url}` : '';
         console.log('Orders token received via edge function:', data.response.token);
         toast({
           title: "Orders Connection Successful",
-          description: "Successfully authenticated orders API via edge function and received token",
+          description: `Authenticated successfully${diagMsg}${urlMsg}`,
         });
       } else {
         console.error('No token in orders edge function response:', data);
@@ -509,15 +522,18 @@ const ExternalDatabaseSettings: React.FC = () => {
     setOrdersLoading(true);
     
     try {
+      const upsertData: any = {
+        api_type: 'orders',
+        base_url: ordersConfig.baseUrl,
+        username: ordersConfig.username,
+        password: ordersConfig.password,
+        updated_at: new Date().toISOString()
+      };
+      if (tenant?.id) upsertData.tenant_id = tenant.id;
+
       const { error } = await supabase
         .from('external_api_configs')
-        .upsert({
-          api_type: 'orders',
-          base_url: ordersConfig.baseUrl,
-          username: ordersConfig.username,
-          password: ordersConfig.password,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'tenant_id,api_type' });
+        .upsert(upsertData, { onConflict: 'tenant_id,api_type' });
 
       if (error) throw error;
       
