@@ -232,17 +232,18 @@ serve(async (req) => {
                 orderStatus = existingOrder.status === 'delivered' ? 'delivered' : 'pending';
               }
 
-              const orderData = {
-                project_id: project.id,
-                external_order_number: orderNumber,
-                supplier: externalOrder.leverancier || 'Unknown',
-                order_date: new Date().toISOString(),
-                expected_delivery: deliveryDate,
-                status: orderStatus,
-                order_type: 'standard',
-                notes: externalOrder.referentie || null,
-                source: 'external database'
-              };
+            const orderData = {
+              project_id: project.id,
+              tenant_id: tenantId,
+              external_order_number: orderNumber,
+              supplier: externalOrder.leverancier || 'Unknown',
+              order_date: new Date().toISOString(),
+              expected_delivery: deliveryDate,
+              status: orderStatus,
+              order_type: 'standard',
+              notes: externalOrder.referentie || null,
+              source: 'external database'
+            };
 
               if (existingOrder) {
                 const hasChanges =
@@ -280,6 +281,7 @@ serve(async (req) => {
                   if (externalOrder.artikelen && Array.isArray(externalOrder.artikelen)) {
                     const itemsToInsert = externalOrder.artikelen.map((artikel: any) => ({
                       order_id: newOrder.id,
+                      tenant_id: tenantId,
                       description: artikel.omschrijving || 'No description',
                       quantity: parseInt(artikel.aantal) || 1,
                       article_code: artikel.artikel || null,
