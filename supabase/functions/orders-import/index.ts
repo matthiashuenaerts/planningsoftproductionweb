@@ -241,7 +241,7 @@ serve(async (req) => {
             order_type: 'external',
             notes: `Imported from Orders API | Supplier: ${supplier} | Delivery week: ${deliveryWeek} | Shipped: ${isShipped ? 'yes' : 'no'} | Delivered: ${isDelivered ? 'yes' : 'no'} | Items: ${itemsCount}`,
           }, {
-            onConflict: 'external_order_number',
+            onConflict: 'project_id,external_order_number',
             ignoreDuplicates: false
           })
           .select()
