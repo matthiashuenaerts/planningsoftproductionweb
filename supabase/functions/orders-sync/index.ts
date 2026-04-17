@@ -281,6 +281,7 @@ serve(async (req) => {
                   if (externalOrder.artikelen && Array.isArray(externalOrder.artikelen)) {
                     const itemsToInsert = externalOrder.artikelen.map((artikel: any) => ({
                       order_id: newOrder.id,
+                      tenant_id: tenantId,
                       description: artikel.omschrijving || 'No description',
                       quantity: parseInt(artikel.aantal) || 1,
                       article_code: artikel.artikel || null,
