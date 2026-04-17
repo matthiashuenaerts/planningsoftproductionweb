@@ -56,6 +56,8 @@ interface NewProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** When provided, prefills the project_link_id field and auto-runs the external sync on open. */
+  initialLinkId?: string | null;
 }
 
 const formSchema = z.object({
