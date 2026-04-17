@@ -1761,6 +1761,97 @@ export type Database = {
           },
         ]
       }
+      external_orders_buffer: {
+        Row: {
+          adres: string | null
+          beschrijving: string | null
+          fetched_at: string
+          id: string
+          klant: string | null
+          klantnummer: string | null
+          orderdatum: string | null
+          ordernummer: string
+          ordertype: string | null
+          orderverwerker: string | null
+          plaatsingsdatum: string | null
+          raw: Json | null
+          referentie: string | null
+          tenant_id: string
+        }
+        Insert: {
+          adres?: string | null
+          beschrijving?: string | null
+          fetched_at?: string
+          id?: string
+          klant?: string | null
+          klantnummer?: string | null
+          orderdatum?: string | null
+          ordernummer: string
+          ordertype?: string | null
+          orderverwerker?: string | null
+          plaatsingsdatum?: string | null
+          raw?: Json | null
+          referentie?: string | null
+          tenant_id: string
+        }
+        Update: {
+          adres?: string | null
+          beschrijving?: string | null
+          fetched_at?: string
+          id?: string
+          klant?: string | null
+          klantnummer?: string | null
+          orderdatum?: string | null
+          ordernummer?: string
+          ordertype?: string | null
+          orderverwerker?: string | null
+          plaatsingsdatum?: string | null
+          raw?: Json | null
+          referentie?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_orders_buffer_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_orders_sync_state: {
+        Row: {
+          count: number | null
+          last_error: string | null
+          last_status: string | null
+          last_sync_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          count?: number | null
+          last_error?: string | null
+          last_status?: string | null
+          last_sync_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          count?: number | null
+          last_error?: string | null
+          last_status?: string | null
+          last_sync_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_orders_sync_state_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floorplan_settings: {
         Row: {
           created_at: string
