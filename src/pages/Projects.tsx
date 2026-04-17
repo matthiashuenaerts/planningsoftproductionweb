@@ -724,7 +724,12 @@ const Projects = () => {
         </div>
       </div>
       
-      <NewProjectModal open={isNewProjectModalOpen} onOpenChange={setIsNewProjectModalOpen} onSuccess={loadProjects} />
+      <NewProjectModal
+        open={isNewProjectModalOpen}
+        onOpenChange={(o) => { setIsNewProjectModalOpen(o); if (!o) setPrefillLinkId(null); }}
+        onSuccess={loadProjects}
+        initialLinkId={prefillLinkId}
+      />
 
       <AlertDialog open={!!projectToDelete} onOpenChange={open => !open && setProjectToDelete(null)}>
         <AlertDialogContent className="rounded-2xl">
@@ -834,7 +839,12 @@ const Projects = () => {
                     );
                   })
                   .map((project, idx) => (
-                    <div key={idx} className="px-4 py-3 hover:bg-muted/50 transition-colors">
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleCreateFromExternal(project.ordernummer)}
+                      className="w-full text-left px-4 py-3 hover:bg-accent transition-colors focus:outline-none focus:bg-accent"
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -870,12 +880,22 @@ const Projects = () => {
                           )}
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
               </div>
             )}
-            <div className="text-xs text-muted-foreground text-right">
-              {externalProjects.length} {t('results')}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {externalLastSync
+                  ? `${t('last_sync') || 'Last sync'}: ${new Date(externalLastSync).toLocaleString()}`
+                  : t('never_synced') || 'Never synced'}
+              </span>
+              <div className="flex items-center gap-3">
+                <span>{externalProjects.length} {t('results')}</span>
+                <Button size="sm" variant="outline" onClick={handleRefreshExternal} disabled={externalLoading} className="h-7 text-xs">
+                  {externalLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : (t('refresh') || 'Refresh')}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
