@@ -52,6 +52,8 @@ const Projects = () => {
   const [externalLoading, setExternalLoading] = useState(false);
   const [hasExternalConfig, setHasExternalConfig] = useState(false);
   const [externalSearch, setExternalSearch] = useState('');
+  const [externalLastSync, setExternalLastSync] = useState<string | null>(null);
+  const [prefillLinkId, setPrefillLinkId] = useState<string | null>(null);
 
   // Check if tenant has external database configured
   useEffect(() => {
@@ -77,6 +79,7 @@ const Projects = () => {
       });
       if (error) throw error;
       setExternalProjects(data?.projects || []);
+      setExternalLastSync(data?.last_sync_at || null);
     } catch (err: any) {
       toast({
         title: t('error'),
@@ -86,6 +89,26 @@ const Projects = () => {
     } finally {
       setExternalLoading(false);
     }
+  };
+
+  const handleRefreshExternal = async () => {
+    if (!tenant?.id) return;
+    setExternalLoading(true);
+    try {
+      toast({ title: t('syncing') || 'Syncing…', description: t('fetching_external_orders') || 'Fetching external orders' });
+      await supabase.functions.invoke('external-orders-sync', { body: { tenant_id: tenant.id } });
+      await loadExternalUnassigned();
+      toast({ title: t('done') || 'Done', description: t('external_orders_refreshed') || 'External orders refreshed' });
+    } catch (err: any) {
+      toast({ title: t('error'), description: err.message, variant: 'destructive' });
+      setExternalLoading(false);
+    }
+  };
+
+  const handleCreateFromExternal = (ordernummer: string) => {
+    setExternalDialogOpen(false);
+    setPrefillLinkId(String(ordernummer));
+    setIsNewProjectModalOpen(true);
   };
 
 
