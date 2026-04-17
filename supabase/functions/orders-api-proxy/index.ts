@@ -126,8 +126,10 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const authClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) {
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: authError } = await authClient.auth.getClaims(jwt);
+    const userId = claimsData?.claims?.sub;
+    if (authError || !userId) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -146,7 +148,7 @@ serve(async (req) => {
       const { data: empData } = await serviceClient
         .from('employees')
         .select('tenant_id')
-        .eq('auth_user_id', user.id)
+        .eq('auth_user_id', userId)
         .single();
       effectiveTenantId = empData?.tenant_id;
     }

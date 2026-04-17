@@ -1283,31 +1283,25 @@ const ExternalDatabaseSettings: React.FC = () => {
                           
                           const importOrdersFromQuery = async () => {
                             try {
+                              if (!tenant?.id) {
+                                throw new Error('Wait for the active tenant to load before importing orders');
+                              }
+
                               setOrdersImporting(true);
                               setOrdersImportResult('');
                               
-                              const response = await fetch('https://pqzfmphitzlgwnmexrbx.supabase.co/functions/v1/orders-import', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxemZtcGhpdHpsZ3dubWV4cmJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNDcxMDIsImV4cCI6MjA2MDcyMzEwMn0.SmvaZXSXKXeru3vuQY8XBlcNmpHyaZmAUk-bObZQQC4`
-                                },
-                                body: JSON.stringify({
+                              const { data, error } = await supabase.functions.invoke('orders-import', {
+                                body: {
                                   projectLinkId: ordersConfig.testOrderNumber,
-                                  baseUrl: ordersConfig.baseUrl,
-                                  username: ordersConfig.username,
-                                  password: ordersConfig.password
-                                })
+                                  tenant_id: tenant.id,
+                                }
                               });
 
-                              if (!response.ok) {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                              if (error) {
+                                throw new Error(error.message || 'Orders import failed');
                               }
-
-                              const data = await response.json();
                               
-                              if (data.success) {
+                              if (data?.success) {
                                 setOrdersImportResult(`Import successful: ${data.message}\nImported: ${data.imported} orders\nErrors: ${data.errors.length}`);
                                 
                                 toast({
@@ -1316,11 +1310,12 @@ const ExternalDatabaseSettings: React.FC = () => {
                                   variant: "default"
                                 });
                               } else {
-                                setOrdersImportResult(`Import failed: ${data.message || 'Unknown error'}`);
+                                const message = data?.message || data?.error || 'Unknown error';
+                                setOrdersImportResult(`Import failed: ${message}`);
                                 
                                 toast({
                                   title: "Import Failed",
-                                  description: data.message || 'Unknown error',
+                                  description: message,
                                   variant: "destructive"
                                 });
                               }
