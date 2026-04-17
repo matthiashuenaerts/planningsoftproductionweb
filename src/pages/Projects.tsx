@@ -814,18 +814,37 @@ const Projects = () => {
                     <div key={idx} className="px-4 py-3 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-foreground">
-                            {project.ordernummer}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm text-foreground">
+                              #{project.ordernummer}
+                            </span>
+                            {project.ordertype && (
+                              <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                                {project.ordertype}
+                              </span>
+                            )}
                           </div>
                           {project.klant && (
-                            <div className="text-xs text-muted-foreground truncate">{project.klant}</div>
+                            <div className="text-xs font-medium text-foreground/80 truncate mt-1">{project.klant}</div>
                           )}
-                          {project.beschrijving && (
-                            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.beschrijving}</div>
+                          {(project.referentie || project.beschrijving) && (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">
+                              {project.referentie || project.beschrijving}
+                            </div>
+                          )}
+                          {project.adres && (
+                            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.adres}</div>
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground whitespace-nowrap">
-                          {project.orderdatum || '—'}
+                        <div className="text-right shrink-0">
+                          <div className="text-xs text-muted-foreground whitespace-nowrap">
+                            {project.orderdatum || '—'}
+                          </div>
+                          {project.orderverwerker && (
+                            <div className="text-[10px] text-muted-foreground/70 mt-1 whitespace-nowrap">
+                              {project.orderverwerker}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
