@@ -49,13 +49,14 @@ serve(async (req) => {
       const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } },
       });
-      const { data: { user }, error: userError } = await authSupabase.auth.getUser();
-      if (userError || !user) {
+      const { data: claimsData, error: userError } = await authSupabase.auth.getClaims(token);
+      const userId = claimsData?.claims?.sub;
+      if (userError || !userId) {
         return new Response(JSON.stringify({ error: 'Forbidden' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      console.log('Authenticated via user JWT:', user.id);
+      console.log('Authenticated via user JWT:', userId);
     }
 
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
