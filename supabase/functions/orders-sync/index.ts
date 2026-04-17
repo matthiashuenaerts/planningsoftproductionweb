@@ -232,17 +232,18 @@ serve(async (req) => {
                 orderStatus = existingOrder.status === 'delivered' ? 'delivered' : 'pending';
               }
 
-              const orderData = {
-                project_id: project.id,
-                external_order_number: orderNumber,
-                supplier: externalOrder.leverancier || 'Unknown',
-                order_date: new Date().toISOString(),
-                expected_delivery: deliveryDate,
-                status: orderStatus,
-                order_type: 'standard',
-                notes: externalOrder.referentie || null,
-                source: 'external database'
-              };
+            const orderData = {
+              project_id: project.id,
+              tenant_id: tenantId,
+              external_order_number: orderNumber,
+              supplier: externalOrder.leverancier || 'Unknown',
+              order_date: new Date().toISOString(),
+              expected_delivery: deliveryDate,
+              status: orderStatus,
+              order_type: 'standard',
+              notes: externalOrder.referentie || null,
+              source: 'external database'
+            };
 
               if (existingOrder) {
                 const hasChanges =
