@@ -204,6 +204,26 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     }
   }, [open, form.watch('is_after_sales')]);
 
+  // Prefill project_link_id and auto-run external sync when opened from
+  // the "Externe Projecten" picker.
+  useEffect(() => {
+    if (open && initialLinkId) {
+      form.setValue('project_link_id', initialLinkId);
+      // Defer until standard tasks/workstations are loaded so synced data merges cleanly
+      const timer = setTimeout(() => {
+        handleSyncProject();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    // Reset on close
+    if (!open) {
+      setSyncedData(null);
+      setPendingOrders([]);
+      setPendingTeamAssignment(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLinkId]);
+
   // Fetch all workstations, standard tasks, and routes when component mounts
   useEffect(() => {
     const fetchData = async () => {
