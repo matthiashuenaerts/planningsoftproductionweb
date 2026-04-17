@@ -102,7 +102,8 @@ interface TaskItem {
 const NewProjectModal: React.FC<NewProjectModalProps> = ({
   open,
   onOpenChange,
-  onSuccess
+  onSuccess,
+  initialLinkId,
 }) => {
   const { toast } = useToast();
   const { tenant } = useTenant();
