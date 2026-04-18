@@ -112,10 +112,12 @@ async function syncTenant(supabase: any, tenantId: string) {
       );
       const data = await resp.json();
       if (!resp.ok) {
-        const code = data?.messages?.[0]?.code;
-        if (code === "401") { hasMore = false; break; } // 0 records
-        console.warn(`_find failed: ${JSON.stringify(data)}`);
+        // Any non-OK response from _find (including FileMaker code 401 = "no records")
+        // means we should fall back to the plain records endpoint, which works on
+        // every FileMaker layout regardless of the orderdatum field's findability.
+        console.warn(`_find failed (status ${resp.status}, fm code ${data?.messages?.[0]?.code}): ${JSON.stringify(data?.messages || data)}`);
         usedFind = false;
+        hasMore = false;
         break;
       }
       const batch = data?.response?.data || [];
@@ -123,6 +125,7 @@ async function syncTenant(supabase: any, tenantId: string) {
       if (batch.length < batchSize) hasMore = false;
       else { offset += batchSize; if (records.length >= 5000) hasMore = false; }
     }
+    console.log(`Tenant ${tenantId}: _find returned ${records.length} records (usedFind=${usedFind})`);
 
     if (!usedFind) {
       offset = 1; hasMore = true;
@@ -145,37 +148,62 @@ async function syncTenant(supabase: any, tenantId: string) {
         if (batch.length < batchSize) hasMore = false;
         else { offset += batchSize; if (records.length >= 5000) hasMore = false; }
       }
+      console.log(`Tenant ${tenantId}: records endpoint returned ${records.length} total records`);
     }
 
     // Map + dedupe + date filter
     const seen = new Set<string>();
     const rows: any[] = [];
+    let skippedNoOrderNum = 0;
+    let skippedOutOfRange = 0;
+    // Helper: case-insensitive field lookup
+    const pick = (fd: any, ...keys: string[]): any => {
+      const lowerMap: Record<string, any> = {};
+      for (const k of Object.keys(fd)) lowerMap[k.toLowerCase()] = fd[k];
+      for (const k of keys) {
+        const v = lowerMap[k.toLowerCase()];
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return null;
+    };
     for (const rec of records) {
       const fd = rec.fieldData || {};
       const ordernummer = String(
-        fd.ordernummer ?? fd.Ordernummer ?? fd.OrderNumber ?? "",
+        pick(fd, "ordernummer", "volgnummer", "OrderNumber", "order_number", "ordernr", "nummer") ?? "",
       ).trim();
-      if (!ordernummer || seen.has(ordernummer)) continue;
-      const orderdatumRaw = fd.orderdatum ?? fd.Orderdatum ?? "";
-      const d = parseDate(orderdatumRaw);
-      if (d && (d < startOfYear || d > oneYearAhead)) continue;
+      if (!ordernummer) { skippedNoOrderNum++; continue; }
+      if (seen.has(ordernummer)) continue;
+      const orderdatumRaw = pick(fd, "orderdatum", "datum", "order_date") ?? "";
+      const d = parseDate(String(orderdatumRaw));
+      // Only filter when we successfully parsed a date AND it falls outside the window.
+      // Records with unknown/empty dates are kept (better to show too many than zero).
+      if (d && (d < startOfYear || d > oneYearAhead)) { skippedOutOfRange++; continue; }
       seen.add(ordernummer);
       rows.push({
         tenant_id: tenantId,
         ordernummer,
-        klant: fd.klant ?? fd.Klant ?? fd.klantnaam ?? fd.Klantnaam ?? null,
-        klantnummer: fd.klantnummer ? String(fd.klantnummer) : null,
-        orderdatum: orderdatumRaw || null,
-        ordertype: fd.ordertype ?? fd.Ordertype ?? null,
-        beschrijving: fd.beschrijving ?? fd.Beschrijving ?? fd.omschrijving ??
-          fd.Omschrijving ?? null,
-        referentie: fd.referentie ?? fd.Referentie ?? null,
-        adres: fd.adres ?? fd.Adres ?? null,
-        plaatsingsdatum: fd.plaatsingsdatum ?? fd.Plaatsingsdatum ?? null,
-        orderverwerker: fd.orderverwerker ?? fd.Orderverwerker ?? null,
+        klant: pick(fd, "klant", "Klantnaam", "klantnaam", "orders_klanten::display_klantnaam", "customer", "client"),
+        klantnummer: (() => { const v = pick(fd, "klantnummer", "id_klant", "customer_number", "client_number"); return v != null ? String(v) : null; })(),
+        orderdatum: orderdatumRaw ? String(orderdatumRaw) : null,
+        ordertype: pick(fd, "ordertype", "type"),
+        beschrijving: pick(fd, "beschrijving", "omschrijving", "nota", "description"),
+        referentie: pick(fd, "referentie", "reference"),
+        adres: pick(fd, "adres", "address"),
+        plaatsingsdatum: pick(fd, "plaatsingsdatum", "leverweek_gewenst", "placement_date"),
+        orderverwerker: pick(fd, "orderverwerker", "processor"),
         raw: fd,
         fetched_at: new Date().toISOString(),
       });
+    }
+    console.log(
+      `Tenant ${tenantId}: mapped ${rows.length} rows from ${records.length} records ` +
+      `(skipped ${skippedNoOrderNum} without order number, ${skippedOutOfRange} out-of-date-range)`,
+    );
+    if (rows.length === 0 && records.length > 0) {
+      // Diagnostic: log the field names of the first record so we can see what FileMaker actually returns.
+      console.warn(
+        `Tenant ${tenantId}: 0 rows mapped. First record fieldData keys: ${JSON.stringify(Object.keys(records[0]?.fieldData || {}))}`,
+      );
     }
 
     // Replace this tenant's buffer atomically
