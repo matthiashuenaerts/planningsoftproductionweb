@@ -148,6 +148,7 @@ async function syncTenant(supabase: any, tenantId: string) {
         if (batch.length < batchSize) hasMore = false;
         else { offset += batchSize; if (records.length >= 5000) hasMore = false; }
       }
+      console.log(`Tenant ${tenantId}: records endpoint returned ${records.length} total records`);
     }
 
     // Map + dedupe + date filter
