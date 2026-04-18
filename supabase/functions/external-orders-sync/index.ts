@@ -154,32 +154,56 @@ async function syncTenant(supabase: any, tenantId: string) {
     // Map + dedupe + date filter
     const seen = new Set<string>();
     const rows: any[] = [];
+    let skippedNoOrderNum = 0;
+    let skippedOutOfRange = 0;
+    // Helper: case-insensitive field lookup
+    const pick = (fd: any, ...keys: string[]): any => {
+      const lowerMap: Record<string, any> = {};
+      for (const k of Object.keys(fd)) lowerMap[k.toLowerCase()] = fd[k];
+      for (const k of keys) {
+        const v = lowerMap[k.toLowerCase()];
+        if (v !== undefined && v !== null && v !== "") return v;
+      }
+      return null;
+    };
     for (const rec of records) {
       const fd = rec.fieldData || {};
       const ordernummer = String(
-        fd.ordernummer ?? fd.Ordernummer ?? fd.OrderNumber ?? "",
+        pick(fd, "ordernummer", "OrderNumber", "order_number", "ordernr", "nummer") ?? "",
       ).trim();
-      if (!ordernummer || seen.has(ordernummer)) continue;
-      const orderdatumRaw = fd.orderdatum ?? fd.Orderdatum ?? "";
-      const d = parseDate(orderdatumRaw);
-      if (d && (d < startOfYear || d > oneYearAhead)) continue;
+      if (!ordernummer) { skippedNoOrderNum++; continue; }
+      if (seen.has(ordernummer)) continue;
+      const orderdatumRaw = pick(fd, "orderdatum", "order_date", "datum") ?? "";
+      const d = parseDate(String(orderdatumRaw));
+      // Only filter when we successfully parsed a date AND it falls outside the window.
+      // Records with unknown/empty dates are kept (better to show too many than zero).
+      if (d && (d < startOfYear || d > oneYearAhead)) { skippedOutOfRange++; continue; }
       seen.add(ordernummer);
       rows.push({
         tenant_id: tenantId,
         ordernummer,
-        klant: fd.klant ?? fd.Klant ?? fd.klantnaam ?? fd.Klantnaam ?? null,
-        klantnummer: fd.klantnummer ? String(fd.klantnummer) : null,
-        orderdatum: orderdatumRaw || null,
-        ordertype: fd.ordertype ?? fd.Ordertype ?? null,
-        beschrijving: fd.beschrijving ?? fd.Beschrijving ?? fd.omschrijving ??
-          fd.Omschrijving ?? null,
-        referentie: fd.referentie ?? fd.Referentie ?? null,
-        adres: fd.adres ?? fd.Adres ?? null,
-        plaatsingsdatum: fd.plaatsingsdatum ?? fd.Plaatsingsdatum ?? null,
-        orderverwerker: fd.orderverwerker ?? fd.Orderverwerker ?? null,
+        klant: pick(fd, "klant", "Klantnaam", "klantnaam", "customer", "client"),
+        klantnummer: (() => { const v = pick(fd, "klantnummer", "customer_number", "client_number"); return v != null ? String(v) : null; })(),
+        orderdatum: orderdatumRaw ? String(orderdatumRaw) : null,
+        ordertype: pick(fd, "ordertype", "type"),
+        beschrijving: pick(fd, "beschrijving", "omschrijving", "description"),
+        referentie: pick(fd, "referentie", "reference"),
+        adres: pick(fd, "adres", "address"),
+        plaatsingsdatum: pick(fd, "plaatsingsdatum", "placement_date"),
+        orderverwerker: pick(fd, "orderverwerker", "processor"),
         raw: fd,
         fetched_at: new Date().toISOString(),
       });
+    }
+    console.log(
+      `Tenant ${tenantId}: mapped ${rows.length} rows from ${records.length} records ` +
+      `(skipped ${skippedNoOrderNum} without order number, ${skippedOutOfRange} out-of-date-range)`,
+    );
+    if (rows.length === 0 && records.length > 0) {
+      // Diagnostic: log the field names of the first record so we can see what FileMaker actually returns.
+      console.warn(
+        `Tenant ${tenantId}: 0 rows mapped. First record fieldData keys: ${JSON.stringify(Object.keys(records[0]?.fieldData || {}))}`,
+      );
     }
 
     // Replace this tenant's buffer atomically
