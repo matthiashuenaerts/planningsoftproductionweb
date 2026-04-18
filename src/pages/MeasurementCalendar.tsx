@@ -610,14 +610,35 @@ const MeasurementCalendar = () => {
                         const isCurrentMonth = isSameMonth(day, currentMonth);
 
                         const handleDragOver = (e: React.DragEvent) => {
-                          if (e.dataTransfer.types.includes('application/measurement-project')) {
+                          if (
+                            e.dataTransfer.types.includes('application/measurement-project') ||
+                            e.dataTransfer.types.includes('application/measurement-entry')
+                          ) {
                             e.preventDefault();
                             e.dataTransfer.dropEffect = 'move';
                           }
                         };
 
-                        const handleDrop = (e: React.DragEvent) => {
+                        const handleDrop = async (e: React.DragEvent) => {
                           e.preventDefault();
+                          const dropDate = format(day, 'yyyy-MM-dd');
+
+                          // Existing measurement → move to this day
+                          const moveData = e.dataTransfer.getData('application/measurement-entry');
+                          if (moveData) {
+                            try {
+                              const entry = JSON.parse(moveData) as { id: string; current_date: string };
+                              if (entry.current_date === dropDate) return;
+                              await measurementService.update(entry.id, { measurement_date: dropDate });
+                              await refreshMeasurementQueries();
+                              toast({ title: t('mc_measurement_updated') || 'Opmeting verplaatst' });
+                            } catch (err: any) {
+                              toast({ title: t('error') || 'Error', description: err?.message, variant: 'destructive' });
+                            }
+                            return;
+                          }
+
+                          // New project from sidebar → open the add dialog
                           const data = e.dataTransfer.getData('application/measurement-project');
                           if (!data) return;
                           try {
@@ -655,8 +676,16 @@ const MeasurementCalendar = () => {
                               {dayMeasurements.map((measurement) => (
                                 <div
                                   key={measurement.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData(
+                                      'application/measurement-entry',
+                                      JSON.stringify({ id: measurement.id, current_date: measurement.measurement_date }),
+                                    );
+                                    e.dataTransfer.effectAllowed = 'move';
+                                  }}
                                   className={cn(
-                                    'w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item',
+                                    'w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded border truncate hover:opacity-80 transition-opacity relative group/item cursor-grab active:cursor-grabbing',
                                     statusColor(measurement.status)
                                   )}
                                 >
