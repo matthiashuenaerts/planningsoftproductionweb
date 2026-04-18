@@ -12,11 +12,23 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { brokenPartsService } from '@/services/brokenPartsService';
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2 } from 'lucide-react';
+import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, subMonths, subYears } from 'date-fns';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/context/LanguageContext';
 import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
 import { useAuth } from '@/context/AuthContext';
@@ -39,6 +51,9 @@ const BrokenPartsList: React.FC = () => {
   const [selectedBrokenPart, setSelectedBrokenPart] = useState<any | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteRange, setBulkDeleteRange] = useState<'1m' | '6m' | '1y' | '2y'>('6m');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { t, createLocalizedPath } = useLanguage();
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -46,8 +61,9 @@ const BrokenPartsList: React.FC = () => {
   const { tenant } = useTenant();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  
+
   const isAdmin = currentEmployee?.role === 'admin';
+  const canBulkDelete = ['admin', 'manager', 'teamleader'].includes(currentEmployee?.role ?? '');
 
   const { data: brokenParts = [], isLoading, error } = useQuery({
     queryKey: ['broken-parts', tenant?.id],
