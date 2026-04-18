@@ -12,11 +12,23 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { brokenPartsService } from '@/services/brokenPartsService';
 import { Button } from "@/components/ui/button";
-import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2 } from 'lucide-react';
+import { Plus, AlertTriangle, X, Eye, MoreVertical, Trash, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, subMonths, subYears } from 'date-fns';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/context/LanguageContext';
 import { BrokenPartDetailDialog } from './BrokenPartDetailDialog';
 import { useAuth } from '@/context/AuthContext';
@@ -39,6 +51,9 @@ const BrokenPartsList: React.FC = () => {
   const [selectedBrokenPart, setSelectedBrokenPart] = useState<any | null>(null);
   const [imageError, setImageError] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleteRange, setBulkDeleteRange] = useState<'1m' | '6m' | '1y' | '2y'>('6m');
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { t, createLocalizedPath } = useLanguage();
   const { currentEmployee } = useAuth();
   const { toast } = useToast();
@@ -46,8 +61,9 @@ const BrokenPartsList: React.FC = () => {
   const { tenant } = useTenant();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  
+
   const isAdmin = currentEmployee?.role === 'admin';
+  const canBulkDelete = ['admin', 'manager', 'teamleader'].includes(currentEmployee?.role ?? '');
 
   const { data: brokenParts = [], isLoading, error } = useQuery({
     queryKey: ['broken-parts', tenant?.id],
@@ -115,6 +131,34 @@ const BrokenPartsList: React.FC = () => {
         description: t('failed_to_delete') || 'Failed to delete broken part',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const now = new Date();
+    const cutoff =
+      bulkDeleteRange === '1m' ? subMonths(now, 1) :
+      bulkDeleteRange === '6m' ? subMonths(now, 6) :
+      bulkDeleteRange === '1y' ? subYears(now, 1) :
+      subYears(now, 2);
+
+    setBulkDeleting(true);
+    try {
+      const removed = await brokenPartsService.deleteOlderThan(cutoff, tenant?.id);
+      queryClient.invalidateQueries({ queryKey: ['broken-parts'] });
+      toast({
+        title: t('success') || 'Success',
+        description: `${removed} ${t('broken_parts_deleted') || 'broken parts deleted'}`,
+      });
+      setBulkDeleteOpen(false);
+    } catch (err: any) {
+      toast({
+        title: t('error') || 'Error',
+        description: err?.message || (t('failed_to_delete') || 'Failed'),
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -225,12 +269,25 @@ const BrokenPartsList: React.FC = () => {
             <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
             {t('broken_parts')}
           </CardTitle>
-          <Button asChild size="sm" className={isMobile ? 'text-xs' : ''}>
-            <Link to={createLocalizedPath("/broken-parts/new")}>
-              <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              {t('report_broken_part')}
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {canBulkDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteOpen(true)}
+                className={isMobile ? 'text-xs' : ''}
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {t('delete_old') || 'Delete old'}
+              </Button>
+            )}
+            <Button asChild size="sm" className={isMobile ? 'text-xs' : ''}>
+              <Link to={createLocalizedPath("/broken-parts/new")}>
+                <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {t('report_broken_part')}
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className={isMobile ? 'px-3' : ''}>
           {brokenParts.length > 0 ? (
@@ -379,6 +436,49 @@ const BrokenPartsList: React.FC = () => {
         onOpenChange={(open) => !open && setSelectedBrokenPart(null)}
         brokenPart={selectedBrokenPart}
       />
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('delete_old_broken_parts') || 'Delete old broken parts'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('delete_old_broken_parts_desc') || 'All broken parts older than the selected age will be permanently removed.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <RadioGroup
+            value={bulkDeleteRange}
+            onValueChange={(v) => setBulkDeleteRange(v as any)}
+            className="space-y-2 py-2"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="1m" id="bp-1m" />
+              <Label htmlFor="bp-1m">{t('older_than_1_month') || 'Older than 1 month'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="6m" id="bp-6m" />
+              <Label htmlFor="bp-6m">{t('older_than_6_months') || 'Older than 6 months'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="1y" id="bp-1y" />
+              <Label htmlFor="bp-1y">{t('older_than_1_year') || 'Older than 1 year'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="2y" id="bp-2y" />
+              <Label htmlFor="bp-2y">{t('older_than_2_years') || 'Older than 2 years'}</Label>
+            </div>
+          </RadioGroup>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>{t('cancel') || 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (t('delete') || 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

@@ -9,10 +9,11 @@ import { orderService } from '@/services/orderService';
 import { TodaysDeliveries } from '@/components/logistics/TodaysDeliveries';
 import { UpcomingDeliveries } from '@/components/logistics/UpcomingDeliveries';
 import { BackorderDeliveries } from '@/components/logistics/BackorderDeliveries';
-import { Truck, Calendar, AlertTriangle, Search, Scan, Clock, PackageCheck } from 'lucide-react';
+import { Truck, Calendar, AlertTriangle, Search, Scan, Clock, PackageCheck, MessageSquare } from 'lucide-react';
 import { EanBarcodeScanner } from '@/components/logistics/EanBarcodeScanner';
 import { Button } from '@/components/ui/button';
 import { BatchReceiptsScanner } from '@/components/logistics/BatchReceiptsScanner';
+import LogisticsChat from '@/components/logistics/LogisticsChat';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -30,6 +31,7 @@ const Logistics = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isStartingRegistration, setIsStartingRegistration] = useState(false);
   const isMobile = useIsMobile();
   const drawerLayout = useDrawerLayout();
@@ -319,6 +321,15 @@ const Logistics = () => {
                 {isMobile ? <span className="sr-only">{t("start_time_registration")}</span> : t("start_time_registration")}
                 {isMobile && 'Time'}
               </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setIsChatOpen(true)}
+                className={`flex items-center gap-1.5 ${isMobile ? 'flex-1 h-9 text-xs justify-center' : 'whitespace-nowrap'}`}
+              >
+                <MessageSquare className={isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                {isMobile ? 'Chat' : 'Logistics Chat'}
+              </Button>
             </div>
           </div>
         </div>
@@ -354,6 +365,8 @@ const Logistics = () => {
           onClose={() => setIsBatchOpen(false)}
           onReceiptsConfirmed={handleDeliveryConfirmed}
         />
+
+        <LogisticsChat open={isChatOpen} onOpenChange={setIsChatOpen} />
       </div>
     </div>
   );

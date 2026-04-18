@@ -2490,6 +2490,45 @@ export type Database = {
           },
         ]
       }
+      logistics_chat_messages: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          message: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          message: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          message?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_chat_messages_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_chat_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -6920,6 +6959,10 @@ export type Database = {
       is_developer: { Args: { p_user_id: string }; Returns: boolean }
       is_employee_on_holiday: {
         Args: { check_date: string; emp_id: string }
+        Returns: boolean
+      }
+      is_logistics_employee: {
+        Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
       resolve_tenant: {
