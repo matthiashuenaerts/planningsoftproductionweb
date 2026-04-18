@@ -112,10 +112,12 @@ async function syncTenant(supabase: any, tenantId: string) {
       );
       const data = await resp.json();
       if (!resp.ok) {
-        const code = data?.messages?.[0]?.code;
-        if (code === "401") { hasMore = false; break; } // 0 records
-        console.warn(`_find failed: ${JSON.stringify(data)}`);
+        // Any non-OK response from _find (including FileMaker code 401 = "no records")
+        // means we should fall back to the plain records endpoint, which works on
+        // every FileMaker layout regardless of the orderdatum field's findability.
+        console.warn(`_find failed (status ${resp.status}, fm code ${data?.messages?.[0]?.code}): ${JSON.stringify(data?.messages || data)}`);
         usedFind = false;
+        hasMore = false;
         break;
       }
       const batch = data?.response?.data || [];
@@ -123,6 +125,7 @@ async function syncTenant(supabase: any, tenantId: string) {
       if (batch.length < batchSize) hasMore = false;
       else { offset += batchSize; if (records.length >= 5000) hasMore = false; }
     }
+    console.log(`Tenant ${tenantId}: _find returned ${records.length} records (usedFind=${usedFind})`);
 
     if (!usedFind) {
       offset = 1; hasMore = true;
