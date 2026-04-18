@@ -134,7 +134,33 @@ const BrokenPartsList: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  const handleBulkDelete = async () => {
+    const now = new Date();
+    const cutoff =
+      bulkDeleteRange === '1m' ? subMonths(now, 1) :
+      bulkDeleteRange === '6m' ? subMonths(now, 6) :
+      bulkDeleteRange === '1y' ? subYears(now, 1) :
+      subYears(now, 2);
+
+    setBulkDeleting(true);
+    try {
+      const removed = await brokenPartsService.deleteOlderThan(cutoff, tenant?.id);
+      queryClient.invalidateQueries({ queryKey: ['broken-parts'] });
+      toast({
+        title: t('success') || 'Success',
+        description: `${removed} ${t('broken_parts_deleted') || 'broken parts deleted'}`,
+      });
+      setBulkDeleteOpen(false);
+    } catch (err: any) {
+      toast({
+        title: t('error') || 'Error',
+        description: err?.message || (t('failed_to_delete') || 'Failed'),
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
     return (
       <Card>
         <CardContent className="pt-6">
