@@ -54,6 +54,7 @@ const Projects = () => {
   const [externalSearch, setExternalSearch] = useState('');
   const [externalLastSync, setExternalLastSync] = useState<string | null>(null);
   const [prefillLinkId, setPrefillLinkId] = useState<string | null>(null);
+  const [externalCount, setExternalCount] = useState<number>(0);
 
   // Check if tenant has external database configured
   useEffect(() => {
@@ -65,7 +66,18 @@ const Projects = () => {
         .eq('api_type', 'projects');
       query = applyTenantFilter(query, tenant?.id);
       const { data } = await query;
-      setHasExternalConfig(!!(data && data.length > 0));
+      const hasConfig = !!(data && data.length > 0);
+      setHasExternalConfig(hasConfig);
+      if (hasConfig) {
+        try {
+          const { data: res } = await supabase.functions.invoke('external-unassigned-projects', {
+            body: { tenant_id: tenant.id },
+          });
+          setExternalCount((res?.projects || []).length);
+        } catch (e) {
+          // silent
+        }
+      }
     };
     checkExternalConfig();
   }, [tenant?.id]);
@@ -79,6 +91,7 @@ const Projects = () => {
       });
       if (error) throw error;
       setExternalProjects(data?.projects || []);
+      setExternalCount((data?.projects || []).length);
       setExternalLastSync(data?.last_sync_at || null);
     } catch (err: any) {
       toast({
@@ -544,10 +557,15 @@ const Projects = () => {
                     setExternalDialogOpen(true);
                     loadExternalUnassigned();
                   }}
-                  className="rounded-xl"
+                  className="rounded-xl relative"
                 >
                   <Database className="mr-2 h-4 w-4" />
                   {t('external_unassigned') || 'Externe projecten'}
+                  {externalCount > 0 && (
+                    <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
+                      {externalCount}
+                    </span>
+                  )}
                 </Button>
               )}
               {isAdmin && (
