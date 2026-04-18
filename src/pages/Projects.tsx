@@ -66,7 +66,18 @@ const Projects = () => {
         .eq('api_type', 'projects');
       query = applyTenantFilter(query, tenant?.id);
       const { data } = await query;
-      setHasExternalConfig(!!(data && data.length > 0));
+      const hasConfig = !!(data && data.length > 0);
+      setHasExternalConfig(hasConfig);
+      if (hasConfig) {
+        try {
+          const { data: res } = await supabase.functions.invoke('external-unassigned-projects', {
+            body: { tenant_id: tenant.id },
+          });
+          setExternalCount((res?.projects || []).length);
+        } catch (e) {
+          // silent
+        }
+      }
     };
     checkExternalConfig();
   }, [tenant?.id]);
