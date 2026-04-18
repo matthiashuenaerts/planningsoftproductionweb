@@ -54,6 +54,7 @@ const Projects = () => {
   const [externalSearch, setExternalSearch] = useState('');
   const [externalLastSync, setExternalLastSync] = useState<string | null>(null);
   const [prefillLinkId, setPrefillLinkId] = useState<string | null>(null);
+  const [externalCount, setExternalCount] = useState<number>(0);
 
   // Check if tenant has external database configured
   useEffect(() => {
