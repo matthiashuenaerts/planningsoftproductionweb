@@ -184,5 +184,37 @@ export const brokenPartsService = {
       console.error('Error in delete:', error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Delete every broken-part record (and its image) created before `cutoff`,
+   * scoped to the current tenant. Returns how many rows were removed.
+   */
+  async deleteOlderThan(cutoff: Date, tenantId?: string | null): Promise<number> {
+    try {
+      let query = supabase
+        .from('broken_parts')
+        .select('id, image_path')
+        .lt('created_at', cutoff.toISOString());
+      query = applyTenantFilter(query, tenantId);
+      const { data: rows, error: fetchErr } = await query;
+      if (fetchErr) throw fetchErr;
+      if (!rows || rows.length === 0) return 0;
+
+      const imagePaths = rows.map((r: any) => r.image_path).filter(Boolean) as string[];
+      if (imagePaths.length > 0) {
+        await supabase.storage.from('broken_parts').remove(imagePaths).catch(() => {});
+      }
+
+      const ids = rows.map((r: any) => r.id);
+      let delQuery = supabase.from('broken_parts').delete().in('id', ids);
+      delQuery = applyTenantFilter(delQuery, tenantId);
+      const { error: delErr } = await delQuery;
+      if (delErr) throw delErr;
+      return ids.length;
+    } catch (error) {
+      console.error('Error in deleteOlderThan:', error);
+      throw error;
+    }
+  },
 };
