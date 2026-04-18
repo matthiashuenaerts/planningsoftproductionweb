@@ -48,7 +48,7 @@ const NotificationBanner = () => {
           setLatestUnread(latest);
           setIsExiting(false);
           
-          showNotification('AutoMattiOn Compass', latest.message);
+          showNotification('AutoMattiOn Compass', latest.message, latest.id);
         }
       } else {
         setLatestUnread(null);
