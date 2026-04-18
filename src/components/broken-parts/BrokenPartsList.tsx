@@ -269,12 +269,25 @@ const BrokenPartsList: React.FC = () => {
             <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
             {t('broken_parts')}
           </CardTitle>
-          <Button asChild size="sm" className={isMobile ? 'text-xs' : ''}>
-            <Link to={createLocalizedPath("/broken-parts/new")}>
-              <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              {t('report_broken_part')}
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {canBulkDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkDeleteOpen(true)}
+                className={isMobile ? 'text-xs' : ''}
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {t('delete_old') || 'Delete old'}
+              </Button>
+            )}
+            <Button asChild size="sm" className={isMobile ? 'text-xs' : ''}>
+              <Link to={createLocalizedPath("/broken-parts/new")}>
+                <Plus className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {t('report_broken_part')}
+              </Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className={isMobile ? 'px-3' : ''}>
           {brokenParts.length > 0 ? (
@@ -423,6 +436,49 @@ const BrokenPartsList: React.FC = () => {
         onOpenChange={(open) => !open && setSelectedBrokenPart(null)}
         brokenPart={selectedBrokenPart}
       />
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('delete_old_broken_parts') || 'Delete old broken parts'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('delete_old_broken_parts_desc') || 'All broken parts older than the selected age will be permanently removed.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <RadioGroup
+            value={bulkDeleteRange}
+            onValueChange={(v) => setBulkDeleteRange(v as any)}
+            className="space-y-2 py-2"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="1m" id="bp-1m" />
+              <Label htmlFor="bp-1m">{t('older_than_1_month') || 'Older than 1 month'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="6m" id="bp-6m" />
+              <Label htmlFor="bp-6m">{t('older_than_6_months') || 'Older than 6 months'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="1y" id="bp-1y" />
+              <Label htmlFor="bp-1y">{t('older_than_1_year') || 'Older than 1 year'}</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="2y" id="bp-2y" />
+              <Label htmlFor="bp-2y">{t('older_than_2_years') || 'Older than 2 years'}</Label>
+            </div>
+          </RadioGroup>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>{t('cancel') || 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : (t('delete') || 'Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
