@@ -557,10 +557,15 @@ const Projects = () => {
                     setExternalDialogOpen(true);
                     loadExternalUnassigned();
                   }}
-                  className="rounded-xl"
+                  className="rounded-xl relative"
                 >
                   <Database className="mr-2 h-4 w-4" />
                   {t('external_unassigned') || 'Externe projecten'}
+                  {externalCount > 0 && (
+                    <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
+                      {externalCount}
+                    </span>
+                  )}
                 </Button>
               )}
               {isAdmin && (
