@@ -161,6 +161,8 @@ const BrokenPartsList: React.FC = () => {
       setBulkDeleting(false);
     }
   };
+
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
