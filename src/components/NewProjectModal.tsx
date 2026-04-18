@@ -477,9 +477,14 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 form.setValue('client', order.klant);
               }
 
-              // Fill project name from order if available
-              if (order.projectnaam) {
-                form.setValue('project_name', order.projectnaam);
+              // Build project name as "<client>_<reference>" with spaces -> underscores
+              const clientPart = (order.klant || '').toString().trim();
+              const refPart = (order.referentie || order.reference || '').toString().trim();
+              const combined = [clientPart, refPart].filter(Boolean).join(' ');
+              if (combined) {
+                form.setValue('project_name', combined.replace(/\s+/g, '_'));
+              } else if (order.projectnaam) {
+                form.setValue('project_name', String(order.projectnaam).replace(/\s+/g, '_'));
               }
 
               // Fill start date from order date (besteldatum)
