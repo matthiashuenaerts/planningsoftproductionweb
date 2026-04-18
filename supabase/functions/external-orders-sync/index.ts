@@ -169,11 +169,11 @@ async function syncTenant(supabase: any, tenantId: string) {
     for (const rec of records) {
       const fd = rec.fieldData || {};
       const ordernummer = String(
-        pick(fd, "ordernummer", "OrderNumber", "order_number", "ordernr", "nummer") ?? "",
+        pick(fd, "ordernummer", "volgnummer", "OrderNumber", "order_number", "ordernr", "nummer") ?? "",
       ).trim();
       if (!ordernummer) { skippedNoOrderNum++; continue; }
       if (seen.has(ordernummer)) continue;
-      const orderdatumRaw = pick(fd, "orderdatum", "order_date", "datum") ?? "";
+      const orderdatumRaw = pick(fd, "orderdatum", "datum", "order_date") ?? "";
       const d = parseDate(String(orderdatumRaw));
       // Only filter when we successfully parsed a date AND it falls outside the window.
       // Records with unknown/empty dates are kept (better to show too many than zero).
