@@ -80,6 +80,7 @@ const Projects = () => {
       });
       if (error) throw error;
       setExternalProjects(data?.projects || []);
+      setExternalCount((data?.projects || []).length);
       setExternalLastSync(data?.last_sync_at || null);
     } catch (err: any) {
       toast({
