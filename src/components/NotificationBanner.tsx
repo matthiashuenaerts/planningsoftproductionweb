@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
-
+const dismissedBannerIds = new Set<string>();
+const surfacedBannerIds = new Set<string>();
 
 const NotificationBanner = () => {
   const { currentEmployee } = useAuth();
@@ -18,8 +18,8 @@ const NotificationBanner = () => {
   const navigate = useNavigate();
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const [isExiting, setIsExiting] = useState(false);
-  
   const { showNotification } = useNativeNotifications();
+  const initializedEmployeeIdRef = useRef<string | null>(null);
 
   const { data: notifications, isSuccess } = useQuery({
     queryKey: ['notifications', currentEmployee?.id],
@@ -40,56 +40,96 @@ const NotificationBanner = () => {
   }, [currentEmployee?.id, queryClient]);
 
   useEffect(() => {
-    if (isSuccess && notifications) {
-      const unread = notifications.filter(n => !n.read);
-      if (unread.length > 0) {
-        const latest = unread.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-        if (latest.id !== latestUnread?.id) {
-          setLatestUnread(latest);
-          setIsExiting(false);
-          
-          showNotification('AutoMattiOn Compass', latest.message, latest.id);
-        }
-      } else {
-        setLatestUnread(null);
-      }
+    if (!currentEmployee?.id) {
+      initializedEmployeeIdRef.current = null;
+      return;
     }
-  }, [notifications, isSuccess, latestUnread?.id, showNotification]);
 
-  // No auto-dismiss — notification stays until manually closed with X
+    if (initializedEmployeeIdRef.current !== currentEmployee.id && notifications) {
+      initializedEmployeeIdRef.current = currentEmployee.id;
+      dismissedBannerIds.clear();
+      surfacedBannerIds.clear();
+      notifications.filter((n) => !n.read).forEach((n) => surfacedBannerIds.add(n.id));
+      setLatestUnread(null);
+      setIsExiting(false);
+    }
+  }, [currentEmployee?.id, notifications]);
 
-  const triggerClose = useCallback(() => {
-    setIsExiting(true);
-    setTimeout(() => {
-      if (latestUnread) {
-        notificationService.markAsRead(latestUnread.id);
-        const currentLatestId = latestUnread.id;
+  useEffect(() => {
+    const unreadIds = new Set((notifications ?? []).filter((n) => !n.read).map((n) => n.id));
+    dismissedBannerIds.forEach((id) => {
+      if (!unreadIds.has(id)) dismissedBannerIds.delete(id);
+    });
+    surfacedBannerIds.forEach((id) => {
+      if (!unreadIds.has(id)) surfacedBannerIds.delete(id);
+    });
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!isSuccess || !notifications || !currentEmployee?.id) return;
+
+    const unread = [...notifications]
+      .filter((n) => !n.read)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const nextUnread = unread.find((n) => !dismissedBannerIds.has(n.id) && !surfacedBannerIds.has(n.id)) ?? null;
+
+    if (!nextUnread) {
+      if (latestUnread && !unread.some((n) => n.id === latestUnread.id)) {
         setLatestUnread(null);
         setIsExiting(false);
-        queryClient.setQueryData(['notifications', currentEmployee?.id], (oldData: Notification[] | undefined) => {
-          return oldData ? oldData.map(n => n.id === currentLatestId ? { ...n, read: true } : n) : [];
-        });
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
       }
+      return;
+    }
+
+    surfacedBannerIds.add(nextUnread.id);
+    setLatestUnread(nextUnread);
+    setIsExiting(false);
+    showNotification('AutoMattiOn Compass', nextUnread.message, nextUnread.id);
+  }, [notifications, isSuccess, currentEmployee?.id, latestUnread, showNotification]);
+
+  const dismissBanner = useCallback((notificationId: string) => {
+    dismissedBannerIds.add(notificationId);
+    setIsExiting(true);
+    window.setTimeout(() => {
+      setLatestUnread((current) => (current?.id === notificationId ? null : current));
+      setIsExiting(false);
     }, 300);
-  }, [latestUnread, currentEmployee?.id, queryClient]);
+  }, []);
+
+  const consumeNotification = useCallback((notification: Notification) => {
+    dismissedBannerIds.delete(notification.id);
+    surfacedBannerIds.delete(notification.id);
+    setLatestUnread((current) => (current?.id === notification.id ? null : current));
+    setIsExiting(false);
+
+    queryClient.setQueryData(['notifications', currentEmployee?.id], (oldData: Notification[] | undefined) => {
+      return oldData ? oldData.filter((n) => n.id !== notification.id) : [];
+    });
+    queryClient.invalidateQueries({ queryKey: ['notifications-unread-count', 'navbar', currentEmployee?.id] });
+
+    void notificationService.deleteNotification(notification.id).finally(() => {
+      queryClient.invalidateQueries({ queryKey: ['notifications', currentEmployee?.id] });
+    });
+  }, [currentEmployee?.id, queryClient]);
 
   const handleClose = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    triggerClose();
+    if (latestUnread) dismissBanner(latestUnread.id);
   };
 
   const handleClick = () => {
-    if (latestUnread) {
-      if (latestUnread.rush_order_id) {
-        navigate(createLocalizedPath(`/rush-orders/${latestUnread.rush_order_id}`));
-      } else if (latestUnread.link) {
-        navigate(createLocalizedPath(latestUnread.link));
-      } else {
-        navigate(createLocalizedPath('/notes-and-tasks'));
-      }
-      handleClose();
+    if (!latestUnread) return;
+
+    if (latestUnread.rush_order_id) {
+      navigate(createLocalizedPath(`/rush-orders/${latestUnread.rush_order_id}`));
+    } else if (latestUnread.link) {
+      navigate(createLocalizedPath(latestUnread.link));
+    } else {
+      navigate(createLocalizedPath('/notes-and-tasks'));
     }
+
+    consumeNotification(latestUnread);
   };
 
   const getTimeAgo = (dateStr: string) => {
@@ -104,7 +144,7 @@ const NotificationBanner = () => {
 
   if (!latestUnread) return null;
 
-  const unreadCount = notifications?.filter(n => !n.read).length || 0;
+  const unreadCount = notifications?.filter((n) => !n.read).length || 0;
 
   return (
     <div
@@ -117,15 +157,12 @@ const NotificationBanner = () => {
       role="alert"
     >
       <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-card shadow-2xl shadow-primary/10 backdrop-blur-sm">
-
         <div className="p-4 pt-5">
           <div className="flex items-start gap-3">
-            {/* Icon */}
             <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
               <Bell className="h-5 w-5 text-primary animate-in zoom-in-50 duration-500" />
             </div>
 
-            {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <p className="text-xs font-semibold text-primary uppercase tracking-wide">
@@ -149,7 +186,6 @@ const NotificationBanner = () => {
               )}
             </div>
 
-            {/* Close */}
             <Button
               variant="ghost"
               size="icon"
