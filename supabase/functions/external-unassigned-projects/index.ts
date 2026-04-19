@@ -65,12 +65,12 @@ serve(async (req) => {
       `[unassigned] tenant=${tenant_id} existing_links=${existingLinkIds.size}`,
     );
 
-    // Read from buffer (excluding rows hidden by the team)
+    // Read from buffer and exclude hidden rows server-side
     const { data: buffer, error: bufErr } = await supabase
       .from("external_orders_buffer")
       .select("*")
       .eq("tenant_id", tenant_id)
-      .eq("hidden", false)
+      .not("hidden", "is", true)
       .order("orderdatum", { ascending: false })
       .limit(5000);
     if (bufErr) {
@@ -86,6 +86,7 @@ serve(async (req) => {
       .maybeSingle();
 
     const projects = (buffer || [])
+      .filter((r: any) => r.hidden !== true)
       .filter((r: any) => !existingLinkIds.has(String(r.ordernummer).trim()))
       .map((r: any) => ({
         ordernummer: r.ordernummer,
@@ -98,6 +99,7 @@ serve(async (req) => {
         adres: r.adres ?? "",
         plaatsingsdatum: r.plaatsingsdatum ?? "",
         orderverwerker: r.orderverwerker ?? "",
+        hidden: r.hidden === true,
       }));
 
     return new Response(
