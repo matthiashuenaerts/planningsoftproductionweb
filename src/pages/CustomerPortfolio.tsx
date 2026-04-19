@@ -17,6 +17,7 @@ import { customerService, Customer } from '@/services/customerService';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useDrawerLayout } from '@/hooks/useDrawerLayout';
+import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog';
 
 const CustomerPortfolio: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const CustomerPortfolio: React.FC = () => {
   const [customerProjects, setCustomerProjects] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   
   // Form state with individual fields to avoid re-render issues
   const [formName, setFormName] = useState('');
@@ -89,6 +91,7 @@ const CustomerPortfolio: React.FC = () => {
 
   const handleSelectCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
+    setShowDetailDialog(true);
     await loadCustomerProjects(customer.id);
   };
 
@@ -326,6 +329,8 @@ const CustomerPortfolio: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Detail Dialog (full info + projects + costing) */}
+      <CustomerDetailDialog open={showDetailDialog} onOpenChange={setShowDetailDialog} customer={selectedCustomer} />
     </div>
   );
 };
