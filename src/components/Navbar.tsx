@@ -70,6 +70,12 @@ const NavbarContent = ({
   const totalUnreadMessages = rushOrders?.reduce((total, order) => {
     return total + (order.unread_messages_count || 0);
   }, 0) || 0;
+  const { data: unreadNotificationsCount = 0 } = useQuery({
+    queryKey: ['notifications-unread-count', 'navbar', currentEmployee?.id],
+    queryFn: () => notificationService.getUnreadCount(currentEmployee!.id),
+    enabled: !!currentEmployee?.id,
+    refetchInterval: 15000,
+  });
 
   const handleItemClick = () => {
     if (onItemClick) {
@@ -282,8 +288,15 @@ const NavbarContent = ({
             <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/15 shrink-0">
               <User className="w-4 h-4 text-white/80" />
             </div>
-            <span className="flex-1 text-xs font-medium truncate text-white/80">{currentEmployee.name}</span>
-            <UserMenu />
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <span className="text-xs font-medium truncate text-white/80">{currentEmployee.name}</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shrink-0">
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </span>
+              )}
+            </div>
+            <UserMenu unreadCount={unreadNotificationsCount} />
           </div>
         )}
 
