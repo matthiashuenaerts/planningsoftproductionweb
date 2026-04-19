@@ -605,14 +605,11 @@ const Projects = () => {
                 >
                   <Database className="mr-2 h-4 w-4" />
                   {t('external_unassigned') || 'Externe projecten'}
-                  {(() => {
-                    const visibleCount = Math.max(0, externalCount - hiddenExternal.size);
-                    return visibleCount > 0 ? (
-                      <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
-                        {visibleCount}
-                      </span>
-                    ) : null;
-                  })()}
+                  {externalCount > 0 && (
+                    <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
+                      {externalCount}
+                    </span>
+                  )}
                 </Button>
               )}
               {isAdmin && (
