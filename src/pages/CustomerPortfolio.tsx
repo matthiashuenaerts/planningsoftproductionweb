@@ -91,6 +91,7 @@ const CustomerPortfolio: React.FC = () => {
 
   const handleSelectCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
+    setShowDetailDialog(true);
     await loadCustomerProjects(customer.id);
   };
 
@@ -328,6 +329,8 @@ const CustomerPortfolio: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Detail Dialog (full info + projects + costing) */}
+      <CustomerDetailDialog open={showDetailDialog} onOpenChange={setShowDetailDialog} customer={selectedCustomer} />
     </div>
   );
 };
