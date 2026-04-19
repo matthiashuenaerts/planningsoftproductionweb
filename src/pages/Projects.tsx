@@ -891,7 +891,6 @@ const Projects = () => {
             ) : (
               <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
                 {externalProjects
-                  .filter(p => !hiddenExternal.has(String(p.ordernummer)))
                   .filter(p => {
                     if (!externalSearch) return true;
                     const q = externalSearch.toLowerCase();
@@ -967,16 +966,16 @@ const Projects = () => {
                   : t('never_synced') || 'Never synced'}
               </span>
               <div className="flex items-center gap-3">
-                {hiddenExternal.size > 0 && (
+                {hiddenCount > 0 && (
                   <button
                     type="button"
                     onClick={restoreHiddenExternal}
                     className="underline hover:text-foreground"
                   >
-                    {t('restore_hidden') || 'Restore hidden'} ({hiddenExternal.size})
+                    {t('restore_hidden') || 'Restore hidden'} ({hiddenCount})
                   </button>
                 )}
-                <span>{externalProjects.filter(p => !hiddenExternal.has(String(p.ordernummer))).length} {t('results')}</span>
+                <span>{externalProjects.length} {t('results')}</span>
                 <Button size="sm" variant="outline" onClick={handleRefreshExternal} disabled={externalLoading} className="h-7 text-xs">
                   {externalLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : (t('refresh') || 'Refresh')}
                 </Button>
