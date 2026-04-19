@@ -1766,6 +1766,7 @@ export type Database = {
           adres: string | null
           beschrijving: string | null
           fetched_at: string
+          hidden: boolean
           id: string
           klant: string | null
           klantnummer: string | null
@@ -1782,6 +1783,7 @@ export type Database = {
           adres?: string | null
           beschrijving?: string | null
           fetched_at?: string
+          hidden?: boolean
           id?: string
           klant?: string | null
           klantnummer?: string | null
@@ -1798,6 +1800,7 @@ export type Database = {
           adres?: string | null
           beschrijving?: string | null
           fetched_at?: string
+          hidden?: boolean
           id?: string
           klant?: string | null
           klantnummer?: string | null

@@ -206,9 +206,23 @@ async function syncTenant(supabase: any, tenantId: string) {
       );
     }
 
+    // Snapshot hidden ordernummers so we can preserve the team's hide preferences across re-sync
+    const { data: hiddenRows } = await supabase
+      .from("external_orders_buffer")
+      .select("ordernummer")
+      .eq("tenant_id", tenantId)
+      .eq("hidden", true);
+    const hiddenOrderNums = new Set(
+      (hiddenRows || []).map((r: any) => String(r.ordernummer)),
+    );
+
     // Replace this tenant's buffer atomically
     await supabase.from("external_orders_buffer").delete().eq("tenant_id", tenantId);
     if (rows.length > 0) {
+      // Re-apply hidden flag for known ordernummers
+      for (const r of rows) {
+        if (hiddenOrderNums.has(String(r.ordernummer))) (r as any).hidden = true;
+      }
       // Insert in chunks to stay safe with payload size
       const CHUNK = 500;
       for (let i = 0; i < rows.length; i += CHUNK) {

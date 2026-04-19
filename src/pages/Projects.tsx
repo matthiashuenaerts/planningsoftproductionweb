@@ -55,31 +55,49 @@ const Projects = () => {
   const [externalLastSync, setExternalLastSync] = useState<string | null>(null);
   const [prefillLinkId, setPrefillLinkId] = useState<string | null>(null);
   const [externalCount, setExternalCount] = useState<number>(0);
-  const hiddenStorageKey = tenant?.id ? `hidden_external_projects_${tenant.id}` : '';
-  const [hiddenExternal, setHiddenExternal] = useState<Set<string>>(new Set());
+  const [hiddenCount, setHiddenCount] = useState<number>(0);
 
-  useEffect(() => {
-    if (!hiddenStorageKey) return;
-    try {
-      const raw = localStorage.getItem(hiddenStorageKey);
-      setHiddenExternal(new Set(raw ? JSON.parse(raw) : []));
-    } catch {
-      setHiddenExternal(new Set());
-    }
-  }, [hiddenStorageKey]);
-
-  const hideExternalProject = (ordernummer: string) => {
-    setHiddenExternal(prev => {
-      const next = new Set(prev);
-      next.add(String(ordernummer));
-      if (hiddenStorageKey) localStorage.setItem(hiddenStorageKey, JSON.stringify(Array.from(next)));
-      return next;
-    });
+  const loadHiddenCount = async () => {
+    if (!tenant?.id) return;
+    const { count } = await supabase
+      .from('external_orders_buffer')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant.id)
+      .eq('hidden', true);
+    setHiddenCount(count || 0);
   };
 
-  const restoreHiddenExternal = () => {
-    setHiddenExternal(new Set());
-    if (hiddenStorageKey) localStorage.removeItem(hiddenStorageKey);
+  const hideExternalProject = async (ordernummer: string) => {
+    if (!tenant?.id) return;
+    // Optimistic UI: drop it from the list immediately
+    setExternalProjects(prev => prev.filter(p => String(p.ordernummer) !== String(ordernummer)));
+    setExternalCount(c => Math.max(0, c - 1));
+    setHiddenCount(c => c + 1);
+    const { error } = await supabase
+      .from('external_orders_buffer')
+      .update({ hidden: true })
+      .eq('tenant_id', tenant.id)
+      .eq('ordernummer', String(ordernummer));
+    if (error) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+      await loadExternalUnassigned();
+      await loadHiddenCount();
+    }
+  };
+
+  const restoreHiddenExternal = async () => {
+    if (!tenant?.id) return;
+    const { error } = await supabase
+      .from('external_orders_buffer')
+      .update({ hidden: false })
+      .eq('tenant_id', tenant.id)
+      .eq('hidden', true);
+    if (error) {
+      toast({ title: t('error'), description: error.message, variant: 'destructive' });
+      return;
+    }
+    setHiddenCount(0);
+    await loadExternalUnassigned();
   };
 
   // Check if tenant has external database configured
@@ -582,19 +600,17 @@ const Projects = () => {
                   onClick={() => {
                     setExternalDialogOpen(true);
                     loadExternalUnassigned();
+                    loadHiddenCount();
                   }}
                   className="rounded-xl relative"
                 >
                   <Database className="mr-2 h-4 w-4" />
                   {t('external_unassigned') || 'Externe projecten'}
-                  {(() => {
-                    const visibleCount = Math.max(0, externalCount - hiddenExternal.size);
-                    return visibleCount > 0 ? (
-                      <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
-                        {visibleCount}
-                      </span>
-                    ) : null;
-                  })()}
+                  {externalCount > 0 && (
+                    <span className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-md">
+                      {externalCount}
+                    </span>
+                  )}
                 </Button>
               )}
               {isAdmin && (
@@ -876,7 +892,6 @@ const Projects = () => {
             ) : (
               <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
                 {externalProjects
-                  .filter(p => !hiddenExternal.has(String(p.ordernummer)))
                   .filter(p => {
                     if (!externalSearch) return true;
                     const q = externalSearch.toLowerCase();
@@ -952,16 +967,16 @@ const Projects = () => {
                   : t('never_synced') || 'Never synced'}
               </span>
               <div className="flex items-center gap-3">
-                {hiddenExternal.size > 0 && (
+                {hiddenCount > 0 && (
                   <button
                     type="button"
                     onClick={restoreHiddenExternal}
                     className="underline hover:text-foreground"
                   >
-                    {t('restore_hidden') || 'Restore hidden'} ({hiddenExternal.size})
+                    {t('restore_hidden') || 'Restore hidden'} ({hiddenCount})
                   </button>
                 )}
-                <span>{externalProjects.filter(p => !hiddenExternal.has(String(p.ordernummer))).length} {t('results')}</span>
+                <span>{externalProjects.length} {t('results')}</span>
                 <Button size="sm" variant="outline" onClick={handleRefreshExternal} disabled={externalLoading} className="h-7 text-xs">
                   {externalLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : (t('refresh') || 'Refresh')}
                 </Button>

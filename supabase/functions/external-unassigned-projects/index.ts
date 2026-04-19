@@ -65,12 +65,14 @@ serve(async (req) => {
       `[unassigned] tenant=${tenant_id} existing_links=${existingLinkIds.size}`,
     );
 
-    // Read from buffer
+    // Read from buffer (excluding rows hidden by the team)
     const { data: buffer, error: bufErr } = await supabase
       .from("external_orders_buffer")
       .select("*")
       .eq("tenant_id", tenant_id)
-      .order("orderdatum", { ascending: false });
+      .eq("hidden", false)
+      .order("orderdatum", { ascending: false })
+      .limit(5000);
     if (bufErr) {
       console.error("[unassigned] buffer err", bufErr);
       throw bufErr;
