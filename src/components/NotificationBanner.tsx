@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
 const dismissedBannerIds = new Set<string>();
+const surfacedBannerIds = new Set<string>();
 
 const NotificationBanner = () => {
   const { currentEmployee } = useAuth();
@@ -18,6 +19,7 @@ const NotificationBanner = () => {
   const [latestUnread, setLatestUnread] = useState<Notification | null>(null);
   const [isExiting, setIsExiting] = useState(false);
   const { showNotification } = useNativeNotifications();
+  const initializedEmployeeIdRef = useRef<string | null>(null);
 
   const { data: notifications, isSuccess } = useQuery({
     queryKey: ['notifications', currentEmployee?.id],
@@ -38,20 +40,39 @@ const NotificationBanner = () => {
   }, [currentEmployee?.id, queryClient]);
 
   useEffect(() => {
+    if (!currentEmployee?.id) {
+      initializedEmployeeIdRef.current = null;
+      return;
+    }
+
+    if (initializedEmployeeIdRef.current !== currentEmployee.id && notifications) {
+      initializedEmployeeIdRef.current = currentEmployee.id;
+      dismissedBannerIds.clear();
+      surfacedBannerIds.clear();
+      notifications.filter((n) => !n.read).forEach((n) => surfacedBannerIds.add(n.id));
+      setLatestUnread(null);
+      setIsExiting(false);
+    }
+  }, [currentEmployee?.id, notifications]);
+
+  useEffect(() => {
     const unreadIds = new Set((notifications ?? []).filter((n) => !n.read).map((n) => n.id));
     dismissedBannerIds.forEach((id) => {
       if (!unreadIds.has(id)) dismissedBannerIds.delete(id);
     });
+    surfacedBannerIds.forEach((id) => {
+      if (!unreadIds.has(id)) surfacedBannerIds.delete(id);
+    });
   }, [notifications]);
 
   useEffect(() => {
-    if (!isSuccess || !notifications) return;
+    if (!isSuccess || !notifications || !currentEmployee?.id) return;
 
     const unread = [...notifications]
       .filter((n) => !n.read)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    const nextUnread = unread.find((n) => !dismissedBannerIds.has(n.id)) ?? null;
+    const nextUnread = unread.find((n) => !dismissedBannerIds.has(n.id) && !surfacedBannerIds.has(n.id)) ?? null;
 
     if (!nextUnread) {
       if (latestUnread && !unread.some((n) => n.id === latestUnread.id)) {
@@ -61,12 +82,11 @@ const NotificationBanner = () => {
       return;
     }
 
-    if (nextUnread.id !== latestUnread?.id) {
-      setLatestUnread(nextUnread);
-      setIsExiting(false);
-      showNotification('AutoMattiOn Compass', nextUnread.message, nextUnread.id);
-    }
-  }, [notifications, isSuccess, latestUnread?.id, showNotification]);
+    surfacedBannerIds.add(nextUnread.id);
+    setLatestUnread(nextUnread);
+    setIsExiting(false);
+    showNotification('AutoMattiOn Compass', nextUnread.message, nextUnread.id);
+  }, [notifications, isSuccess, currentEmployee?.id, latestUnread, showNotification]);
 
   const dismissBanner = useCallback((notificationId: string) => {
     dismissedBannerIds.add(notificationId);
@@ -79,6 +99,7 @@ const NotificationBanner = () => {
 
   const consumeNotification = useCallback((notification: Notification) => {
     dismissedBannerIds.delete(notification.id);
+    surfacedBannerIds.delete(notification.id);
     setLatestUnread((current) => (current?.id === notification.id ? null : current));
     setIsExiting(false);
 
