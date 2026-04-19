@@ -17,6 +17,7 @@ import { customerService, Customer } from '@/services/customerService';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useDrawerLayout } from '@/hooks/useDrawerLayout';
+import { CustomerDetailDialog } from '@/components/customers/CustomerDetailDialog';
 
 const CustomerPortfolio: React.FC = () => {
   const navigate = useNavigate();
