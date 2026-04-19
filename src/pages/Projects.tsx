@@ -600,6 +600,7 @@ const Projects = () => {
                   onClick={() => {
                     setExternalDialogOpen(true);
                     loadExternalUnassigned();
+                    loadHiddenCount();
                   }}
                   className="rounded-xl relative"
                 >
