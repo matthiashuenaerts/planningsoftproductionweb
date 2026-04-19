@@ -67,22 +67,47 @@ const Projects = () => {
     setHiddenCount(count || 0);
   };
 
+  const loadExternalUnassigned = async () => {
+    if (!tenant?.id) return;
+    setExternalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('external-unassigned-projects', {
+        body: { tenant_id: tenant.id },
+      });
+      if (error) throw error;
+
+      const visibleProjects = Array.isArray(data?.projects)
+        ? data.projects.filter((project: any) => project?.hidden !== true)
+        : [];
+
+      setExternalProjects(visibleProjects);
+      setExternalCount(typeof data?.count === 'number' ? data.count : visibleProjects.length);
+      setExternalLastSync(data?.last_sync_at || null);
+    } catch (err: any) {
+      toast({
+        title: t('error'),
+        description: err.message || 'Failed to load external projects',
+        variant: 'destructive',
+      });
+    } finally {
+      setExternalLoading(false);
+    }
+  };
+
   const hideExternalProject = async (ordernummer: string) => {
     if (!tenant?.id) return;
-    // Optimistic UI: drop it from the list immediately
-    setExternalProjects(prev => prev.filter(p => String(p.ordernummer) !== String(ordernummer)));
-    setExternalCount(c => Math.max(0, c - 1));
-    setHiddenCount(c => c + 1);
     const { error } = await supabase
       .from('external_orders_buffer')
       .update({ hidden: true })
       .eq('tenant_id', tenant.id)
       .eq('ordernummer', String(ordernummer));
+
     if (error) {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
-      await loadExternalUnassigned();
-      await loadHiddenCount();
+      return;
     }
+
+    await Promise.all([loadExternalUnassigned(), loadHiddenCount()]);
   };
 
   const restoreHiddenExternal = async () => {
@@ -96,8 +121,7 @@ const Projects = () => {
       toast({ title: t('error'), description: error.message, variant: 'destructive' });
       return;
     }
-    setHiddenCount(0);
-    await loadExternalUnassigned();
+    await Promise.all([loadExternalUnassigned(), loadHiddenCount()]);
   };
 
   // Check if tenant has external database configured
@@ -113,40 +137,11 @@ const Projects = () => {
       const hasConfig = !!(data && data.length > 0);
       setHasExternalConfig(hasConfig);
       if (hasConfig) {
-        try {
-          const { data: res } = await supabase.functions.invoke('external-unassigned-projects', {
-            body: { tenant_id: tenant.id },
-          });
-          setExternalCount((res?.projects || []).length);
-        } catch (e) {
-          // silent
-        }
+        await Promise.all([loadExternalUnassigned(), loadHiddenCount()]);
       }
     };
     checkExternalConfig();
   }, [tenant?.id]);
-
-  const loadExternalUnassigned = async () => {
-    if (!tenant?.id) return;
-    setExternalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('external-unassigned-projects', {
-        body: { tenant_id: tenant.id },
-      });
-      if (error) throw error;
-      setExternalProjects(data?.projects || []);
-      setExternalCount((data?.projects || []).length);
-      setExternalLastSync(data?.last_sync_at || null);
-    } catch (err: any) {
-      toast({
-        title: t('error'),
-        description: err.message || 'Failed to load external projects',
-        variant: 'destructive',
-      });
-    } finally {
-      setExternalLoading(false);
-    }
-  };
 
   const handleRefreshExternal = async () => {
     if (!tenant?.id) return;
