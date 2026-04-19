@@ -873,6 +873,7 @@ const Projects = () => {
             ) : (
               <div className="max-h-[55vh] overflow-y-auto border rounded-lg divide-y">
                 {externalProjects
+                  .filter(p => !hiddenExternal.has(String(p.ordernummer)))
                   .filter(p => {
                     if (!externalSearch) return true;
                     const q = externalSearch.toLowerCase();
@@ -882,49 +883,62 @@ const Projects = () => {
                       String(p.beschrijving || '').toLowerCase().includes(q)
                     );
                   })
+                  .sort((a, b) => String(a.ordernummer).localeCompare(String(b.ordernummer), undefined, { numeric: true, sensitivity: 'base' }))
                   .map((project, idx) => (
-                    <button
+                    <div
                       key={idx}
-                      type="button"
-                      onClick={() => handleCreateFromExternal(project.ordernummer)}
-                      className="w-full text-left px-4 py-3 hover:bg-accent transition-colors focus:outline-none focus:bg-accent"
+                      className="w-full flex items-stretch hover:bg-accent transition-colors group"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-foreground">
-                              #{project.ordernummer}
-                            </span>
-                            {project.ordertype && (
-                              <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                                {project.ordertype}
+                      <button
+                        type="button"
+                        onClick={() => handleCreateFromExternal(project.ordernummer)}
+                        className="flex-1 text-left px-4 py-3 focus:outline-none"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm text-foreground">
+                                #{project.ordernummer}
                               </span>
+                              {project.ordertype && (
+                                <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                                  {project.ordertype}
+                                </span>
+                              )}
+                            </div>
+                            {project.klant && (
+                              <div className="text-xs font-medium text-foreground/80 truncate mt-1">{project.klant}</div>
+                            )}
+                            {(project.referentie || project.beschrijving) && (
+                              <div className="text-xs text-muted-foreground truncate mt-0.5">
+                                {project.referentie || project.beschrijving}
+                              </div>
+                            )}
+                            {project.adres && (
+                              <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.adres}</div>
                             )}
                           </div>
-                          {project.klant && (
-                            <div className="text-xs font-medium text-foreground/80 truncate mt-1">{project.klant}</div>
-                          )}
-                          {(project.referentie || project.beschrijving) && (
-                            <div className="text-xs text-muted-foreground truncate mt-0.5">
-                              {project.referentie || project.beschrijving}
+                          <div className="text-right shrink-0">
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                              {project.orderdatum || '—'}
                             </div>
-                          )}
-                          {project.adres && (
-                            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{project.adres}</div>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs text-muted-foreground whitespace-nowrap">
-                            {project.orderdatum || '—'}
+                            {project.orderverwerker && (
+                              <div className="text-[10px] text-muted-foreground/70 mt-1 whitespace-nowrap">
+                                {project.orderverwerker}
+                              </div>
+                            )}
                           </div>
-                          {project.orderverwerker && (
-                            <div className="text-[10px] text-muted-foreground/70 mt-1 whitespace-nowrap">
-                              {project.orderverwerker}
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    </button>
+                      </button>
+                      <button
+                        type="button"
+                        title={t('hide') || 'Hide'}
+                        onClick={(e) => { e.stopPropagation(); hideExternalProject(project.ordernummer); }}
+                        className="px-3 flex items-center justify-center text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   ))}
               </div>
             )}
@@ -935,7 +949,16 @@ const Projects = () => {
                   : t('never_synced') || 'Never synced'}
               </span>
               <div className="flex items-center gap-3">
-                <span>{externalProjects.length} {t('results')}</span>
+                {hiddenExternal.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={restoreHiddenExternal}
+                    className="underline hover:text-foreground"
+                  >
+                    {t('restore_hidden') || 'Restore hidden'} ({hiddenExternal.size})
+                  </button>
+                )}
+                <span>{externalProjects.filter(p => !hiddenExternal.has(String(p.ordernummer))).length} {t('results')}</span>
                 <Button size="sm" variant="outline" onClick={handleRefreshExternal} disabled={externalLoading} className="h-7 text-xs">
                   {externalLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : (t('refresh') || 'Refresh')}
                 </Button>
