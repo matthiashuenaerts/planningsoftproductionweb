@@ -52,13 +52,17 @@ serve(async (req) => {
     );
 
     // Existing project link IDs for this tenant
-    const { data: existing } = await supabase
+    const { data: existing, error: existErr } = await supabase
       .from("projects")
       .select("project_link_id")
       .eq("tenant_id", tenant_id)
       .not("project_link_id", "is", null);
+    if (existErr) console.error("[unassigned] existing err", existErr);
     const existingLinkIds = new Set(
       (existing || []).map((p: any) => String(p.project_link_id).trim()),
+    );
+    console.log(
+      `[unassigned] tenant=${tenant_id} existing_links=${existingLinkIds.size}`,
     );
 
     // Read from buffer
@@ -67,7 +71,11 @@ serve(async (req) => {
       .select("*")
       .eq("tenant_id", tenant_id)
       .order("orderdatum", { ascending: false });
-    if (bufErr) throw bufErr;
+    if (bufErr) {
+      console.error("[unassigned] buffer err", bufErr);
+      throw bufErr;
+    }
+    console.log(`[unassigned] buffer_rows=${buffer?.length ?? 0}`);
 
     const { data: state } = await supabase
       .from("external_orders_sync_state")
