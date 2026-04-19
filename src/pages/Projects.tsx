@@ -55,6 +55,32 @@ const Projects = () => {
   const [externalLastSync, setExternalLastSync] = useState<string | null>(null);
   const [prefillLinkId, setPrefillLinkId] = useState<string | null>(null);
   const [externalCount, setExternalCount] = useState<number>(0);
+  const hiddenStorageKey = tenant?.id ? `hidden_external_projects_${tenant.id}` : '';
+  const [hiddenExternal, setHiddenExternal] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!hiddenStorageKey) return;
+    try {
+      const raw = localStorage.getItem(hiddenStorageKey);
+      setHiddenExternal(new Set(raw ? JSON.parse(raw) : []));
+    } catch {
+      setHiddenExternal(new Set());
+    }
+  }, [hiddenStorageKey]);
+
+  const hideExternalProject = (ordernummer: string) => {
+    setHiddenExternal(prev => {
+      const next = new Set(prev);
+      next.add(String(ordernummer));
+      if (hiddenStorageKey) localStorage.setItem(hiddenStorageKey, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const restoreHiddenExternal = () => {
+    setHiddenExternal(new Set());
+    if (hiddenStorageKey) localStorage.removeItem(hiddenStorageKey);
+  };
 
   // Check if tenant has external database configured
   useEffect(() => {
