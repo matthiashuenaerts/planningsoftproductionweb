@@ -1,6 +1,4 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 
 export interface Notification {
   id: string;
@@ -20,7 +18,7 @@ export const notificationService = {
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
-        
+
       if (error) throw error;
       return data || [];
     } catch (error: any) {
@@ -28,7 +26,7 @@ export const notificationService = {
       return [];
     }
   },
-  
+
   async getUnreadCount(userId: string): Promise<number> {
     try {
       const { count, error } = await supabase
@@ -36,7 +34,7 @@ export const notificationService = {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('read', false);
-        
+
       if (error) throw error;
       return count || 0;
     } catch (error: any) {
@@ -44,14 +42,14 @@ export const notificationService = {
       return 0;
     }
   },
-  
+
   async markAsRead(notificationId: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId);
-        
+
       if (error) throw error;
       return true;
     } catch (error: any) {
@@ -59,7 +57,7 @@ export const notificationService = {
       return false;
     }
   },
-  
+
   async markAllAsRead(userId: string): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -67,7 +65,7 @@ export const notificationService = {
         .update({ read: true })
         .eq('user_id', userId)
         .eq('read', false);
-        
+
       if (error) throw error;
       return true;
     } catch (error: any) {
@@ -75,19 +73,19 @@ export const notificationService = {
       return false;
     }
   },
-  
+
   async deleteNotification(notificationId: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('notifications')
         .delete()
         .eq('id', notificationId);
-        
+
       if (error) throw error;
       return true;
     } catch (error: any) {
       console.error('Error deleting notification:', error);
       return false;
     }
-  }
+  },
 };
