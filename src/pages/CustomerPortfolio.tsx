@@ -34,6 +34,7 @@ const CustomerPortfolio: React.FC = () => {
   const [customerProjects, setCustomerProjects] = useState<any[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   
   // Form state with individual fields to avoid re-render issues
   const [formName, setFormName] = useState('');
